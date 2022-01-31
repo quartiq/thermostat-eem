@@ -34,11 +34,6 @@ mod app {
             .map(|()| log::set_max_level(log::LevelFilter::Trace))
             .unwrap();
         info!("---Hello World");
-        (
-            Shared {},
-            // initial values for the `#[local]` resources
-            Local {},
-            init::Monotonics(),
-        )
+        (Shared {}, Local {}, init::Monotonics())
     }
 }
