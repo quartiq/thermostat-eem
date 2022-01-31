@@ -17,22 +17,17 @@ pub use stm32h7xx_hal as hal;
 use log::info;
 
 #[rtic::app(device = hal::stm32, peripherals = true)]
-mod app{
+mod app {
     use super::*;
 
     #[shared]
-    struct Shared {
-
-    }
+    struct Shared {}
 
     #[local]
-    struct Local {
-
-    }
+    struct Local {}
 
     #[init]
     fn init(_c: init::Context) -> (Shared, Local, init::Monotonics) {
-
         static LOGGER: RTTLogger = RTTLogger::new(log::LevelFilter::Trace);
         rtt_target::rtt_init_print!();
         log::set_logger(&LOGGER)
@@ -46,5 +41,4 @@ mod app{
             init::Monotonics(),
         )
     }
-    
 }
