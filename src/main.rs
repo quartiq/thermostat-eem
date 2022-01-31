@@ -26,6 +26,8 @@ mod app {
 
     #[init]
     fn init(c: init::Context) -> (Shared, Local, init::Monotonics) {
+
+        // setup Thermostat hardware
         let mut Thermostat = hardware::setup::setup(c.core, c.device);
 
         (Shared {}, Local {}, init::Monotonics())
