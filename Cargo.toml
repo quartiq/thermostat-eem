@@ -1,0 +1,17 @@
+[package]
+name = "thermostat-eem"
+version = "0.1.0"
+edition = "2021"
+authors = ["SingularitySurfer"]
+
+[dependencies]
+cortex-m = { version = "0.7" }
+cortex-m-rt = { version = "0.7", features = ["device"] }
+stm32h7xx-hal = {version = "0.11.0", features = ["stm32h743v","rt"]}
+panic-halt = "0.2.0"
+log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
+rtt-target = { version = "0.3", features = ["cortex-m"] }
+
+[dependencies.rtt-logger]
+git = "https://github.com/quartiq/rtt-logger.git"
+rev = "70b0eb5"
