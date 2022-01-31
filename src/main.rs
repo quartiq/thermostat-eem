@@ -7,12 +7,13 @@
 #![no_std]
 #![no_main]
 
+pub mod hardware;
+
 extern crate panic_halt;
 pub extern crate stm32h7xx_hal;
 
-// use cortex_m_rt::entry;
+use hardware::hal;
 use rtt_logger::RTTLogger;
-pub use stm32h7xx_hal as hal;
 
 use log::info;
 
