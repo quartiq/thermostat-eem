@@ -1,7 +1,6 @@
-//! # Driver Firmware
+//! # Thermostat_EEM Firmware
 //!
-//! Firmware repository for "Driver", an intelligent, high performance laser current driver.
-//! Driver is a mezzanine module to Stabilizer, on which the firmware is deployed.
+//! Firmware repository for "Thermostat EEM", a multichannel temperature controller.
 //!
 //! This software is currently just the groundwork for the future developments.
 
