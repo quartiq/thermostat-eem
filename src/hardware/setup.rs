@@ -3,6 +3,8 @@ use stm32h7xx_hal::hal::digital::v2::OutputPin;
 
 use super::hal::{gpio::GpioExt, prelude::*};
 
+use super::LEDs;
+
 use log::info;
 pub struct ThermostatDevices {
     pub ph: bool,
@@ -34,9 +36,25 @@ pub fn setup(
     let gpioe = device.GPIOE.split(ccdr.peripheral.GPIOE);
     let gpiog = device.GPIOG.split(ccdr.peripheral.GPIOG);
 
-    let mut leds = [gpiog.pg9.into_push_pull_output()];
+    let mut leds = LEDs {
+        led0: gpiog.pg9.into_push_pull_output(),
+        led1: gpiog.pg10.into_push_pull_output(),
+        led2: gpioe.pe8.into_push_pull_output(),
+        led3: gpioe.pe10.into_push_pull_output(),
+        led4: gpioe.pe12.into_push_pull_output(),
+        led5: gpiog.pg15.into_push_pull_output(),
+        led6: gpioe.pe15.into_push_pull_output(),
+        led7: gpiog.pg8.into_push_pull_output(),
+    };
 
-    leds[0].set_high().unwrap();
+    leds.led0.set_high().unwrap();
+    leds.led1.set_high().unwrap();
+    leds.led2.set_high().unwrap();
+    leds.led3.set_high().unwrap();
+    leds.led4.set_high().unwrap();
+    leds.led5.set_high().unwrap();
+    leds.led6.set_high().unwrap();
+    leds.led7.set_high().unwrap();
 
     (ThermostatDevices { ph: false })
 }
