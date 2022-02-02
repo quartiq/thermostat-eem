@@ -7,6 +7,15 @@ pub use stm32h7xx_hal as hal;
 pub mod setup;
 // pub mod system_timer;
 
+// Thermostat MAC definition
+const SRC_MAC: [u8; 6] = [0x80, 0x1f, 0x12, 0x63, 0x84, 0x1b];
+
+// Number of TX descriptors in the ethernet descriptor ring.
+const TX_DESRING_CNT: usize = 4;
+
+// Number of RX descriptors in the ethernet descriptor ring.
+const RX_DESRING_CNT: usize = 4;
+
 // Front LEDs.
 pub struct LEDs {
     led0: hal::gpio::gpiog::PG9<hal::gpio::Output<hal::gpio::PushPull>>,
