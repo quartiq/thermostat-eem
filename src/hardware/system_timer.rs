@@ -1,3 +1,4 @@
+use embedded_time::{clock::Error, fraction::Fraction, Clock, Instant};
 ///! System timer used for RTIC scheduling
 ///!
 ///! # Design
@@ -6,10 +7,6 @@
 ///! than the CPU clock. This allows for longer scheduling periods with less resolution. This is
 ///! needed for infrequent (e.g. multiple second) telemetry periods.
 use hal::prelude::*;
-use rtic::{
-    time::{clock::Error, fraction::Fraction, Clock, Instant},
-    Monotonic,
-};
 use stm32h7xx_hal as hal;
 
 // A global buffer indicating how many times the internal counter has overflowed.
@@ -86,68 +83,5 @@ impl Clock for SystemTimer {
                 return Ok(instant);
             }
         }
-    }
-}
-
-impl Monotonic for SystemTimer {
-    /// Reset the timer count.
-    unsafe fn reset(&mut self) {
-        // Note: The timer must be safely configured in `SystemTimer::initialize()`.
-        let regs = &*hal::device::TIM15::ptr();
-
-        OVERFLOWS = 0;
-        regs.cnt.reset();
-    }
-
-    fn set_compare(&mut self, instant: &Instant<Self>) {
-        let regs = unsafe { &*hal::device::TIM15::ptr() };
-
-        let now = self.try_now().unwrap();
-        match now.checked_duration_until(instant) {
-            // If the scheduled instant is too far in the future, we can't set an exact
-            // deadline because it's too far in the future. Instead, just set a time in the
-            // future and retry then.
-            Some(duration) if duration.integer() > (1 << 16) => {
-                // Set the deadline and enable the interrupt
-                regs.ccr1.write(|w| w.ccr().bits(0xFFFF));
-                regs.dier.modify(|_, w| w.cc1ie().set_bit());
-            }
-
-            Some(_reachable_future_time) => {
-                // Else, the instant is within a single overflow. Set it for the future.
-                // Ignore the duration and truncate the overflow (top 16 bits) of the final
-                // deadline. We just checked that we can fit within a single overflow.
-                let deadline_ticks = instant.duration_since_epoch().integer() as u16;
-
-                // Set the deadline and enable the interrupt
-                regs.ccr1.write(|w| w.ccr().bits(deadline_ticks));
-                regs.dier.modify(|_, w| w.cc1ie().set_bit());
-            }
-
-            // If the deadline has already passed, schedule an interrupt immediately.
-            None => {
-                cortex_m::peripheral::NVIC::pend(hal::interrupt::TIM15);
-            }
-        }
-
-        // Finally, perform a sanity check to ensure the scheduled deadline is still in
-        // the future. This checks for a race condition of the timer stepping past the deadline
-        // while we are configuring it. If we've proceeded past the dealdine, reschedule the
-        // compare to occur immediately.
-        if self.try_now().unwrap() > *instant {
-            self.clear_compare_flag();
-            cortex_m::peripheral::NVIC::pend(hal::interrupt::TIM15);
-        }
-    }
-
-    fn clear_compare_flag(&mut self) {
-        let regs = unsafe { &*hal::device::TIM15::ptr() };
-
-        // Note(cs): When operating on the timer registers, we must be atomic to prevent
-        // pre-emption.
-        cortex_m::interrupt::free(|_cs| {
-            regs.sr.modify(|_, w| w.cc1if().clear_bit());
-            regs.dier.modify(|_, w| w.cc1ie().clear_bit());
-        });
     }
 }

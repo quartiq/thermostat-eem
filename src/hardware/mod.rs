@@ -5,7 +5,7 @@
 pub use stm32h7xx_hal as hal;
 
 pub mod setup;
-// pub mod system_timer;
+pub mod system_timer;
 
 // Thermostat MAC definition
 const SRC_MAC: [u8; 6] = [0x80, 0x1f, 0x12, 0x63, 0x84, 0x1b];
@@ -15,6 +15,14 @@ const TX_DESRING_CNT: usize = 4;
 
 // Number of RX descriptors in the ethernet descriptor ring.
 const RX_DESRING_CNT: usize = 4;
+
+pub type NetworkStack = smoltcp_nal::NetworkStack<
+    'static,
+    hal::ethernet::EthernetDMA<'static, TX_DESRING_CNT, RX_DESRING_CNT>,
+    system_timer::SystemTimer,
+>;
+
+pub type EthernetPhy = hal::ethernet::phy::LAN8742A<hal::ethernet::EthernetMAC>;
 
 // Front LEDs.
 pub struct LEDs {

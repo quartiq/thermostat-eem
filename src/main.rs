@@ -29,7 +29,18 @@ mod app {
     #[init]
     fn init(c: init::Context) -> (Shared, Local, init::Monotonics) {
         // setup Thermostat hardware
-        let mut Thermostat = hardware::setup::setup(c.core, c.device);
+        let mut thermostat = hardware::setup::setup(c.core, c.device);
+
+        let mut network = NetworkUsers::new(
+            thermostat.net.stack,
+            thermostat.net.phy,
+            env!("CARGO_BIN_NAME"),
+            thermostat.net.mac_address,
+            option_env!("BROKER")
+                .unwrap_or("10.34.16.10")
+                .parse()
+                .unwrap(),
+        );
 
         (Shared {}, Local {}, init::Monotonics())
     }

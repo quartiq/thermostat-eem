@@ -2,7 +2,7 @@ use rtt_logger::RTTLogger;
 use smoltcp_nal::smoltcp;
 use stm32h7xx_hal::hal::digital::v2::OutputPin;
 
-// use crate::hardware::system_timer;
+use crate::hardware::system_timer;
 
 use crate::hardware::SRC_MAC;
 
@@ -13,7 +13,7 @@ use super::hal::{
     prelude::*,
 };
 
-use super::LEDs;
+use super::{EthernetPhy, LEDs, NetworkStack};
 
 use log::info;
 
@@ -80,7 +80,17 @@ impl Default for NetStorage {
         }
     }
 }
+
+/// The available networking devices on Thermostat.
+pub struct NetworkDevices {
+    pub stack: NetworkStack,
+    pub phy: EthernetPhy,
+    pub mac_address: smoltcp::wire::EthernetAddress,
+}
+
+/// The available hardware interfaces on Thermostat.}
 pub struct ThermostatDevices {
+    pub net: NetworkDevices,
     pub leds: LEDs,
 }
 
@@ -119,13 +129,10 @@ pub fn setup(
         .unwrap();
     info!("---Starting Hardware Setup");
 
-    // // Set up the system timer for RTIC scheduling.
-    // {
-    //     let tim15 = device
-    //         .TIM15
-    //         .timer(10.khz(), ccdr.peripheral.TIM15, &ccdr.clocks);
-    //     system_timer::SystemTimer::initialize(tim15);
-    // }
+    let tim15 = device
+        .TIM15
+        .timer(10.khz(), ccdr.peripheral.TIM15, &ccdr.clocks);
+    system_timer::SystemTimer::initialize(tim15);
 
     let mut delay = asm_delay::AsmDelay::new(asm_delay::bitrate::Hertz(ccdr.clocks.c_ck().0));
 
@@ -163,7 +170,7 @@ pub fn setup(
     log::info!("EUI48: {}", mac_addr);
 
     // Setup network
-    let network_devices = {
+    let net = {
         let ethernet_pins = {
             // Reset the PHY before configuring pins.
             let mut eth_phy_nrst = gpiog.pg14.into_push_pull_output();
@@ -301,16 +308,16 @@ pub fn setup(
             data
         };
 
-        // let mut stack =
-        //     smoltcp_nal::NetworkStack::new(interface, system_timer::SystemTimer::default());
+        let mut stack =
+            smoltcp_nal::NetworkStack::new(interface, system_timer::SystemTimer::default());
 
-        // stack.seed_random_port(&random_seed);
+        stack.seed_random_port(&random_seed);
 
-        // NetworkDevices {
-        //     stack,
-        //     phy: lan8742a,
-        //     mac_address: mac_addr,
-        // }
+        NetworkDevices {
+            stack,
+            phy: lan8742a,
+            mac_address: mac_addr,
+        }
     };
-    ThermostatDevices { leds }
+    ThermostatDevices { net, leds }
 }
