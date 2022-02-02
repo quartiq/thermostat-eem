@@ -18,6 +18,7 @@ use net::{
     telemetry::{Telemetry, TelemetryBuffer},
     NetworkState, NetworkUsers,
 };
+use stm32h7xx_hal::hal::digital::v2::OutputPin;
 use systick_monotonic::*;
 
 #[derive(Clone, Copy, Debug, Miniconf)]
@@ -33,11 +34,11 @@ impl Default for Settings {
 
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
 mod app {
+
     use super::*;
 
     #[monotonic(binds = SysTick, default = true)]
-    type Mono = Systick<1_000_000>; // 1 MHz / 1 us granularity
-
+    type Mono = Systick<10_000>; // ToDo: Is this enough?
     #[shared]
     struct Shared {
         network: NetworkUsers<Settings, Telemetry>,
@@ -49,7 +50,7 @@ mod app {
     #[init]
     fn init(c: init::Context) -> (Shared, Local, init::Monotonics) {
         // setup Thermostat hardware
-        let (mut thermostat, mut mono) = hardware::setup::setup(c.core, c.device);
+        let (mut thermostat, mono) = hardware::setup::setup(c.core, c.device);
 
         let mut network = NetworkUsers::new(
             thermostat.net.stack,
@@ -65,11 +66,26 @@ mod app {
         ethernet_link::spawn().unwrap();
 
         info!("init done");
+
         (Shared { network }, Local {}, init::Monotonics(mono))
+    }
+
+    #[idle(shared=[network])]
+    fn idle(mut c: idle::Context) -> ! {
+        loop {
+            match c.shared.network.lock(|net| net.update()) {
+                NetworkState::SettingsChanged => {
+                    // settings_update::spawn().unwrap()
+                }
+                NetworkState::Updated => {}
+                NetworkState::NoChange => cortex_m::asm::wfi(),
+            }
+        }
     }
 
     #[task(priority = 1, shared=[network])]
     fn ethernet_link(mut c: ethernet_link::Context) {
+        // info!("polling ethernet");
         c.shared
             .network
             .lock(|network| network.processor.handle_link());
