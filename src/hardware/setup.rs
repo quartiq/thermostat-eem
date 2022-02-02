@@ -101,7 +101,7 @@ static mut DES_RING: ethernet::DesRing<{ super::TX_DESRING_CNT }, { super::RX_DE
     ethernet::DesRing::new();
 
 pub fn setup(
-    mut core: rtic::export::Peripherals,
+    core: rtic::export::Peripherals,
     device: stm32h7xx_hal::stm32::Peripherals,
 ) -> (ThermostatDevices, Systick<10_000>) {
     let pwr = device.PWR.constrain();

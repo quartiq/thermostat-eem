@@ -78,14 +78,14 @@ mod app {
                     // settings_update::spawn().unwrap()
                 }
                 NetworkState::Updated => {}
-                NetworkState::NoChange => cortex_m::asm::wfi(),
+                NetworkState::NoChange => {}
             }
         }
     }
 
     #[task(priority = 1, shared=[network])]
     fn ethernet_link(mut c: ethernet_link::Context) {
-        // info!("polling ethernet");
+        info!("polling ethernet");
         c.shared
             .network
             .lock(|network| network.processor.handle_link());
