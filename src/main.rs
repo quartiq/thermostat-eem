@@ -21,7 +21,15 @@ use net::{
 use systick_monotonic::*;
 
 #[derive(Clone, Copy, Debug, Miniconf)]
-pub struct Settings {}
+pub struct Settings {
+    led: [bool; 8],
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self { led: [false; 8] }
+    }
+}
 
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
 mod app {
@@ -40,12 +48,8 @@ mod app {
 
     #[init]
     fn init(c: init::Context) -> (Shared, Local, init::Monotonics) {
-        // Initialize the monotonic
-        let systick = c.core.SYST;
-        let mono = Systick::new(systick, 400_000_000); // not sure if 400MHz is right
-
         // setup Thermostat hardware
-        let mut thermostat = hardware::setup::setup(c.core, c.device);
+        let (mut thermostat, mut mono) = hardware::setup::setup(c.core, c.device);
 
         let mut network = NetworkUsers::new(
             thermostat.net.stack,
@@ -60,6 +64,7 @@ mod app {
 
         ethernet_link::spawn().unwrap();
 
+        info!("init done");
         (Shared { network }, Local {}, init::Monotonics(mono))
     }
 
@@ -68,7 +73,7 @@ mod app {
         c.shared
             .network
             .lock(|network| network.processor.handle_link());
-        ethernet_link::spawn_after(1u32.seconds()).unwrap();
+        ethernet_link::spawn_after(1.secs()).unwrap();
     }
 
     #[task(binds = ETH, priority = 1)]

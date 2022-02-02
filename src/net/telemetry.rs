@@ -15,9 +15,7 @@ use minimq::{QoS, Retain};
 use serde::Serialize;
 
 use super::NetworkReference;
-use crate::hardware::{
-    adc::AdcCode, afe::Gain, dac::DacCode, system_timer::SystemTimer,
-};
+use crate::hardware::system_timer::SystemTimer;
 use minimq::embedded_nal::IpAddr;
 
 /// The telemetry client for reporting telemetry data over MQTT.
@@ -34,14 +32,7 @@ pub struct TelemetryClient<T: Serialize> {
 /// This allows for the DSP process to continually update the values without incurring significant
 /// run-time overhead during conversion to SI units.
 #[derive(Copy, Clone)]
-pub struct TelemetryBuffer {
-    /// The latest input sample on ADC0/ADC1.
-    pub adcs: [AdcCode; 2],
-    /// The latest output code on DAC0/DAC1.
-    pub dacs: [DacCode; 2],
-    /// The latest digital input states during processing.
-    pub digital_inputs: [bool; 2],
-}
+pub struct TelemetryBuffer {}
 
 /// The telemetry structure is data that is ultimately reported as telemetry over MQTT.
 ///
@@ -49,24 +40,11 @@ pub struct TelemetryBuffer {
 /// This structure should be generated on-demand by the buffer when required to minimize conversion
 /// overhead.
 #[derive(Serialize)]
-pub struct Telemetry {
-    /// Most recent input voltage measurement.
-    pub adcs: [f32; 2],
-
-    /// Most recent output voltage.
-    pub dacs: [f32; 2],
-
-    /// Most recent digital input assertion state.
-    pub digital_inputs: [bool; 2],
-}
+pub struct Telemetry {}
 
 impl Default for TelemetryBuffer {
     fn default() -> Self {
-        Self {
-            adcs: [AdcCode(0), AdcCode(0)],
-            dacs: [DacCode(0), DacCode(0)],
-            digital_inputs: [false, false],
-        }
+        Self {}
     }
 }
 
@@ -79,15 +57,8 @@ impl TelemetryBuffer {
     ///
     /// # Returns
     /// The finalized telemetry structure that can be serialized and reported.
-    pub fn finalize(self, afe0: Gain, afe1: Gain) -> Telemetry {
-        let in0_volts = Into::<f32>::into(self.adcs[0]) / afe0.as_multiplier();
-        let in1_volts = Into::<f32>::into(self.adcs[1]) / afe1.as_multiplier();
-
-        Telemetry {
-            adcs: [in0_volts, in1_volts],
-            dacs: [self.dacs[0].into(), self.dacs[1].into()],
-            digital_inputs: self.digital_inputs,
-        }
+    pub fn finalize() -> Telemetry {
+        Telemetry {}
     }
 }
 
@@ -102,19 +73,8 @@ impl<T: Serialize> TelemetryClient<T> {
     ///
     /// # Returns
     /// A new telemetry client.
-    pub fn new(
-        stack: NetworkReference,
-        client_id: &str,
-        prefix: &str,
-        broker: IpAddr,
-    ) -> Self {
-        let mqtt = minimq::Minimq::new(
-            broker,
-            client_id,
-            stack,
-            SystemTimer::default(),
-        )
-        .unwrap();
+    pub fn new(stack: NetworkReference, client_id: &str, prefix: &str, broker: IpAddr) -> Self {
+        let mqtt = minimq::Minimq::new(broker, client_id, stack, SystemTimer::default()).unwrap();
 
         let mut telemetry_topic: String<128> = String::from(prefix);
         telemetry_topic.push_str("/telemetry").unwrap();
@@ -135,8 +95,7 @@ impl<T: Serialize> TelemetryClient<T> {
     /// # Args
     /// * `telemetry` - The telemetry to report
     pub fn publish(&mut self, telemetry: &T) {
-        let telemetry: Vec<u8, 512> =
-            serde_json_core::to_vec(telemetry).unwrap();
+        let telemetry: Vec<u8, 512> = serde_json_core::to_vec(telemetry).unwrap();
         self.mqtt
             .client
             .publish(
@@ -157,9 +116,7 @@ impl<T: Serialize> TelemetryClient<T> {
     /// should be called regularly.
     pub fn update(&mut self) {
         match self.mqtt.poll(|_client, _topic, _message, _properties| {}) {
-            Err(minimq::Error::Network(
-                smoltcp_nal::NetworkError::NoIpAddress,
-            )) => {}
+            Err(minimq::Error::Network(smoltcp_nal::NetworkError::NoIpAddress)) => {}
 
             Err(error) => log::info!("Unexpected error: {:?}", error),
             _ => {}

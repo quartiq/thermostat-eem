@@ -1,6 +1,7 @@
 use rtt_logger::RTTLogger;
 use smoltcp_nal::smoltcp;
 use stm32h7xx_hal::hal::digital::v2::OutputPin;
+use systick_monotonic::*;
 
 use crate::hardware::system_timer;
 
@@ -102,7 +103,7 @@ static mut DES_RING: ethernet::DesRing<{ super::TX_DESRING_CNT }, { super::RX_DE
 pub fn setup(
     mut core: rtic::export::Peripherals,
     device: stm32h7xx_hal::stm32::Peripherals,
-) -> ThermostatDevices {
+) -> (ThermostatDevices, Systick<1_000_000>) {
     let pwr = device.PWR.constrain();
     let vos = pwr.freeze();
 
@@ -128,6 +129,10 @@ pub fn setup(
         .map(|()| log::set_max_level(log::LevelFilter::Trace))
         .unwrap();
     info!("---Starting Hardware Setup");
+
+    // Initialize the monotonic
+    let systick = core.SYST;
+    let mono = Systick::new(systick, 400_000_000); // not sure if 400MHz is right
 
     let tim15 = device
         .TIM15
@@ -166,6 +171,7 @@ pub fn setup(
     leds.led6.set_high().unwrap();
     leds.led7.set_high().unwrap();
 
+    info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
     log::info!("EUI48: {}", mac_addr);
 
@@ -227,6 +233,8 @@ pub fn setup(
                 rmii_txd1,
             )
         };
+
+        info!("Phy pins bound");
         // Configure the ethernet controller
         let (eth_dma, eth_mac) = ethernet::new(
             device.ETHERNET_MAC,
@@ -245,6 +253,7 @@ pub fn setup(
         let mut lan8742a = ethernet::phy::LAN8742A::new(eth_mac.set_phy_addr(0));
         lan8742a.phy_reset();
         lan8742a.phy_init();
+        info!("Enabling interrupt");
 
         unsafe { ethernet::enable_interrupt() };
 
@@ -319,5 +328,5 @@ pub fn setup(
             mac_address: mac_addr,
         }
     };
-    ThermostatDevices { net, leds }
+    (ThermostatDevices { net, leds }, mono)
 }

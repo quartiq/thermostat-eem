@@ -334,9 +334,8 @@ checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "heapless"
-version = "0.7.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d076121838e03f862871315477528debffdb7462fb229216ecef91b1a3eb31eb"
+version = "0.7.7"
+source = "git+https://github.com/quartiq/heapless.git?branch=feature/assume-init#11a3ef7207683f1538969e2dd89cd4c7281c243e"
 dependencies = [
  "atomic-polyfill",
  "hash32",
@@ -508,6 +507,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "num_enum"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "720d3ea1055e4e4574c0c0b0f8c3fd4f24c4cdaf465948206dea090b57b526ad"
+dependencies = [
+ "num_enum_derive",
+]
+
+[[package]]
+name = "num_enum_derive"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d992b768490d7fe0d8586d9b5745f6c49f557da6d81dc982b1d167ad4edbb21"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -843,11 +862,16 @@ dependencies = [
  "cortex-m-rt",
  "cortex-m-rtic",
  "embedded-time",
+ "heapless",
  "log",
  "miniconf",
+ "minimq",
+ "num_enum",
  "panic-halt",
  "rtt-logger",
  "rtt-target",
+ "serde",
+ "serde-json-core",
  "smoltcp-nal",
  "stm32h7xx-hal",
  "systick-monotonic",
