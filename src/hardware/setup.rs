@@ -128,7 +128,7 @@ pub fn setup(
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(log::LevelFilter::Trace))
         .unwrap();
-    info!("---Starting Hardware Setup");
+    info!("---Starting hardware setup");
 
     // Initialize the monotonic
     let systick = core.SYST;
@@ -171,7 +171,7 @@ pub fn setup(
     leds.led6.set_high().unwrap();
     leds.led7.set_high().unwrap();
 
-    info!("Setup Ethernet");
+    info!("-- Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
     log::info!("EUI48: {}", mac_addr);
 
@@ -257,6 +257,7 @@ pub fn setup(
 
         unsafe { ethernet::enable_interrupt() };
 
+        info!("Configure buffers");
         // Note(unwrap): The hardware configuration function is only allowed to be called once.
         // Unwrapping is intended to panic if called again to prevent re-use of global memory.
         let store = cortex_m::singleton!(: NetStorage = NetStorage::default()).unwrap();
@@ -322,11 +323,16 @@ pub fn setup(
 
         stack.seed_random_port(&random_seed);
 
+        info!("-- Setup Ethernet done.");
+
         NetworkDevices {
             stack,
             phy: lan8742a,
             mac_address: mac_addr,
         }
     };
+
+    info!("--- Hardware setup done.");
+
     (ThermostatDevices { net, leds }, mono)
 }
