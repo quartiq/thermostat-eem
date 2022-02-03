@@ -136,7 +136,6 @@ impl Adc {
     fn read_reg(&mut self, addr: AdcReg, size: u8) -> u32 {
         let mut buf = [addr as u8 | 0x40, 0, 0, 0, 0];
         self.cs.set_low().unwrap();
-        info!("addr: {:#x}", buf[0]);
 
         self.spi.transfer(&mut buf[..(size + 1) as usize]).unwrap();
         let data = match size {
@@ -147,7 +146,6 @@ impl Adc {
             _ => 0,
         };
         self.cs.set_high().unwrap();
-        info!("data: {:#x}", data);
         return data;
     }
 

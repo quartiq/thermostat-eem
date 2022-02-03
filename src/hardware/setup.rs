@@ -92,6 +92,7 @@ pub struct NetworkDevices {
 pub struct ThermostatDevices {
     pub net: NetworkDevices,
     pub leds: LEDs,
+    pub adc: Adc,
 }
 
 #[link_section = ".sram3.eth"]
@@ -346,5 +347,5 @@ pub fn setup(
 
     info!("--- Hardware setup done.");
 
-    (ThermostatDevices { net, leds }, mono)
+    (ThermostatDevices { net, leds, adc }, mono)
 }

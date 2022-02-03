@@ -10,7 +10,7 @@ pub mod net;
 
 extern crate panic_halt;
 pub extern crate stm32h7xx_hal;
-use hardware::hal;
+use hardware::{adc::Adc, hal};
 use log::info;
 use net::{
     data_stream::{FrameGenerator, StreamFormat, StreamTarget},
@@ -39,13 +39,16 @@ mod app {
 
     #[monotonic(binds = SysTick, default = true)]
     type Mono = Systick<10_000>; // ToDo: Is this enough?
+
     #[shared]
     struct Shared {
         network: NetworkUsers<Settings, Telemetry>,
     }
 
     #[local]
-    struct Local {}
+    struct Local {
+        adc: Adc,
+    }
 
     #[init]
     fn init(c: init::Context) -> (Shared, Local, init::Monotonics) {
@@ -65,12 +68,16 @@ mod app {
 
         ethernet_link::spawn().unwrap();
 
+        let local = Local {
+            adc: thermostat.adc,
+        };
+
         info!("init done");
 
-        (Shared { network }, Local {}, init::Monotonics(mono))
+        (Shared { network }, local, init::Monotonics(mono))
     }
 
-    #[idle(shared=[network])]
+    #[idle(shared=[network], local=[adc])]
     fn idle(mut c: idle::Context) -> ! {
         loop {
             match c.shared.network.lock(|net| net.update()) {
@@ -78,7 +85,9 @@ mod app {
                     // settings_update::spawn().unwrap()
                 }
                 NetworkState::Updated => {}
-                NetworkState::NoChange => {}
+                NetworkState::NoChange => {
+                    info!("adc.read_data(): {}", c.local.adc.read_data().0);
+                }
             }
         }
     }
