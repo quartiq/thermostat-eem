@@ -13,9 +13,7 @@ pub mod data_stream;
 pub mod network_processor;
 pub mod telemetry;
 
-use crate::hardware::{
-    system_timer::SystemTimer, EthernetPhy, NetworkManager, NetworkStack,
-};
+use crate::hardware::{system_timer::SystemTimer, EthernetPhy, NetworkManager, NetworkStack};
 use data_stream::{DataStream, FrameGenerator};
 use minimq::embedded_nal::IpAddr;
 use network_processor::NetworkProcessor;
@@ -27,8 +25,7 @@ use miniconf::Miniconf;
 use serde::Serialize;
 use smoltcp_nal::embedded_nal::SocketAddr;
 
-pub type NetworkReference =
-    smoltcp_nal::shared::NetworkStackProxy<'static, NetworkStack>;
+pub type NetworkReference = smoltcp_nal::shared::NetworkStackProxy<'static, NetworkStack>;
 
 /// The default MQTT broker IP address if unspecified.
 pub const DEFAULT_MQTT_BROKER: [u8; 4] = [10, 34, 16, 10];
@@ -78,11 +75,9 @@ where
         broker: IpAddr,
     ) -> Self {
         let stack_manager =
-            cortex_m::singleton!(: NetworkManager = NetworkManager::new(stack))
-                .unwrap();
+            cortex_m::singleton!(: NetworkManager = NetworkManager::new(stack)).unwrap();
 
-        let processor =
-            NetworkProcessor::new(stack_manager.acquire_stack(), phy);
+        let processor = NetworkProcessor::new(stack_manager.acquire_stack(), phy);
 
         let prefix = get_device_prefix(app, mac);
 
@@ -102,8 +97,7 @@ where
             broker,
         );
 
-        let (generator, stream) =
-            data_stream::setup_streaming(stack_manager.acquire_stack());
+        let (generator, stream) = data_stream::setup_streaming(stack_manager.acquire_stack());
 
         NetworkUsers {
             miniconf: settings,
@@ -118,11 +112,7 @@ where
     ///
     /// # Args
     /// * `format` - A unique u8 code indicating the format of the data.
-    pub fn configure_streaming(
-        &mut self,
-        format: impl Into<u8>,
-        batch_size: u8,
-    ) -> FrameGenerator {
+    pub fn configure_streaming(&mut self, format: impl Into<u8>, batch_size: u8) -> FrameGenerator {
         let mut generator = self.generator.take().unwrap();
         generator.configure(format, batch_size);
         generator

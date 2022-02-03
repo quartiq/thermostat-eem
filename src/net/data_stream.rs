@@ -50,8 +50,7 @@ const FRAME_SIZE: usize = 1024 + HEADER_SIZE;
 const FRAME_QUEUE_SIZE: usize = FRAME_COUNT * 2;
 
 // Static storage used for a heapless::Pool of frame buffers.
-static mut FRAME_DATA: [u8; FRAME_SIZE * FRAME_COUNT] =
-    [0; FRAME_SIZE * FRAME_COUNT];
+static mut FRAME_DATA: [u8; FRAME_SIZE * FRAME_COUNT] = [0; FRAME_SIZE * FRAME_COUNT];
 
 /// Represents the destination for the UDP stream to send data to.
 ///
@@ -63,9 +62,7 @@ static mut FRAME_DATA: [u8; FRAME_SIZE * FRAME_COUNT] =
 ///
 /// ## Example
 /// `{"ip": [192, 168,0, 1], "port": 1111}`
-#[derive(
-    Copy, Clone, Debug, MiniconfAtomic, Serialize, Deserialize, Default,
-)]
+#[derive(Copy, Clone, Debug, MiniconfAtomic, Serialize, Deserialize, Default)]
 pub struct StreamTarget {
     pub ip: [u8; 4],
     pub port: u16,
@@ -110,18 +107,14 @@ impl From<StreamTarget> for SocketAddr {
 /// # Returns
 /// (generator, stream) where `generator` can be used to enqueue "batches" for transmission. The
 /// `stream` is the logically consumer (UDP transmitter) of the enqueued data.
-pub fn setup_streaming(
-    stack: NetworkReference,
-) -> (FrameGenerator, DataStream) {
+pub fn setup_streaming(stack: NetworkReference) -> (FrameGenerator, DataStream) {
     // The queue needs to be at least as large as the frame count to ensure that every allocated
     // frame can potentially be enqueued for transmission.
     let queue =
-        cortex_m::singleton!(: Queue<StreamFrame, FRAME_QUEUE_SIZE> = Queue::new())
-            .unwrap();
+        cortex_m::singleton!(: Queue<StreamFrame, FRAME_QUEUE_SIZE> = Queue::new()).unwrap();
     let (producer, consumer) = queue.split();
 
-    let frame_pool =
-        cortex_m::singleton!(: Pool<[u8; FRAME_SIZE]>= Pool::new()).unwrap();
+    let frame_pool = cortex_m::singleton!(: Pool<[u8; FRAME_SIZE]>= Pool::new()).unwrap();
 
     // Note(unsafe): We guarantee that FRAME_DATA is only accessed once in this function.
     let memory = unsafe { &mut FRAME_DATA };
