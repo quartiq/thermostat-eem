@@ -17,7 +17,7 @@ use super::hal::{
     time::MegaHertz,
 };
 
-// use crate::AdcFilterSettings;
+use crate::AdcFilterSettings;
 
 /// SPI Mode 3
 pub const SPI_MODE: spi::Mode = spi::Mode {
@@ -225,10 +225,10 @@ impl Adc {
         self.write_reg(AdcReg::FILTCON1, 2, 0b110 << 8 | 1 << 11 | 0b10011);
     }
 
-    // /// Set both ADC channel filter config to the same settings.
-    // pub fn set_filters(&mut self, set: AdcFilterSettings) {
-    //     let reg: u32 = (set.odr | set.order << 5 | set.enhfilt << 8 | set.enhfilten << 11) as u32;
-    //     self.write_reg(AdcReg::FILTCON0, 2, reg);
-    //     self.write_reg(AdcReg::FILTCON1, 2, reg);
-    // }
+    /// Set both ADC channel filter config to the same settings.
+    pub fn set_filters(&mut self, set: AdcFilterSettings) {
+        let reg: u32 = (set.odr | set.order << 5 | set.enhfilt << 8 | set.enhfilten << 11) as u32;
+        self.write_reg(AdcReg::FILTCON0, 2, reg);
+        self.write_reg(AdcReg::FILTCON1, 2, reg);
+    }
 }

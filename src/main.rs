@@ -18,22 +18,41 @@ use net::{
     telemetry::{Telemetry, TelemetryBuffer},
     NetworkState, NetworkUsers,
 };
-use stm32h7xx_hal::hal::digital::v2::OutputPin;
+use serde::Deserialize;
 use systick_monotonic::*;
+
+#[derive(Copy, Clone, Debug, Deserialize, Miniconf)]
+pub struct AdcFilterSettings {
+    pub odr: u32,
+    pub order: u32,
+    pub enhfilt: u32,
+    pub enhfilten: u32,
+}
 
 #[derive(Clone, Copy, Debug, Miniconf)]
 pub struct Settings {
     led: [bool; 8],
+    adcfiltersettings: AdcFilterSettings,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { led: [false; 8] }
+        Self {
+            led: [false; 8],
+            adcfiltersettings: AdcFilterSettings {
+                odr: 0b10101,   // 10Hz output data rate
+                order: 0,       // Sinc5+Sinc1 filter
+                enhfilt: 0b110, // 16.67 SPS, 92 dB rejection, 60 ms settling
+                enhfilten: 1,   // enable postfilter
+            },
+        }
     }
 }
 
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
 mod app {
+
+    use hardware::setup::ThermostatDevices;
 
     use super::*;
 
@@ -43,6 +62,7 @@ mod app {
     #[shared]
     struct Shared {
         network: NetworkUsers<Settings, Telemetry>,
+        settings: Settings,
     }
 
     #[local]
@@ -66,15 +86,23 @@ mod app {
                 .unwrap(),
         );
 
+        let settings = Settings::default();
         ethernet_link::spawn().unwrap();
+
+        thermostat.adc.set_filters(settings.adcfiltersettings);
 
         let local = Local {
             adc: thermostat.adc,
         };
 
+        let shared = Shared {
+            network: network,
+            settings: settings,
+        };
+
         info!("init done");
 
-        (Shared { network }, local, init::Monotonics(mono))
+        (shared, local, init::Monotonics(mono))
     }
 
     #[idle(shared=[network], local=[adc])]
