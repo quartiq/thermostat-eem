@@ -9,7 +9,7 @@ use super::hal::{
     gpio::{gpioe::*, Alternate, Output, PushPull, AF5},
     hal::{blocking::spi::Transfer, blocking::spi::Write, digital::v2::OutputPin},
     prelude::*,
-    rcc::Ccdr,
+    rcc::{rec, CoreClocks},
     spi,
     spi::Enabled,
     spi::Spi,
@@ -90,15 +90,15 @@ pub struct Adc {
 }
 
 impl Adc {
-    pub fn new(ccdr: Ccdr, spi4: SPI4, mut pins: AdcPins) -> Self {
+    pub fn new(prec: rec::Spi4, spi4: SPI4, mut pins: AdcPins, clocks: &CoreClocks) -> Self {
         pins.cs.set_high().unwrap();
 
         let spi: Spi<_, _, u8> = spi4.spi(
             (pins.sck, pins.miso, pins.mosi),
             spi::MODE_0,
             1.mhz(),
-            ccdr.peripheral.SPI4,
-            &ccdr.clocks,
+            prec,
+            clocks,
         );
         let mut adc = Adc { spi, cs: pins.cs };
         adc.reset();
@@ -136,6 +136,8 @@ impl Adc {
     fn read_reg(&mut self, addr: AdcReg, size: u8) -> u32 {
         let mut buf = [addr as u8 | 0x40, 0, 0, 0, 0];
         self.cs.set_low().unwrap();
+        info!("addr: {:#x}", buf[0]);
+
         self.spi.transfer(&mut buf[..(size + 1) as usize]).unwrap();
         let data = match size {
             1 => buf[1].clone() as u32,
@@ -145,6 +147,7 @@ impl Adc {
             _ => 0,
         };
         self.cs.set_high().unwrap();
+        info!("data: {:#x}", data);
         return data;
     }
 

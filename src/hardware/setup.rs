@@ -3,10 +3,6 @@ use smoltcp_nal::smoltcp;
 use stm32h7xx_hal::hal::digital::v2::OutputPin;
 use systick_monotonic::*;
 
-use crate::hardware::system_timer;
-
-use crate::hardware::SRC_MAC;
-
 use super::hal::{
     self as hal,
     ethernet::{self, PHY},
@@ -14,7 +10,10 @@ use super::hal::{
     prelude::*,
 };
 
-use super::{EthernetPhy, LEDs, NetworkStack};
+use super::{
+    adc::{Adc, AdcPins},
+    system_timer, EthernetPhy, LEDs, NetworkStack, SRC_MAC,
+};
 
 use log::info;
 
@@ -331,6 +330,19 @@ pub fn setup(
             mac_address: mac_addr,
         }
     };
+
+    info!("Setup ADC");
+    let adc_pins = AdcPins {
+        sck: gpioe.pe2.into_alternate_af5(),
+        miso: gpioe.pe5.into_alternate_af5(),
+        mosi: gpioe.pe6.into_alternate_af5(),
+        cs: gpioe.pe0.into_push_pull_output(),
+    };
+    let mut adc = Adc::new(ccdr.peripheral.SPI4, device.SPI4, adc_pins, &ccdr.clocks);
+
+    info!("adc data: {}", adc.read_data().0);
+
+    info!("adc.get_status_reg(): {:#x}", adc.get_status_reg());
 
     info!("--- Hardware setup done.");
 
