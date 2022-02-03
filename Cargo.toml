@@ -24,6 +24,8 @@ minimq = "0.5.2"
 serde = { version = "1.0.136", features = ["derive"], default-features = false }
 serde-json-core = "0.4"#
 num_enum = { version = "0.5.6", default-features = false }
+byteorder = { version = "1", default-features = false }
+
 
 
 [dependencies.rtt-logger]

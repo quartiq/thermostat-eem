@@ -1,21 +1,23 @@
 // Thermostat ADC driver
 // (AD7172 https://www.analog.com/media/en/technical-documentation/data-sheets/AD7172-2.pdf)
-// SingularitySurfer 2021
+// SingularitySurfer 2022
 
 use byteorder::{BigEndian, ByteOrder};
 use log::{info, warn};
 
-use stm32_eth::hal::{
-    gpio::{gpiob::*, Alternate, Output, PushPull, AF5},
+use super::hal::{
+    gpio::{gpioe::*, Alternate, Output, PushPull, AF5},
     hal::{blocking::spi::Transfer, blocking::spi::Write, digital::v2::OutputPin},
-    rcc::Clocks,
+    prelude::*,
+    rcc::Ccdr,
     spi,
+    spi::Enabled,
     spi::Spi,
-    stm32::SPI2,
+    stm32::SPI4,
     time::MegaHertz,
 };
 
-use crate::AdcFilterSettings;
+// use crate::AdcFilterSettings;
 
 /// SPI Mode 3
 pub const SPI_MODE: spi::Mode = spi::Mode {
@@ -67,40 +69,38 @@ enum Setupcon {
 }
 
 pub type AdcSpi = Spi<
-    SPI2,
+    SPI4,
     (
-        PB10<Alternate<AF5>>,
-        PB14<Alternate<AF5>>,
-        PB15<Alternate<AF5>>,
+        PE2<Alternate<AF5>>,
+        PE5<Alternate<AF5>>,
+        PE6<Alternate<AF5>>,
     ),
 >;
 
 pub struct AdcPins {
-    pub sck: PB10<Alternate<AF5>>,
-    pub miso: PB14<Alternate<AF5>>,
-    pub mosi: PB15<Alternate<AF5>>,
-    pub sync: PB12<Output<PushPull>>,
+    pub sck: PE2<Alternate<AF5>>,
+    pub miso: PE5<Alternate<AF5>>,
+    pub mosi: PE6<Alternate<AF5>>,
+    pub cs: PE0<Output<PushPull>>,
 }
 
 pub struct Adc {
-    spi: AdcSpi,
-    sync: PB12<Output<PushPull>>,
+    spi: Spi<SPI4, Enabled, u8>,
+    cs: PE0<Output<PushPull>>,
 }
 
 impl Adc {
-    pub fn new(clocks: Clocks, spi2: SPI2, mut pins: AdcPins) -> Self {
-        pins.sync.set_high().unwrap();
-        let spi = Spi::spi2(
-            spi2,
+    pub fn new(ccdr: Ccdr, spi4: SPI4, mut pins: AdcPins) -> Self {
+        pins.cs.set_high().unwrap();
+
+        let spi: Spi<_, _, u8> = spi4.spi(
             (pins.sck, pins.miso, pins.mosi),
-            SPI_MODE,
-            SPI_CLOCK.into(),
-            clocks,
+            spi::MODE_0,
+            1.mhz(),
+            ccdr.peripheral.SPI4,
+            &ccdr.clocks,
         );
-        let mut adc = Adc {
-            spi,
-            sync: pins.sync,
-        };
+        let mut adc = Adc { spi, cs: pins.cs };
         adc.reset();
 
         info!("ADC ID: {:#X}", adc.read_reg(AdcReg::ID, 2));
@@ -119,9 +119,9 @@ impl Adc {
     /// Reset ADC.
     pub fn reset(&mut self) {
         let mut buf = [0xFFu8; 8];
-        self.sync.set_low().unwrap();
+        self.cs.set_low().unwrap();
         let result = self.spi.transfer(&mut buf);
-        self.sync.set_high().unwrap();
+        self.cs.set_high().unwrap();
         match result {
             Err(e) => {
                 warn!("ADC reset failed! {:?}", e)
@@ -135,7 +135,7 @@ impl Adc {
     /// Read a ADC register of size in bytes.
     fn read_reg(&mut self, addr: AdcReg, size: u8) -> u32 {
         let mut buf = [addr as u8 | 0x40, 0, 0, 0, 0];
-        self.sync.set_low().unwrap();
+        self.cs.set_low().unwrap();
         self.spi.transfer(&mut buf[..(size + 1) as usize]).unwrap();
         let data = match size {
             1 => buf[1].clone() as u32,
@@ -144,14 +144,14 @@ impl Adc {
             4 => BigEndian::read_u32(&buf[1..5]) as u32,
             _ => 0,
         };
-        self.sync.set_high().unwrap();
+        self.cs.set_high().unwrap();
         return data;
     }
 
     /// Write a ADC register of size in bytes.
     fn write_reg(&mut self, addr: AdcReg, size: u8, data: u32) {
         let mut addr_buf = [addr as u8];
-        self.sync.set_low().unwrap();
+        self.cs.set_low().unwrap();
         self.spi.write(&mut addr_buf).unwrap();
         let mut buf = [0, 0, 0, 0];
         BigEndian::write_u32(&mut buf, data);
@@ -162,15 +162,15 @@ impl Adc {
             4 => self.spi.transfer(&mut buf[0..4]).unwrap(),
             _ => &[0],
         };
-        self.sync.set_high().unwrap();
+        self.cs.set_high().unwrap();
     }
 
     /// Reads the status register and returns the value.
     pub fn get_status_reg(&mut self) -> u8 {
         let mut addr_buf = [0];
-        self.sync.set_low().unwrap();
+        self.cs.set_low().unwrap();
         self.spi.transfer(&mut addr_buf).unwrap();
-        self.sync.set_high().unwrap();
+        self.cs.set_high().unwrap();
         addr_buf[0]
     }
 
@@ -224,10 +224,10 @@ impl Adc {
         self.write_reg(AdcReg::FILTCON1, 2, 0b110 << 8 | 1 << 11 | 0b10011);
     }
 
-    /// Set both ADC channel filter config to the same settings.
-    pub fn set_filters(&mut self, set: AdcFilterSettings) {
-        let reg: u32 = (set.odr | set.order << 5 | set.enhfilt << 8 | set.enhfilten << 11) as u32;
-        self.write_reg(AdcReg::FILTCON0, 2, reg);
-        self.write_reg(AdcReg::FILTCON1, 2, reg);
-    }
+    // /// Set both ADC channel filter config to the same settings.
+    // pub fn set_filters(&mut self, set: AdcFilterSettings) {
+    //     let reg: u32 = (set.odr | set.order << 5 | set.enhfilt << 8 | set.enhfilten << 11) as u32;
+    //     self.write_reg(AdcReg::FILTCON0, 2, reg);
+    //     self.write_reg(AdcReg::FILTCON1, 2, reg);
+    // }
 }

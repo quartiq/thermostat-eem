@@ -4,6 +4,7 @@
 
 pub use stm32h7xx_hal as hal;
 
+pub mod adc;
 pub mod setup;
 pub mod system_timer;
 
