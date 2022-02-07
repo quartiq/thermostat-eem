@@ -1,7 +1,7 @@
+use crate::hardware::system_timer;
 use rtt_logger::RTTLogger;
 use smoltcp_nal::smoltcp;
 use stm32h7xx_hal::hal::digital::v2::OutputPin;
-use systick_monotonic::*;
 
 use super::hal::{
     self as hal,
@@ -12,7 +12,7 @@ use super::hal::{
 
 use super::{
     adc::{Adc, AdcPins},
-    system_timer, EthernetPhy, LEDs, NetworkStack, SRC_MAC,
+    EthernetPhy, LEDs, NetworkStack, SRC_MAC,
 };
 
 use log::info;
@@ -88,7 +88,7 @@ pub struct NetworkDevices {
     pub mac_address: smoltcp::wire::EthernetAddress,
 }
 
-/// The available hardware interfaces on Thermostat.}
+/// The available hardware interfaces on Thermostat.
 pub struct ThermostatDevices {
     pub net: NetworkDevices,
     pub leds: LEDs,
@@ -101,9 +101,9 @@ static mut DES_RING: ethernet::DesRing<{ super::TX_DESRING_CNT }, { super::RX_DE
     ethernet::DesRing::new();
 
 pub fn setup(
-    core: rtic::export::Peripherals,
     device: stm32h7xx_hal::stm32::Peripherals,
-) -> (ThermostatDevices, Systick<10_000>) {
+    clock: system_timer::SystemTimer,
+) -> ThermostatDevices {
     let pwr = device.PWR.constrain();
     let vos = pwr.freeze();
 
@@ -128,16 +128,7 @@ pub fn setup(
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(log::LevelFilter::Trace))
         .unwrap();
-    info!("---Starting hardware setup");
-
-    // Initialize the monotonic
-    let systick = core.SYST;
-    let mono = Systick::new(systick, 400_000_000); // not sure if 400MHz is right
-
-    let tim15 = device
-        .TIM15
-        .timer(10.khz(), ccdr.peripheral.TIM15, &ccdr.clocks);
-    system_timer::SystemTimer::initialize(tim15);
+    info!("--- Starting hardware setup");
 
     let mut delay = asm_delay::AsmDelay::new(asm_delay::bitrate::Hertz(ccdr.clocks.c_ck().0));
 
@@ -145,9 +136,9 @@ pub fn setup(
     let gpioa = device.GPIOA.split(ccdr.peripheral.GPIOA);
     let gpiob = device.GPIOB.split(ccdr.peripheral.GPIOB);
     let gpioc = device.GPIOC.split(ccdr.peripheral.GPIOC);
-    let gpiod = device.GPIOD.split(ccdr.peripheral.GPIOD);
+    // let gpiod = device.GPIOD.split(ccdr.peripheral.GPIOD);
     let gpioe = device.GPIOE.split(ccdr.peripheral.GPIOE);
-    let gpiof = device.GPIOF.split(ccdr.peripheral.GPIOF);
+    // let gpiof = device.GPIOF.split(ccdr.peripheral.GPIOF);
     let gpiog = device.GPIOG.split(ccdr.peripheral.GPIOG);
 
     // Setup LEDs
@@ -162,14 +153,14 @@ pub fn setup(
         led7: gpiog.pg8.into_push_pull_output(),
     };
 
-    leds.led0.set_high().unwrap();
-    leds.led1.set_high().unwrap();
-    leds.led2.set_high().unwrap();
-    leds.led3.set_high().unwrap();
-    leds.led4.set_high().unwrap();
-    leds.led5.set_high().unwrap();
-    leds.led6.set_high().unwrap();
-    leds.led7.set_high().unwrap();
+    leds.led0.set_low().unwrap();
+    leds.led1.set_low().unwrap();
+    leds.led2.set_low().unwrap();
+    leds.led3.set_low().unwrap();
+    leds.led4.set_low().unwrap();
+    leds.led5.set_low().unwrap();
+    leds.led6.set_low().unwrap();
+    leds.led7.set_low().unwrap();
 
     info!("-- Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
@@ -234,7 +225,7 @@ pub fn setup(
             )
         };
 
-        info!("Phy pins bound");
+        info!("Ethernet PHY pins bound");
         // Configure the ethernet controller
         let (eth_dma, eth_mac) = ethernet::new(
             device.ETHERNET_MAC,
@@ -253,11 +244,10 @@ pub fn setup(
         let mut lan8742a = ethernet::phy::LAN8742A::new(eth_mac.set_phy_addr(0));
         lan8742a.phy_reset();
         lan8742a.phy_init();
-        info!("Enabling interrupt");
 
         unsafe { ethernet::enable_interrupt() };
 
-        info!("Configure buffers");
+        info!("Configure TCP/UDP buffers and neighbour/routing caches");
         // Note(unwrap): The hardware configuration function is only allowed to be called once.
         // Unwrapping is intended to panic if called again to prevent re-use of global memory.
         let store = cortex_m::singleton!(: NetStorage = NetStorage::default()).unwrap();
@@ -318,8 +308,7 @@ pub fn setup(
             data
         };
 
-        let mut stack =
-            smoltcp_nal::NetworkStack::new(interface, system_timer::SystemTimer::default());
+        let mut stack = smoltcp_nal::NetworkStack::new(interface, clock);
 
         stack.seed_random_port(&random_seed);
 
@@ -347,5 +336,5 @@ pub fn setup(
 
     info!("--- Hardware setup done.");
 
-    (ThermostatDevices { net, leds, adc }, mono)
+    ThermostatDevices { net, leds, adc }
 }

@@ -1,4 +1,4 @@
-///! Stabilizer Telemetry Capabilities
+///! Thermostat Telemetry Capabilities
 ///!
 ///! # Design
 ///! Telemetry is reported regularly using an MQTT client. All telemetry is reported in SI units
@@ -32,7 +32,9 @@ pub struct TelemetryClient<T: Serialize> {
 /// This allows for the DSP process to continually update the values without incurring significant
 /// run-time overhead during conversion to SI units.
 #[derive(Copy, Clone)]
-pub struct TelemetryBuffer {}
+pub struct TelemetryBuffer {
+    pub led: bool,
+}
 
 /// The telemetry structure is data that is ultimately reported as telemetry over MQTT.
 ///
@@ -40,25 +42,22 @@ pub struct TelemetryBuffer {}
 /// This structure should be generated on-demand by the buffer when required to minimize conversion
 /// overhead.
 #[derive(Serialize)]
-pub struct Telemetry {}
+pub struct Telemetry {
+    pub led: bool,
+}
 
 impl Default for TelemetryBuffer {
     fn default() -> Self {
-        Self {}
+        Self { led: false }
     }
 }
 
 impl TelemetryBuffer {
     /// Convert the telemetry buffer to finalized, SI-unit telemetry for reporting.
-    ///
-    /// # Args
-    /// * `afe0` - The current AFE configuration for channel 0.
-    /// * `afe1` - The current AFE configuration for channel 1.
-    ///
     /// # Returns
     /// The finalized telemetry structure that can be serialized and reported.
-    pub fn finalize() -> Telemetry {
-        Telemetry {}
+    pub fn finalize(self) -> Telemetry {
+        Telemetry { led: self.led }
     }
 }
 
@@ -67,14 +66,21 @@ impl<T: Serialize> TelemetryClient<T> {
     ///
     /// # Args
     /// * `stack` - A reference to the (shared) underlying network stack.
+    /// * `clock` - System timer clock.
     /// * `client_id` - The MQTT client ID of the telemetry client.
     /// * `prefix` - The device prefix to use for MQTT telemetry reporting.
     /// * `broker` - The IP address of the MQTT broker to use.
     ///
     /// # Returns
     /// A new telemetry client.
-    pub fn new(stack: NetworkReference, client_id: &str, prefix: &str, broker: IpAddr) -> Self {
-        let mqtt = minimq::Minimq::new(broker, client_id, stack, SystemTimer::default()).unwrap();
+    pub fn new(
+        stack: NetworkReference,
+        clock: SystemTimer,
+        client_id: &str,
+        prefix: &str,
+        broker: IpAddr,
+    ) -> Self {
+        let mqtt = minimq::Minimq::new(broker, client_id, stack, clock).unwrap();
 
         let mut telemetry_topic: String<128> = String::from(prefix);
         telemetry_topic.push_str("/telemetry").unwrap();

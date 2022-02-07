@@ -2,7 +2,7 @@
 name = "thermostat-eem"
 version = "0.1.0"
 edition = "2021"
-authors = ["SingularitySurfer"]
+authors = ["Norman Krackow <nk@quartiq.de>", "Robert Jördens", "Ryan Summers"]
 
 [dependencies]
 cortex-m = { version = "0.7" }
@@ -13,13 +13,11 @@ log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"
 rtt-target = { version = "0.3", features = ["cortex-m"] }
 asm-delay = "0.9.0"
 smoltcp-nal = { version = "0.2", features = ["shared-stack"] }
-#cortex-m-rtic = "0.6.0-alpha.2"
 cortex-m-rtic = "1.0.0"
 embedded-time = "0.12.1"
 miniconf = "0.3"
 systick-monotonic = "1.0.0"
 heapless = { version = "0.7", features = ["serde"] }
-#heapless = "=0.7.0"
 minimq = "0.5.2"
 serde = { version = "1.0.136", features = ["derive"], default-features = false }
 serde-json-core = "0.4"#
@@ -30,8 +28,3 @@ byteorder = { version = "1", default-features = false }
 
 [dependencies.rtt-logger]
 git = "https://github.com/quartiq/rtt-logger.git"
-rev = "70b0eb5"
-
-[patch.crates-io.heapless]
-git = "https://github.com/quartiq/heapless.git"
-branch = "feature/assume-init"
