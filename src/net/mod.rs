@@ -9,12 +9,10 @@ pub use heapless;
 pub use miniconf;
 pub use serde;
 
-pub mod data_stream;
 pub mod network_processor;
 pub mod telemetry;
 
 use crate::hardware::{system_timer::SystemTimer, EthernetPhy, NetworkManager, NetworkStack};
-use data_stream::{DataStream, FrameGenerator};
 use minimq::embedded_nal::IpAddr;
 use network_processor::NetworkProcessor;
 use telemetry::TelemetryClient;
@@ -23,7 +21,6 @@ use core::fmt::Write;
 use heapless::String;
 use miniconf::Miniconf;
 use serde::Serialize;
-use smoltcp_nal::embedded_nal::SocketAddr;
 
 pub type NetworkReference = smoltcp_nal::shared::NetworkStackProxy<'static, NetworkStack>;
 
@@ -46,8 +43,6 @@ pub enum NetworkState {
 pub struct NetworkUsers<S: Default + Miniconf, T: Serialize> {
     pub miniconf: miniconf::MqttClient<S, NetworkReference, SystemTimer, 512>,
     pub processor: NetworkProcessor,
-    stream: DataStream,
-    generator: Option<FrameGenerator>,
     pub telemetry: TelemetryClient<T>,
 }
 
@@ -97,34 +92,10 @@ where
             broker,
         );
 
-        let (generator, stream) = data_stream::setup_streaming(stack_manager.acquire_stack());
-
         NetworkUsers {
             miniconf: settings,
             processor,
             telemetry,
-            stream,
-            generator: Some(generator),
-        }
-    }
-
-    /// Enable live data streaming.
-    ///
-    /// # Args
-    /// * `format` - A unique u8 code indicating the format of the data.
-    pub fn configure_streaming(&mut self, format: impl Into<u8>, batch_size: u8) -> FrameGenerator {
-        let mut generator = self.generator.take().unwrap();
-        generator.configure(format, batch_size);
-        generator
-    }
-
-    /// Direct the stream to the provided remote target.
-    ///
-    /// # Args
-    /// * `remote` - The destination for the streamed data.
-    pub fn direct_stream(&mut self, remote: SocketAddr) {
-        if self.generator.is_none() {
-            self.stream.set_remote(remote);
         }
     }
 
@@ -135,11 +106,6 @@ where
     pub fn update(&mut self) -> NetworkState {
         // Update the MQTT clients.
         self.telemetry.update();
-
-        // Update the data stream.
-        if self.generator.is_none() {
-            self.stream.process();
-        }
 
         // Poll for incoming data.
         let poll_result = match self.processor.update() {

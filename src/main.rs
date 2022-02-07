@@ -12,13 +12,7 @@ extern crate panic_halt;
 pub extern crate stm32h7xx_hal;
 use hardware::hal;
 use log::info;
-use net::{
-    data_stream::{FrameGenerator, StreamFormat, StreamTarget},
-    miniconf::Miniconf,
-    telemetry::{Telemetry, TelemetryBuffer},
-    NetworkState, NetworkUsers,
-};
-use stm32h7xx_hal::hal::digital::v2::OutputPin;
+use net::{miniconf::Miniconf, telemetry::Telemetry, NetworkState, NetworkUsers};
 use systick_monotonic::*;
 
 #[derive(Clone, Copy, Debug, Miniconf)]
@@ -50,9 +44,9 @@ mod app {
     #[init]
     fn init(c: init::Context) -> (Shared, Local, init::Monotonics) {
         // setup Thermostat hardware
-        let (mut thermostat, mono) = hardware::setup::setup(c.core, c.device);
+        let (thermostat, mono) = hardware::setup::setup(c.core, c.device);
 
-        let mut network = NetworkUsers::new(
+        let network = NetworkUsers::new(
             thermostat.net.stack,
             thermostat.net.phy,
             env!("CARGO_BIN_NAME"),
