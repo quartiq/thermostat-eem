@@ -56,6 +56,7 @@ where
     /// # Args
     /// * `stack` - The network stack that will be used to share with all network users.
     /// * `phy` - The ethernet PHY connecting the network.
+    /// * `clock` - System timer clock.
     /// * `app` - The name of the application.
     /// * `mac` - The MAC address of the network.
     /// * `broker` - The IP address of the MQTT broker to use.

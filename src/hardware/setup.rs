@@ -126,7 +126,7 @@ pub fn setup(
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(log::LevelFilter::Trace))
         .unwrap();
-    info!("---Starting hardware setup");
+    info!("--- Starting hardware setup");
 
     let mut delay = asm_delay::AsmDelay::new(asm_delay::bitrate::Hertz(ccdr.clocks.c_ck().0));
 
@@ -151,14 +151,14 @@ pub fn setup(
         led7: gpiog.pg8.into_push_pull_output(),
     };
 
-    leds.led0.set_high().unwrap();
-    leds.led1.set_high().unwrap();
-    leds.led2.set_high().unwrap();
-    leds.led3.set_high().unwrap();
-    leds.led4.set_high().unwrap();
-    leds.led5.set_high().unwrap();
-    leds.led6.set_high().unwrap();
-    leds.led7.set_high().unwrap();
+    leds.led0.set_low().unwrap();
+    leds.led1.set_low().unwrap();
+    leds.led2.set_low().unwrap();
+    leds.led3.set_low().unwrap();
+    leds.led4.set_low().unwrap();
+    leds.led5.set_low().unwrap();
+    leds.led6.set_low().unwrap();
+    leds.led7.set_low().unwrap();
 
     info!("-- Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
