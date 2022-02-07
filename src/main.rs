@@ -11,7 +11,6 @@ pub mod net;
 extern crate panic_halt;
 pub extern crate stm32h7xx_hal;
 use hardware::{hal, system_timer::SystemTimer, LEDs};
-use log::info;
 use net::{
     miniconf::Miniconf,
     telemetry::{Telemetry, TelemetryBuffer},
@@ -22,7 +21,22 @@ use systick_monotonic::*;
 
 #[derive(Clone, Copy, Debug, Miniconf)]
 pub struct Settings {
+    /// Specifies the telemetry output period in seconds.
+    ///
+    /// # Path
+    /// `telemetry_period`
+    ///
+    /// # Value
+    /// Any positive non-zero value. Will be rounded to milliseconds.
     telemetry_period: f32,
+
+    /// LED0 state.
+    ///
+    /// # Path
+    /// `led`
+    ///
+    /// # Value
+    /// "true" or "false".
     led: bool,
 }
 
@@ -40,7 +54,7 @@ mod app {
     use super::*;
 
     #[monotonic(binds = SysTick, default = true)]
-    type Mono = Systick<10_000>; // ToDo: Is this enough?
+    type Mono = Systick<10_000>; // 10kHz for now, might change later
     #[shared]
     struct Shared {
         network: NetworkUsers<Settings, Telemetry>,
@@ -89,8 +103,6 @@ mod app {
             telemetry: TelemetryBuffer::default(),
         };
 
-        info!("init done");
-
         (shared, local, init::Monotonics(mono))
     }
 
@@ -134,13 +146,12 @@ mod app {
             .lock(|network| network.telemetry.publish(&telemetry.finalize()));
 
         // Schedule the telemetry task in the future.
-        // ToDo: figure out how to give feedback for impossible (neg etc) telemetry periods
+        // ToDo: Figure out how to give feedback for impossible (neg. etc) telemetry periods.
         telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
     }
 
     #[task(priority = 1, shared=[network])]
     fn ethernet_link(mut c: ethernet_link::Context) {
-        info!("polling ethernet");
         c.shared
             .network
             .lock(|network| network.processor.handle_link());
