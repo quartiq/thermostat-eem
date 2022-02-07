@@ -2,17 +2,27 @@
 name = "thermostat-eem"
 version = "0.1.0"
 edition = "2021"
-authors = ["SingularitySurfer"]
+authors = ["Norman Krackow <nk@quartiq.de>", "Robert Jördens", "Ryan Summers"]
 
 [dependencies]
 cortex-m = { version = "0.7" }
 cortex-m-rt = { version = "0.7", features = ["device"] }
-stm32h7xx-hal = {version = "0.11.0", features = ["stm32h743v","rt"]}
+stm32h7xx-hal = {version = "0.11.0", features = ["stm32h743v", "rt", "ethernet"]}
 panic-halt = "0.2.0"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
 rtt-target = { version = "0.3", features = ["cortex-m"] }
+asm-delay = "0.9.0"
+smoltcp-nal = { version = "0.2", features = ["shared-stack"] }
 cortex-m-rtic = "1.0.0"
+embedded-time = "0.12.1"
+miniconf = "0.3"
+systick-monotonic = "1.0.0"
+heapless = { version = "0.7", features = ["serde"] }
+minimq = "0.5.2"
+serde = { version = "1.0.136", features = ["derive"], default-features = false }
+serde-json-core = "0.4"#
+num_enum = { version = "0.5.6", default-features = false }
+
 
 [dependencies.rtt-logger]
 git = "https://github.com/quartiq/rtt-logger.git"
-rev = "70b0eb5"
