@@ -48,19 +48,21 @@ pub struct Settings {
     /// # Value
     /// "true" or "false".
     led: bool,
+
+    adcfiltersettings: AdcFilterSettings,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            // adcfiltersettings: AdcFilterSettings {
-            //     odr: 0b10101,   // 10Hz output data rate
-            //     order: 0,       // Sinc5+Sinc1 filter
-            //     enhfilt: 0b110, // 16.67 SPS, 92 dB rejection, 60 ms settling
-            //     enhfilten: 1,   // enable postfilter
-            // },
             telemetry_period: 1.0,
             led: false,
+            adcfiltersettings: AdcFilterSettings {
+                odr: 0b10101,   // 10Hz output data rate
+                order: 0,       // Sinc5+Sinc1 filter
+                enhfilt: 0b110, // 16.67 SPS, 92 dB rejection, 60 ms settling
+                enhfilten: 1,   // enable postfilter
+            },
         }
     }
 }
@@ -76,11 +78,11 @@ mod app {
         network: NetworkUsers<Settings, Telemetry>,
         settings: Settings,
         telemetry: TelemetryBuffer,
+        adc: Adc,
     }
 
     #[local]
     struct Local {
-        adc: Adc,
         leds: LEDs,
     }
 
@@ -106,13 +108,11 @@ mod app {
                 .unwrap(),
         );
 
-        let settings = Settings::default();
         ethernet_link::spawn().unwrap();
         settings_update::spawn().unwrap();
         telemetry_task::spawn().unwrap();
 
         let local = Local {
-            adc: thermostat.adc,
             leds: thermostat.leds,
         };
 
@@ -120,25 +120,29 @@ mod app {
             network,
             settings: Settings::default(),
             telemetry: TelemetryBuffer::default(),
+            adc: thermostat.adc,
         };
 
         (shared, local, init::Monotonics(mono))
     }
 
-    #[idle(shared=[network], local=[adc])]
+    #[idle(shared=[network, adc])]
     fn idle(mut c: idle::Context) -> ! {
         loop {
             match c.shared.network.lock(|net| net.update()) {
                 NetworkState::SettingsChanged => settings_update::spawn().unwrap(),
                 NetworkState::Updated => {}
                 NetworkState::NoChange => {
-                    info!("adc.read_data(): {}", c.local.adc.read_data().0);
+                    // info!(
+                    //     "adc.read_data(): {}",
+                    //     c.shared.adc.lock(|adc| adc.read_data().0)
+                    // );
                 }
             }
         }
     }
 
-    #[task(priority = 1, local=[leds], shared=[settings, network, telemetry])]
+    #[task(priority = 1, local=[leds], shared=[settings, network, telemetry, adc])]
     fn settings_update(mut c: settings_update::Context) {
         let settings = c
             .shared
@@ -154,13 +158,21 @@ mod app {
         }
 
         c.shared.telemetry.lock(|tele| tele.led = settings.led);
+
+        c.shared
+            .adc
+            .lock(|adc| adc.set_filters(settings.adcfiltersettings));
     }
 
-    #[task(priority = 1, shared=[network, settings, telemetry])]
+    #[task(priority = 1, shared=[network, settings, telemetry, adc])]
     fn telemetry_task(mut c: telemetry_task::Context) {
         let telemetry: TelemetryBuffer = c.shared.telemetry.lock(|telemetry| *telemetry);
 
         let telemetry_period = c.shared.settings.lock(|settings| settings.telemetry_period);
+
+        c.shared
+            .telemetry
+            .lock(|tele| tele.adc[0] = c.shared.adc.lock(|adc| adc.read_data().0));
 
         c.shared
             .network

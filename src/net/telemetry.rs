@@ -34,6 +34,7 @@ pub struct TelemetryClient<T: Serialize> {
 #[derive(Copy, Clone)]
 pub struct TelemetryBuffer {
     pub led: bool,
+    pub adc: [u32; 8],
 }
 
 /// The telemetry structure is data that is ultimately reported as telemetry over MQTT.
@@ -44,11 +45,15 @@ pub struct TelemetryBuffer {
 #[derive(Serialize)]
 pub struct Telemetry {
     pub led: bool,
+    pub adc: [u32; 8],
 }
 
 impl Default for TelemetryBuffer {
     fn default() -> Self {
-        Self { led: false }
+        Self {
+            led: false,
+            adc: [0; 8],
+        }
     }
 }
 
@@ -57,7 +62,10 @@ impl TelemetryBuffer {
     /// # Returns
     /// The finalized telemetry structure that can be serialized and reported.
     pub fn finalize(self) -> Telemetry {
-        Telemetry { led: self.led }
+        Telemetry {
+            led: self.led,
+            adc: self.adc,
+        }
     }
 }
 
