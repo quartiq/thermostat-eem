@@ -54,7 +54,7 @@ mod app {
     use super::*;
 
     #[monotonic(binds = SysTick, default = true)]
-    type Mono = Systick<10_000>; // 10kHz for now, might change later
+    type Mono = Systick<1_000>; // 1ms resolution
     #[shared]
     struct Shared {
         network: NetworkUsers<Settings, Telemetry>,

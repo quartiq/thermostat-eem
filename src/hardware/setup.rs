@@ -87,7 +87,7 @@ pub struct NetworkDevices {
     pub mac_address: smoltcp::wire::EthernetAddress,
 }
 
-/// The available hardware interfaces on Thermostat.}
+/// The available hardware interfaces on Thermostat.
 pub struct ThermostatDevices {
     pub net: NetworkDevices,
     pub leds: LEDs,
@@ -223,7 +223,7 @@ pub fn setup(
             )
         };
 
-        info!("Phy pins bound");
+        info!("Ethernet PHY pins bound");
         // Configure the ethernet controller
         let (eth_dma, eth_mac) = ethernet::new(
             device.ETHERNET_MAC,
@@ -242,11 +242,10 @@ pub fn setup(
         let mut lan8742a = ethernet::phy::LAN8742A::new(eth_mac.set_phy_addr(0));
         lan8742a.phy_reset();
         lan8742a.phy_init();
-        info!("Enabling interrupt");
 
         unsafe { ethernet::enable_interrupt() };
 
-        info!("Configure buffers");
+        info!("Configure TCP/UDP buffers and neighbour/routing caches");
         // Note(unwrap): The hardware configuration function is only allowed to be called once.
         // Unwrapping is intended to panic if called again to prevent re-use of global memory.
         let store = cortex_m::singleton!(: NetStorage = NetStorage::default()).unwrap();
