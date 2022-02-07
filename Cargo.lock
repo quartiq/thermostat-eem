@@ -649,7 +649,7 @@ dependencies = [
 [[package]]
 name = "rtt-logger"
 version = "0.1.1"
-source = "git+https://github.com/quartiq/rtt-logger.git?rev=70b0eb5#70b0eb587fa43902aaf58296fe866418a1f4e920"
+source = "git+https://github.com/quartiq/rtt-logger.git#70b0eb587fa43902aaf58296fe866418a1f4e920"
 dependencies = [
  "log",
  "rtt-target",
