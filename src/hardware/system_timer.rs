@@ -18,7 +18,7 @@ impl Clock for SystemTimer {
     type T = u32;
 
     // The duration of each tick in seconds.
-    const SCALING_FACTOR: Fraction = Fraction::new(1, 10_000);
+    const SCALING_FACTOR: Fraction = Fraction::new(1, 1_000);
 
     fn try_now(&self) -> Result<Instant<Self>, Error> {
         Ok(Instant::new((self.0)() as _))
