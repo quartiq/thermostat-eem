@@ -65,6 +65,7 @@ where
     pub fn new(
         stack: NetworkStack,
         phy: EthernetPhy,
+        clock: SystemTimer,
         app: &str,
         mac: smoltcp_nal::smoltcp::wire::EthernetAddress,
         broker: IpAddr,
@@ -81,12 +82,13 @@ where
             &get_client_id(app, "settings", mac),
             &prefix,
             broker,
-            SystemTimer::default(),
+            clock,
         )
         .unwrap();
 
         let telemetry = TelemetryClient::new(
             stack_manager.acquire_stack(),
+            clock,
             &get_client_id(app, "tlm", mac),
             &prefix,
             broker,

@@ -10,7 +10,7 @@ pub mod net;
 
 extern crate panic_halt;
 pub extern crate stm32h7xx_hal;
-use hardware::hal;
+use hardware::{hal, system_timer::SystemTimer};
 use log::info;
 use net::{miniconf::Miniconf, telemetry::Telemetry, NetworkState, NetworkUsers};
 use systick_monotonic::*;
@@ -43,12 +43,18 @@ mod app {
 
     #[init]
     fn init(c: init::Context) -> (Shared, Local, init::Monotonics) {
+        // Initialize monotonic
+        let systick = c.core.SYST;
+        let mono = Systick::new(systick, 400_000_000); // not sure if 400MHz is right
+        let clock = SystemTimer::new(|| monotonics::now().ticks());
+
         // setup Thermostat hardware
-        let (thermostat, mono) = hardware::setup::setup(c.core, c.device);
+        let thermostat = hardware::setup::setup(c.device, clock);
 
         let network = NetworkUsers::new(
             thermostat.net.stack,
             thermostat.net.phy,
+            clock,
             env!("CARGO_BIN_NAME"),
             thermostat.net.mac_address,
             option_env!("BROKER")
