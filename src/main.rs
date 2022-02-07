@@ -98,7 +98,7 @@ mod app {
         };
 
         let shared = Shared {
-            network: network,
+            network,
             settings: Settings::default(),
             telemetry: TelemetryBuffer::default(),
         };
