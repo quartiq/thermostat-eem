@@ -133,10 +133,7 @@ mod app {
                 NetworkState::SettingsChanged => settings_update::spawn().unwrap(),
                 NetworkState::Updated => {}
                 NetworkState::NoChange => {
-                    // info!(
-                    //     "adc.read_data(): {}",
-                    //     c.shared.adc.lock(|adc| adc.read_data().0)
-                    // );
+                    // cortex_m::asm::wfi();
                 }
             }
         }
@@ -170,9 +167,23 @@ mod app {
 
         let telemetry_period = c.shared.settings.lock(|settings| settings.telemetry_period);
 
-        c.shared
-            .telemetry
-            .lock(|tele| tele.adc[0] = c.shared.adc.lock(|adc| adc.read_data().0));
+        let data0 = c.shared.adc.lock(|adc| adc.read_data());
+        let data1 = c.shared.adc.lock(|adc| adc.read_data());
+        let adcdata: [u32; 2];
+        match data0.1 {
+            0 => {
+                adcdata = [data0.0, data1.0];
+            }
+            _ => {
+                adcdata = [data1.0, data0.0];
+            }
+        }
+        info!("data1: {:?}", data0);
+        info!("data2: {:?}", data1);
+        c.shared.telemetry.lock(|tele| {
+            tele.adc[0] = adcdata[0];
+            tele.adc[1] = adcdata[1];
+        });
 
         c.shared
             .network
