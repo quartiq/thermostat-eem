@@ -1,4 +1,5 @@
 use crate::hardware::system_timer;
+use hal::rcc::PllConfigStrategy;
 use rtt_logger::RTTLogger;
 use smoltcp_nal::smoltcp;
 use stm32h7xx_hal::hal::digital::v2::OutputPin;
@@ -124,6 +125,8 @@ pub fn setup(
         .per_ck(100.mhz())
         .pll2_p_ck(100.mhz())
         .pll2_q_ck(100.mhz())
+        .pll1_q_ck(2.mhz())
+        .mco1_from_pll1_q_ck(2.mhz())
         .freeze(vos, &device.SYSCFG);
 
     static LOGGER: RTTLogger = RTTLogger::new(log::LevelFilter::Trace);
@@ -331,11 +334,10 @@ pub fn setup(
         mosi: gpioe.pe6.into_alternate_af5(),
         cs: gpioe.pe0.into_push_pull_output(),
     };
-    let mut adc = Adc::new(ccdr.peripheral.SPI4, device.SPI4, adc_pins, &ccdr.clocks);
+    let adc = Adc::new(ccdr.peripheral.SPI4, device.SPI4, adc_pins, &ccdr.clocks);
 
-    info!("adc data: {}", adc.read_data().0);
-
-    info!("adc.get_status_reg(): {:#x}", adc.get_status_reg());
+    info!("enable MCO 2MHz clock output to ADCs");
+    gpioa.pa8.into_alternate_af0();
 
     info!("--- Hardware setup done.");
 
