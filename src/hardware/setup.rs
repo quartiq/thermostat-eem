@@ -104,6 +104,9 @@ pub fn setup(
     device: stm32h7xx_hal::stm32::Peripherals,
     clock: system_timer::SystemTimer,
 ) -> ThermostatDevices {
+    // Enable debug during WFE/WFI-induced sleep
+    device.DBGMCU.cr.modify(|_, w| w.dbgsleep_d1().set_bit());
+
     let pwr = device.PWR.constrain();
     let vos = pwr.freeze();
 

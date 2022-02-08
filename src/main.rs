@@ -133,10 +133,7 @@ mod app {
                 NetworkState::SettingsChanged => settings_update::spawn().unwrap(),
                 NetworkState::Updated => {}
                 NetworkState::NoChange => {
-                    // info!(
-                    //     "adc.read_data(): {}",
-                    //     c.shared.adc.lock(|adc| adc.read_data().0)
-                    // );
+                    cortex_m::asm::wfi();
                 }
             }
         }
