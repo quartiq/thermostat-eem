@@ -106,7 +106,7 @@ impl Adc {
         info!("ADC ID: {:#X}", adc.read_reg(AdcReg::ID, 2));
 
         // Setup ADCMODE register. Internal reference, external clock, no delay, continuous conversion.
-        adc.write_reg(AdcReg::ADCMODE, 2, 0x8008);
+        adc.write_reg(AdcReg::ADCMODE, 2, 0x8000);
 
         // Setup IFMODE register. Only enable data stat to get channel info on conversions.
         adc.write_reg(AdcReg::IFMODE, 2, 0b100_0000);
