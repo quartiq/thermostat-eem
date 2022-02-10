@@ -58,10 +58,10 @@ impl Default for Settings {
             telemetry_period: 1.0,
             led: false,
             adcfiltersettings: AdcFilterSettings {
-                odr: 0b10101,   // 10Hz output data rate
+                odr: 0b10110,   // 10Hz output data rate
                 order: 0,       // Sinc5+Sinc1 filter
                 enhfilt: 0b110, // 16.67 SPS, 92 dB rejection, 60 ms settling
-                enhfilten: 1,   // enable postfilter
+                enhfilten: 0,   // enable postfilter
             },
         }
     }
@@ -134,22 +134,20 @@ mod app {
                 NetworkState::SettingsChanged => settings_update::spawn().unwrap(),
                 NetworkState::Updated => {}
                 NetworkState::NoChange => {
-                    loop {
-                        let statreg = c.shared.adc.lock(|adc| adc.get_status_reg());
-                        if statreg != 0xff {
-                            let (adcdata, ch) = c.shared.adc.lock(|adc| adc.read_data());
-                            match ch {
-                                0 => {
-                                    adcdata1 = adcdata;
-                                }
-                                _ => {
-                                    // ADC ch1 is Thermostat ch0
-                                    let adcdata0 = adcdata;
-                                    info!("adcdata0: {:?}", adcdata0);
-                                    // just spawn tele when new data is available.
-                                    c.shared.telemetry.lock(|tele| tele.adc[0] = adcdata0);
-                                    telemetry_task::spawn().unwrap();
-                                }
+                    let statreg = c.shared.adc.lock(|adc| adc.get_status_reg());
+                    if statreg != 0xff {
+                        let (adcdata, ch) = c.shared.adc.lock(|adc| adc.read_data());
+                        match ch {
+                            1 => {
+                                adcdata1 = adcdata;
+                            }
+                            _ => {
+                                // ADC ch1 is Thermostat ch0
+                                let adcdata0 = adcdata;
+                                info!("adcdata0: {:?}", adcdata1);
+                                // just spawn tele when new data on ch1 (second channel) is available.
+                                c.shared.telemetry.lock(|tele| tele.adc[0] = adcdata1);
+                                telemetry_task::spawn().unwrap();
                             }
                         }
                     }
@@ -178,6 +176,7 @@ mod app {
         c.shared
             .adc
             .lock(|adc| adc.set_filters(settings.adcfiltersettings));
+        // info!("settingscfiltersettings: {:?}", settings.adcfiltersettings);
     }
 
     #[task(priority = 1, shared=[network, settings, telemetry, adc])]

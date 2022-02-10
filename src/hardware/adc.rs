@@ -218,11 +218,11 @@ impl Adc {
             // External Reference
         );
 
-        // Setup filter register ch0. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
-        self.write_reg(AdcReg::FILTCON0, 2, 0b110 << 8 | 1 << 11 | 0b10011);
+        // Setup filter register ch0. 10Hz data rate. Sinc5Sinc1 Filter.
+        self.write_reg(AdcReg::FILTCON0, 2, 0b110 << 8 | 0b10011);
 
-        // Setup filter register ch1. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
-        self.write_reg(AdcReg::FILTCON1, 2, 0b110 << 8 | 1 << 11 | 0b10011);
+        // Setup filter register ch1. 10Hz data rate. Sinc5Sinc1 Filter.
+        self.write_reg(AdcReg::FILTCON1, 2, 0b110 << 8 | 0b10011);
     }
 
     /// Set both ADC channel filter config to the same settings.
