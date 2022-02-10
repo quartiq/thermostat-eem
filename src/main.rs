@@ -126,14 +126,33 @@ mod app {
         (shared, local, init::Monotonics(mono))
     }
 
-    #[idle(shared=[network, adc])]
+    #[idle(shared=[network, adc, telemetry])]
     fn idle(mut c: idle::Context) -> ! {
+        let mut adcdata1 = 0; // initialize to zero in case ch0 comes first
         loop {
             match c.shared.network.lock(|net| net.update()) {
                 NetworkState::SettingsChanged => settings_update::spawn().unwrap(),
                 NetworkState::Updated => {}
                 NetworkState::NoChange => {
-                    cortex_m::asm::wfi();
+                    loop {
+                        let statreg = c.shared.adc.lock(|adc| adc.get_status_reg());
+                        if statreg != 0xff {
+                            let (adcdata, ch) = c.shared.adc.lock(|adc| adc.read_data());
+                            match ch {
+                                0 => {
+                                    adcdata1 = adcdata;
+                                }
+                                _ => {
+                                    // ADC ch1 is Thermostat ch0
+                                    let adcdata0 = adcdata;
+                                    info!("adcdata0: {:?}", adcdata0);
+                                    // just spawn tele when new data is available.
+                                    c.shared.telemetry.lock(|tele| tele.adc[0] = adcdata0);
+                                    telemetry_task::spawn().unwrap();
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -177,7 +196,7 @@ mod app {
 
         // Schedule the telemetry task in the future.
         // ToDo: Figure out how to give feedback for impossible (neg. etc) telemetry periods.
-        telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
+        // telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
     }
 
     #[task(priority = 1, shared=[network])]
