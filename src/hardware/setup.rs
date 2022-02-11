@@ -1,5 +1,4 @@
 use crate::hardware::system_timer;
-use rtt_logger::RTTLogger;
 use smoltcp_nal::smoltcp;
 use stm32h7xx_hal::hal::digital::v2::OutputPin;
 
@@ -14,7 +13,7 @@ use super::hal::{
 
 use super::{EthernetPhy, LEDs, NetworkStack};
 
-use log::info;
+use defmt::info;
 
 const NUM_TCP_SOCKETS: usize = 4;
 const NUM_UDP_SOCKETS: usize = 1;
@@ -121,11 +120,6 @@ pub fn setup(
         .pll2_q_ck(100.mhz())
         .freeze(vos, &device.SYSCFG);
 
-    static LOGGER: RTTLogger = RTTLogger::new(log::LevelFilter::Trace);
-    rtt_target::rtt_init_print!();
-    log::set_logger(&LOGGER)
-        .map(|()| log::set_max_level(log::LevelFilter::Trace))
-        .unwrap();
     info!("--- Starting hardware setup");
 
     let mut delay = asm_delay::AsmDelay::new(asm_delay::bitrate::Hertz(ccdr.clocks.c_ck().0));
