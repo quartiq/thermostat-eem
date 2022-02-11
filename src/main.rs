@@ -8,6 +8,8 @@
 pub mod hardware;
 pub mod net;
 
+use defmt_rtt as _; // global logger
+
 extern crate panic_halt;
 pub extern crate stm32h7xx_hal;
 use hardware::{hal, system_timer::SystemTimer, LEDs};
