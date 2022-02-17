@@ -169,7 +169,7 @@ mod app {
 
         c.shared
             .telemetry
-            .lock(|tele| tele.adc[0] = c.shared.adc.lock(|adc| adc.read_data().0));
+            .lock(|tele| tele.adc[0] = c.shared.adc.lock(|adc| adc.read_data().0)); // This reads a random channel from ADC0
 
         c.shared
             .network
