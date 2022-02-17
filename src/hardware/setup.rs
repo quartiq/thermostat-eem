@@ -13,6 +13,7 @@ use super::hal::{
 
 use super::{
     adc::{Adc, AdcPins},
+    dac::{Dac, DacPins, DacSpi, Pwm}
     EthernetPhy, LEDs, NetworkStack, SRC_MAC,
 };
 
@@ -338,6 +339,14 @@ pub fn setup(
 
     info!("enable MCO 2MHz clock output to ADCs");
     gpioa.pa8.into_alternate_af0();
+
+    info!("Setup DAC");
+    let dac_pins = DacPins {
+        sck: gpioe.pe2.into_alternate_af5(),
+        mosi: gpioe.pe6.into_alternate_af5(),
+        sync: gpioe.pe4.into_push_pull_output(),
+        shdn: gpioe.pe10.into_push_pull_output(),
+    };
 
     info!("--- Hardware setup done.");
 
