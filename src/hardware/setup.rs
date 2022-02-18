@@ -342,8 +342,11 @@ pub fn setup(
 
     info!("Setup PWM");
 
-    let pwms = Pwms::new(
-        ccdr,
+    let mut pwms = Pwms::new(
+        &ccdr.clocks,
+        ccdr.peripheral.TIM1,
+        ccdr.peripheral.TIM3,
+        ccdr.peripheral.TIM4,
         device.TIM1,
         device.TIM3,
         device.TIM4,
@@ -360,6 +363,8 @@ pub fn setup(
         gpioc.pc8,
         gpioc.pc9,
     );
+
+    pwms.set(2, 0.5);
 
     info!("--- Hardware setup done.");
 

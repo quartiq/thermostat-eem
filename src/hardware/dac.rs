@@ -11,12 +11,14 @@ use super::hal::{
     prelude::*,
     pwm,
     pwm::*,
-    rcc::Ccdr,
+    rcc::{rec, CoreClocks},
     spi,
     spi::{NoMiso, Spi},
     stm32::{SPI3, TIM1, TIM3, TIM4},
     time::{MegaHertz, U32Ext},
 };
+
+use log::info;
 
 use super::unit_conversion::{i_to_dac, i_to_pwm, v_to_pwm};
 
@@ -39,7 +41,7 @@ macro_rules! setup_tim {
             $pin3.into_alternate_af1(),
         );
         let (mut pwm_0, mut pwm_1, mut pwm_2, mut pwm_3) =
-            $tim.pwm(channels, F_PWM.khz(), $ccdr.peripheral.$timp, &$ccdr.clocks);
+            $tim.pwm(channels, F_PWM.khz(), $peripheral.$timp, &$clocks);
         init_pwm_pin(&mut pwm_0);
         init_pwm_pin(&mut pwm_1);
         init_pwm_pin(&mut pwm_2);
@@ -63,25 +65,30 @@ pub struct DacPins {
     pub shdn3: PG7<Output<PushPull>>,
 }
 
-type Pt<T, S> = pwm::Pwm<T, S, ComplementaryDisabled, ActiveHigh, ActiveHigh>;
+type Pt0<T, S> = pwm::Pwm<T, S, ComplementaryDisabled, ActiveHigh, ActiveHigh>;
+type Pt1<T, S> = pwm::Pwm<T, S, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
+
 pub struct Pwms {
-    pub max_v0: Pt<TIM1, C1>,
-    pub max_v1: Pt<TIM1, C2>,
-    pub max_v2: Pt<TIM1, C3>,
-    pub max_v3: pwm::Pwm<TIM1, C4, ComplementaryImpossible, ActiveHigh, ActiveHigh>,
-    pub max_i_pos0: Pt<TIM4, C1>,
-    pub max_i_pos1: Pt<TIM4, C2>,
-    pub max_i_pos2: Pt<TIM4, C3>,
-    pub max_i_pos3: Pt<TIM4, C4>,
-    pub max_i_neg0: Pt<TIM3, C1>,
-    pub max_i_neg1: Pt<TIM3, C2>,
-    pub max_i_neg2: Pt<TIM3, C3>,
-    pub max_i_neg3: Pt<TIM3, C4>,
+    pub max_v0: Pt0<TIM1, C1>,
+    pub max_v1: Pt0<TIM1, C2>,
+    pub max_v2: Pt0<TIM1, C3>,
+    pub max_v3: Pt1<TIM1, C4>,
+    pub max_i_pos0: Pt1<TIM4, C1>,
+    pub max_i_pos1: Pt1<TIM4, C2>,
+    pub max_i_pos2: Pt1<TIM4, C3>,
+    pub max_i_pos3: Pt1<TIM4, C4>,
+    pub max_i_neg0: Pt1<TIM3, C1>,
+    pub max_i_neg1: Pt1<TIM3, C2>,
+    pub max_i_neg2: Pt1<TIM3, C3>,
+    pub max_i_neg3: Pt1<TIM3, C4>,
 }
 
 impl Pwms {
     pub fn new<M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12>(
-        ccdr: Ccdr,
+        clocks: &CoreClocks,
+        tim1_rcc: rec::Tim1,
+        tim3_rcc: rec::Tim3,
+        tim4_rcc: rec::Tim4,
         tim1: TIM1,
         tim3: TIM3,
         tim4: TIM4,
@@ -107,13 +114,13 @@ impl Pwms {
         //     setup_tim!(tim1, ccdr, TIM1, max_v0_pin, max_v1_pin, max_v2_pin, max_v3_pin);
 
         let channels = (
-            max_v0_pin.into_alternate_af2(),
-            max_v1_pin.into_alternate_af2(),
-            max_v2_pin.into_alternate_af2(),
-            max_v3_pin.into_alternate_af2(),
+            max_v0_pin.into_alternate_af1(),
+            max_v1_pin.into_alternate_af1(),
+            max_v2_pin.into_alternate_af1(),
+            max_v3_pin.into_alternate_af1(),
         );
         let (mut max_v0, mut max_v1, mut max_v2, mut max_v3) =
-            tim4.pwm(channels, F_PWM.khz(), ccdr.peripheral.TIM4, &ccdr.clocks);
+            tim1.pwm(channels, F_PWM.khz(), tim1_rcc, &clocks);
         init_pwm_pin(&mut max_v0);
         init_pwm_pin(&mut max_v1);
         init_pwm_pin(&mut max_v2);
@@ -128,12 +135,8 @@ impl Pwms {
             max_i_pos2_pin.into_alternate_af2(),
             max_i_pos3_pin.into_alternate_af2(),
         );
-        let (mut max_i_pos0, mut max_i_pos1, mut max_i_pos2, mut max_i_pos3) = tim4.pwm(
-            max_i_pos0_pin.into_alternate_af2(),
-            F_PWM.khz(),
-            ccdr.peripheral.TIM4,
-            &ccdr.clocks,
-        );
+        let (mut max_i_pos0, mut max_i_pos1, mut max_i_pos2, mut max_i_pos3) =
+            tim4.pwm(channels, F_PWM.khz(), tim4_rcc, &clocks);
         init_pwm_pin(&mut max_i_pos0);
         init_pwm_pin(&mut max_i_pos1);
         init_pwm_pin(&mut max_i_pos2);
@@ -148,7 +151,7 @@ impl Pwms {
             max_i_neg3_pin.into_alternate_af2(),
         );
         let (mut max_i_neg0, mut max_i_neg1, mut max_i_neg2, mut max_i_neg3) =
-            tim3.pwm(channels, F_PWM.khz(), ccdr.peripheral.TIM3, &ccdr.clocks);
+            tim3.pwm(channels, F_PWM.khz(), tim3_rcc, &clocks);
         init_pwm_pin(&mut max_i_neg0);
         init_pwm_pin(&mut max_i_neg1);
         init_pwm_pin(&mut max_i_neg2);
@@ -171,13 +174,14 @@ impl Pwms {
     }
 
     /// Set PWM channel to relative dutycycle.
-    pub fn set(&mut self, duty: f32, ch: u8) {
+    pub fn set(&mut self, ch: u8, duty: f32) {
         fn set<P: PwmPin<Duty = u16>>(pin: &mut P, duty: f32) {
             let duty = i_to_pwm(duty);
             let max = pin.get_max_duty();
             let value = ((duty * (max as f32)) as u16).min(max);
             pin.set_duty(value);
         }
+        info!("ch: {:?} duty: {:?}", ch, duty);
         match ch {
             0 => set(&mut self.max_v0, duty),
             1 => set(&mut self.max_v1, duty),
@@ -199,17 +203,17 @@ impl Pwms {
         max_i1: f32,
         max_v1: f32,
     ) {
-        self.set(v_to_pwm(max_v0), 0);
-        self.set(v_to_pwm(max_v1), 1);
-        self.set(i_to_pwm(max_i0), 2);
-        self.set(i_to_pwm(min_i0), 3);
-        self.set(i_to_pwm(max_i1), 4);
-        self.set(i_to_pwm(min_i1), 5);
+        self.set( 0,v_to_pwm(max_v0));
+        self.set( 1,v_to_pwm(max_v1));
+        self.set( 2,i_to_pwm(max_i0));
+        self.set( 3,i_to_pwm(min_i0));
+        self.set( 4,i_to_pwm(max_i1));
+        self.set( 5,i_to_pwm(min_i1));
     }
 }
 
-/// DAC: https://www.analog.com/media/en/technical-documentation/data-sheets/AD5680.pdf
-/// Peltier Driver: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
+// / DAC: https://www.analog.com/media/en/technical-documentation/data-sheets/AD5680.pdf
+// / Peltier Driver: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
 // pub struct Dac {
 //     spi: DacSpi,
 //     pub val: [u32; 2],
