@@ -33,15 +33,10 @@ pub const MAX_VALUE: u32 = 0x3FFFF; // Maximum DAC output value
 pub const F_PWM: u32 = 20; // PWM freq in kHz
 
 macro_rules! setup_tim {
-    ($tim:ident, $ccdr:ident, $timp:ident, $pin0:ident, $pin1:ident, $pin2:ident, $pin3:ident) => {{
-        let channels = (
-            $pin0.into_alternate_af1(),
-            $pin1.into_alternate_af1(),
-            $pin2.into_alternate_af1(),
-            $pin3.into_alternate_af1(),
-        );
+    ($tim:ident, $clocks:ident, $timp:ident, $af:ident, $pin0:ident, $pin1:ident, $pin2:ident, $pin3:ident) => {{
+        let channels = ($pin0.$af(), $pin1.$af(), $pin2.$af(), $pin3.$af());
         let (mut pwm_0, mut pwm_1, mut pwm_2, mut pwm_3) =
-            $tim.pwm(channels, F_PWM.khz(), $peripheral.$timp, &$clocks);
+            $tim.pwm(channels, F_PWM.khz(), $timp, $clocks);
         init_pwm_pin(&mut pwm_0);
         init_pwm_pin(&mut pwm_1);
         init_pwm_pin(&mut pwm_2);
@@ -110,52 +105,38 @@ impl Pwms {
             pin.enable();
         }
 
-        // let (mut max_v0, mut max_v1, mut max_v2, mut max_v3) =
-        //     setup_tim!(tim1, ccdr, TIM1, max_v0_pin, max_v1_pin, max_v2_pin, max_v3_pin);
-
-        let channels = (
-            max_v0_pin.into_alternate_af1(),
-            max_v1_pin.into_alternate_af1(),
-            max_v2_pin.into_alternate_af1(),
-            max_v3_pin.into_alternate_af1(),
+        let (max_v0, max_v1, max_v2, max_v3) = setup_tim!(
+            tim1,
+            clocks,
+            tim1_rcc,
+            into_alternate_af1,
+            max_v0_pin,
+            max_v1_pin,
+            max_v2_pin,
+            max_v3_pin
         );
-        let (mut max_v0, mut max_v1, mut max_v2, mut max_v3) =
-            tim1.pwm(channels, F_PWM.khz(), tim1_rcc, &clocks);
-        init_pwm_pin(&mut max_v0);
-        init_pwm_pin(&mut max_v1);
-        init_pwm_pin(&mut max_v2);
-        init_pwm_pin(&mut max_v3);
 
-        // let (mut max_i_pos0, mut max_i_pos1, mut max_i_pos2, mut max_i_pos3) =
-        //     setup_tim!(tim4, ccdr, TIM4, max_i_pos0_pin, max_i_pos1_pin, max_i_pos2_pin, max_i_pos3_pin);
-
-        let channels = (
-            max_i_pos0_pin.into_alternate_af2(),
-            max_i_pos1_pin.into_alternate_af2(),
-            max_i_pos2_pin.into_alternate_af2(),
-            max_i_pos3_pin.into_alternate_af2(),
+        let (max_i_pos0, max_i_pos1, max_i_pos2, max_i_pos3) = setup_tim!(
+            tim4,
+            clocks,
+            tim4_rcc,
+            into_alternate_af2,
+            max_i_pos0_pin,
+            max_i_pos1_pin,
+            max_i_pos2_pin,
+            max_i_pos3_pin
         );
-        let (mut max_i_pos0, mut max_i_pos1, mut max_i_pos2, mut max_i_pos3) =
-            tim4.pwm(channels, F_PWM.khz(), tim4_rcc, &clocks);
-        init_pwm_pin(&mut max_i_pos0);
-        init_pwm_pin(&mut max_i_pos1);
-        init_pwm_pin(&mut max_i_pos2);
-        init_pwm_pin(&mut max_i_pos3);
 
-        // let (mut max_i_neg0, mut max_i_neg1, mut max_i_neg2, mut max_i_neg3) =
-        //     setup_tim!(tim3, ccdr, TIM3, max_i_neg0_pin, max_i_neg1_pin, max_i_neg2_pin, max_i_neg3_pin);
-        let channels = (
-            max_i_neg0_pin.into_alternate_af2(),
-            max_i_neg1_pin.into_alternate_af2(),
-            max_i_neg2_pin.into_alternate_af2(),
-            max_i_neg3_pin.into_alternate_af2(),
+        let (max_i_neg0, max_i_neg1, max_i_neg2, max_i_neg3) = setup_tim!(
+            tim3,
+            clocks,
+            tim3_rcc,
+            into_alternate_af2,
+            max_i_neg0_pin,
+            max_i_neg1_pin,
+            max_i_neg2_pin,
+            max_i_neg3_pin
         );
-        let (mut max_i_neg0, mut max_i_neg1, mut max_i_neg2, mut max_i_neg3) =
-            tim3.pwm(channels, F_PWM.khz(), tim3_rcc, &clocks);
-        init_pwm_pin(&mut max_i_neg0);
-        init_pwm_pin(&mut max_i_neg1);
-        init_pwm_pin(&mut max_i_neg2);
-        init_pwm_pin(&mut max_i_neg3);
 
         Pwms {
             max_v0,
@@ -203,12 +184,12 @@ impl Pwms {
         max_i1: f32,
         max_v1: f32,
     ) {
-        self.set( 0,v_to_pwm(max_v0));
-        self.set( 1,v_to_pwm(max_v1));
-        self.set( 2,i_to_pwm(max_i0));
-        self.set( 3,i_to_pwm(min_i0));
-        self.set( 4,i_to_pwm(max_i1));
-        self.set( 5,i_to_pwm(min_i1));
+        self.set(0, v_to_pwm(max_v0));
+        self.set(1, v_to_pwm(max_v1));
+        self.set(2, i_to_pwm(max_i0));
+        self.set(3, i_to_pwm(min_i0));
+        self.set(4, i_to_pwm(max_i1));
+        self.set(5, i_to_pwm(min_i1));
     }
 }
 
