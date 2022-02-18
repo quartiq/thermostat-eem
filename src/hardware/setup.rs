@@ -13,7 +13,7 @@ use super::hal::{
 
 use super::{
     adc::{Adc, AdcPins},
-    dac::{Dac, DacPins, DacSpi, Pwm}
+    dac::Pwms,
     EthernetPhy, LEDs, NetworkStack, SRC_MAC,
 };
 
@@ -143,7 +143,7 @@ pub fn setup(
     let gpioa = device.GPIOA.split(ccdr.peripheral.GPIOA);
     let gpiob = device.GPIOB.split(ccdr.peripheral.GPIOB);
     let gpioc = device.GPIOC.split(ccdr.peripheral.GPIOC);
-    // let gpiod = device.GPIOD.split(ccdr.peripheral.GPIOD);
+    let gpiod = device.GPIOD.split(ccdr.peripheral.GPIOD);
     let gpioe = device.GPIOE.split(ccdr.peripheral.GPIOE);
     // let gpiof = device.GPIOF.split(ccdr.peripheral.GPIOF);
     let gpiog = device.GPIOG.split(ccdr.peripheral.GPIOG);
@@ -340,13 +340,26 @@ pub fn setup(
     info!("enable MCO 2MHz clock output to ADCs");
     gpioa.pa8.into_alternate_af0();
 
-    info!("Setup DAC");
-    let dac_pins = DacPins {
-        sck: gpioe.pe2.into_alternate_af5(),
-        mosi: gpioe.pe6.into_alternate_af5(),
-        sync: gpioe.pe4.into_push_pull_output(),
-        shdn: gpioe.pe10.into_push_pull_output(),
-    };
+    info!("Setup PWM");
+
+    let pwms = Pwms::new(
+        ccdr,
+        device.TIM1,
+        device.TIM3,
+        device.TIM4,
+        gpioe.pe9,
+        gpioe.pe11,
+        gpioe.pe13,
+        gpioe.pe14,
+        gpiod.pd12,
+        gpiod.pd13,
+        gpiod.pd14,
+        gpiod.pd15,
+        gpioc.pc6,
+        gpiob.pb5,
+        gpioc.pc8,
+        gpioc.pc9,
+    );
 
     info!("--- Hardware setup done.");
 

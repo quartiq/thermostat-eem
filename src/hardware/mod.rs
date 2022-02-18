@@ -8,6 +8,7 @@ pub mod adc;
 pub mod dac;
 pub mod setup;
 pub mod system_timer;
+pub mod unit_conversion;
 
 // Thermostat MAC definition
 // ToDo: implement eeprom MAC

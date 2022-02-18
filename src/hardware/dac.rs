@@ -7,17 +7,18 @@
 
 use super::hal::{
     gpio::{gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiog::*, Alternate, Output, PushPull, AF5},
-    hal::{blocking::spi::Transfer, digital::v2::OutputPin, PwmPin, Pwm},
-    pwm::*,
+    hal::{blocking::spi::Transfer, digital::v2::OutputPin, PwmPin},
     prelude::*,
-    rcc::{rec, CoreClocks},
+    pwm,
+    pwm::*,
+    rcc::Ccdr,
     spi,
     spi::{NoMiso, Spi},
-    stm32::{SPI3, TIM1, TIM3},
+    stm32::{SPI3, TIM1, TIM3, TIM4},
     time::{MegaHertz, U32Ext},
 };
 
-use crate::unit_conversion::{i_to_dac, i_to_pwm, v_to_pwm};
+use super::unit_conversion::{i_to_dac, i_to_pwm, v_to_pwm};
 
 /// SPI Mode 1
 pub const SPI_MODE: spi::Mode = spi::Mode {
@@ -28,6 +29,24 @@ pub const SPI_MODE: spi::Mode = spi::Mode {
 pub const SPI_CLOCK: MegaHertz = MegaHertz(30); // DAC SPI clock speed
 pub const MAX_VALUE: u32 = 0x3FFFF; // Maximum DAC output value
 pub const F_PWM: u32 = 20; // PWM freq in kHz
+
+macro_rules! setup_tim {
+    ($tim:ident, $ccdr:ident, $timp:ident, $pin0:ident, $pin1:ident, $pin2:ident, $pin3:ident) => {{
+        let channels = (
+            $pin0.into_alternate_af1(),
+            $pin1.into_alternate_af1(),
+            $pin2.into_alternate_af1(),
+            $pin3.into_alternate_af1(),
+        );
+        let (mut pwm_0, mut pwm_1, mut pwm_2, mut pwm_3) =
+            $tim.pwm(channels, F_PWM.khz(), $ccdr.peripheral.$timp, &$ccdr.clocks);
+        init_pwm_pin(&mut pwm_0);
+        init_pwm_pin(&mut pwm_1);
+        init_pwm_pin(&mut pwm_2);
+        init_pwm_pin(&mut pwm_3);
+        (pwm_0, pwm_1, pwm_2, pwm_3)
+    }};
+}
 
 pub type DacSpi = Spi<SPI3, (PC10<Alternate<AF5>>, NoMiso, PC12<Alternate<AF5>>)>;
 
@@ -44,19 +63,20 @@ pub struct DacPins {
     pub shdn3: PG7<Output<PushPull>>,
 }
 
+type Pt<T, S> = pwm::Pwm<T, S, ComplementaryDisabled, ActiveHigh, ActiveHigh>;
 pub struct Pwms {
-    pub max_v0: Pwm<TIM1, C1, ComplementaryDisabled, ActiveHigh, ActiveHigh>,
-    pub max_v1: PwmChannels<TIM1, pwm::C2>,
-    pub max_v2: PwmChannels<TIM1, pwm::C3>,
-    pub max_v3: PwmChannels<TIM1, pwm::C4>,
-    pub max_i_pos0: PwmChannels<TIM4, pwm::C1>,
-    pub max_i_pos1: PwmChannels<TIM4, pwm::C2>,
-    pub max_i_pos2: PwmChannels<TIM4, pwm::C3>,
-    pub max_i_pos3: PwmChannels<TIM4, pwm::C4>,
-    pub max_i_neg0: PwmChannels<TIM3, pwm::C1>,
-    pub max_i_neg1: PwmChannels<TIM3, pwm::C2>,
-    pub max_i_neg2: PwmChannels<TIM3, pwm::C3>,
-    pub max_i_neg3: PwmChannels<TIM3, pwm::C4>,
+    pub max_v0: Pt<TIM1, C1>,
+    pub max_v1: Pt<TIM1, C2>,
+    pub max_v2: Pt<TIM1, C3>,
+    pub max_v3: pwm::Pwm<TIM1, C4, ComplementaryImpossible, ActiveHigh, ActiveHigh>,
+    pub max_i_pos0: Pt<TIM4, C1>,
+    pub max_i_pos1: Pt<TIM4, C2>,
+    pub max_i_pos2: Pt<TIM4, C3>,
+    pub max_i_pos3: Pt<TIM4, C4>,
+    pub max_i_neg0: Pt<TIM3, C1>,
+    pub max_i_neg1: Pt<TIM3, C2>,
+    pub max_i_neg2: Pt<TIM3, C3>,
+    pub max_i_neg3: Pt<TIM3, C4>,
 }
 
 impl Pwms {
@@ -65,61 +85,70 @@ impl Pwms {
         tim1: TIM1,
         tim3: TIM3,
         tim4: TIM4,
-        max_v0: PE9<M1>,
-        max_v1: PE11<M2>,
-        max_v2: PE13<M3>,
-        max_v3: PE14<M4>,
-        max_i_pos0: PD12<M5>,
-        max_i_pos1: PD13<M6>,
-        max_i_pos2: PD14<M7>,
-        max_i_pos3: PD15<M8>,
-        max_i_neg0: PC6<M9>,
-        max_i_neg1: PB5<M10>,
-        max_i_neg2: PC8<M11>,
-        max_i_neg3: PC9<M12>,
+        max_v0_pin: PE9<M1>,
+        max_v1_pin: PE11<M2>,
+        max_v2_pin: PE13<M3>,
+        max_v3_pin: PE14<M4>,
+        max_i_pos0_pin: PD12<M5>,
+        max_i_pos1_pin: PD13<M6>,
+        max_i_pos2_pin: PD14<M7>,
+        max_i_pos3_pin: PD15<M8>,
+        max_i_neg0_pin: PC6<M9>,
+        max_i_neg1_pin: PB5<M10>,
+        max_i_neg2_pin: PC8<M11>,
+        max_i_neg3_pin: PC9<M12>,
     ) -> Pwms {
         fn init_pwm_pin<P: PwmPin<Duty = u16>>(pin: &mut P) {
             pin.set_duty(0);
             pin.enable();
         }
 
-        // setup max_v channels on timer 1
+        // let (mut max_v0, mut max_v1, mut max_v2, mut max_v3) =
+        //     setup_tim!(tim1, ccdr, TIM1, max_v0_pin, max_v1_pin, max_v2_pin, max_v3_pin);
+
         let channels = (
-            max_v0.into_alternate_af1(),
-            max_v1.into_alternate_af1(),
-            max_v2.into_alternate_af1(),
-            max_v3.into_alternate_af1(),
+            max_v0_pin.into_alternate_af2(),
+            max_v1_pin.into_alternate_af2(),
+            max_v2_pin.into_alternate_af2(),
+            max_v3_pin.into_alternate_af2(),
         );
         let (mut max_v0, mut max_v1, mut max_v2, mut max_v3) =
-            tim1.pwm(channels, F_PWM.khz(), ccdr.peripheral.TIM1, &ccdr.clocks);
+            tim4.pwm(channels, F_PWM.khz(), ccdr.peripheral.TIM4, &ccdr.clocks);
         init_pwm_pin(&mut max_v0);
         init_pwm_pin(&mut max_v1);
         init_pwm_pin(&mut max_v2);
         init_pwm_pin(&mut max_v3);
 
-        // setup max_i_pos channels on timer 4
+        // let (mut max_i_pos0, mut max_i_pos1, mut max_i_pos2, mut max_i_pos3) =
+        //     setup_tim!(tim4, ccdr, TIM4, max_i_pos0_pin, max_i_pos1_pin, max_i_pos2_pin, max_i_pos3_pin);
+
         let channels = (
-            max_i_pos0.into_alternate_af1(),
-            max_i_pos1.into_alternate_af1(),
-            max_i_pos2.into_alternate_af1(),
-            max_i_pos3.into_alternate_af1(),
+            max_i_pos0_pin.into_alternate_af2(),
+            max_i_pos1_pin.into_alternate_af2(),
+            max_i_pos2_pin.into_alternate_af2(),
+            max_i_pos3_pin.into_alternate_af2(),
         );
-        let (mut max_i_pos0, mut max_i_pos1, mut max_i_pos2, mut max_i_pos3) =
-            tim4.pwm(channels, F_PWM.khz(), ccdr.peripheral.TIM4, &ccdr.clocks);
+        let (mut max_i_pos0, mut max_i_pos1, mut max_i_pos2, mut max_i_pos3) = tim4.pwm(
+            max_i_pos0_pin.into_alternate_af2(),
+            F_PWM.khz(),
+            ccdr.peripheral.TIM4,
+            &ccdr.clocks,
+        );
         init_pwm_pin(&mut max_i_pos0);
         init_pwm_pin(&mut max_i_pos1);
         init_pwm_pin(&mut max_i_pos2);
         init_pwm_pin(&mut max_i_pos3);
 
-        // setup max_i_neg channels on timer 3
+        // let (mut max_i_neg0, mut max_i_neg1, mut max_i_neg2, mut max_i_neg3) =
+        //     setup_tim!(tim3, ccdr, TIM3, max_i_neg0_pin, max_i_neg1_pin, max_i_neg2_pin, max_i_neg3_pin);
         let channels = (
-            max_i_neg0.into_alternate_af1(),
-            max_i_neg1.into_alternate_af1(),
-            max_i_neg2.into_alternate_af1(),
-            max_i_neg3.into_alternate_af1(),
+            max_i_neg0_pin.into_alternate_af2(),
+            max_i_neg1_pin.into_alternate_af2(),
+            max_i_neg2_pin.into_alternate_af2(),
+            max_i_neg3_pin.into_alternate_af2(),
         );
         let (mut max_i_neg0, mut max_i_neg1, mut max_i_neg2, mut max_i_neg3) =
-            tim4.pwm(channels, F_PWM.khz(), ccdr.peripheral.TIM4, &ccdr.clocks);
+            tim3.pwm(channels, F_PWM.khz(), ccdr.peripheral.TIM3, &ccdr.clocks);
         init_pwm_pin(&mut max_i_neg0);
         init_pwm_pin(&mut max_i_neg1);
         init_pwm_pin(&mut max_i_neg2);
@@ -181,89 +210,85 @@ impl Pwms {
 
 /// DAC: https://www.analog.com/media/en/technical-documentation/data-sheets/AD5680.pdf
 /// Peltier Driver: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
-pub struct Dac {
-    spi: DacSpi,
-    pub val: [u32; 2],
-    sync0: PG3<Output<PushPull>>,
-    sync1: PG2<Output<PushPull>>,
-    sync2: PG1<Output<PushPull>>,
-    sync3: PG0<Output<PushPull>>,
-    shdn0: PG4<Output<PushPull>>,
-    shdn1: PG5<Output<PushPull>>,
-    shdn2: PG6<Output<PushPull>>,
-    shdn3: PG7<Output<PushPull>>,
-}
+// pub struct Dac {
+//     spi: DacSpi,
+//     pub val: [u32; 2],
+//     sync0: PG3<Output<PushPull>>,
+//     sync1: PG2<Output<PushPull>>,
+//     sync2: PG1<Output<PushPull>>,
+//     sync3: PG0<Output<PushPull>>,
+//     shdn0: PG4<Output<PushPull>>,
+//     shdn1: PG5<Output<PushPull>>,
+//     shdn2: PG6<Output<PushPull>>,
+//     shdn3: PG7<Output<PushPull>>,
+// }
 
-impl Dac {
-    pub fn new(clocks: Clocks, spi3: SPI3, pins: DacPins) -> Self {
-        let spi = Spi::spi3(
-            spi3,
-            (pins.sck, NoMiso, pins.mosi),
-            SPI_MODE,
-            SPI_CLOCK.into(),
-            clocks,
-        );
+// impl Dac {
+//     pub fn new(clocks: Clocks, spi3: SPI3, pins: DacPins) -> Self {
+//         let spi = Spi::spi3(
+//             spi3,
+//             (pins.sck, NoMiso, pins.mosi),
+//             SPI_MODE,
+//             SPI_CLOCK.into(),
+//             clocks,
+//         );
 
-        let mut dac = Dac {
-            spi,
-            val: [0, 0],
-            sync0: pins.sync0,
-            sync1: pins.sync1,
-            sync2: pins.sync2,
-            sync3: pins.sync3,
-            shdn0: pins.shdn0,
-            shdn1: pins.shdn1,
-            shdn2: pins.shdn2,
-            shdn3: pins.shdn3,
-        };
-        dac.dis_ch(0);
+//         let mut dac = Dac {
+//             spi,
+//             val: [0, 0],
+//             sync0: pins.sync0,
+//             sync1: pins.sync1,
+//             sync2: pins.sync2,
+//             sync3: pins.sync3,
+//             shdn0: pins.shdn0,
+//             shdn1: pins.shdn1,
+//             shdn2: pins.shdn2,
+//             shdn3: pins.shdn3,
+//         };
+//         dac.dis_ch(0);
 
-        dac.sync0.set_high().unwrap();
+//         dac.sync0.set_high().unwrap();
 
-        // default to zero amps
-        dac.set(i_to_dac(0.0), 0);
-        dac
-    }
+//         // default to zero amps
+//         dac.set(i_to_dac(0.0), 0);
+//         dac
+//     }
 
-    /// Set the DAC output to value on a channel.
-    pub fn set(&mut self, value: u32, ch: u8) {
-        let value = value.min(MAX_VALUE);
-        // 24 bit transfer. First 6 bit and last 2 bit are low.
-        let mut buf = [(value >> 14) as u8, (value >> 6) as u8, (value << 2) as u8];
-        if ch == 0 {
-            self.sync0.set_low().unwrap();
-            self.spi0.transfer(&mut buf).unwrap();
-            self.val[0] = value;
-            self.sync0.set_high().unwrap();
-        } else {
-            // self.sync1.set_high().unwrap();
-            // // must be high for >= 33 ns
-            // delay(100); // 100 * 5.95ns
-            // self.sync1.set_low().unwrap();
-            // self.spi1.transfer(&mut buf).unwrap();
-            // self.val[1] = value;
-        }
-    }
+//     /// Set the DAC output to value on a channel.
+//     pub fn set(&mut self, value: u32, ch: u8) {
+//         let value = value.min(MAX_VALUE);
+//         // 24 bit transfer. First 6 bit and last 2 bit are low.
+//         let mut buf = [(value >> 14) as u8, (value >> 6) as u8, (value << 2) as u8];
+//         if ch == 0 {
+//             self.sync0.set_low().unwrap();
+//             self.spi0.transfer(&mut buf).unwrap();
+//             self.val[0] = value;
+//             self.sync0.set_high().unwrap();
+//         } else {
+//             // self.sync1.set_high().unwrap();
+//             // // must be high for >= 33 ns
+//             // delay(100); // 100 * 5.95ns
+//             // self.sync1.set_low().unwrap();
+//             // self.spi1.transfer(&mut buf).unwrap();
+//             // self.val[1] = value;
+//         }
+//     }
 
-    /// enable a TEC channel via shutdown pin.
-    pub fn en_ch(&mut self, ch: u8) {
-        if ch == 0 {
-            self.shdn0.set_high().unwrap();
-        } else {
-            // self.shdn1.set_high().unwrap();
-        }
-    }
+//     /// enable a TEC channel via shutdown pin.
+//     pub fn en_ch(&mut self, ch: u8) {
+//         if ch == 0 {
+//             self.shdn0.set_high().unwrap();
+//         } else {
+//             // self.shdn1.set_high().unwrap();
+//         }
+//     }
 
-    /// disable a TEC channel via shutdown pin.
-    pub fn dis_ch(&mut self, ch: u8) {
-        if ch == 0 {
-            self.shdn0.set_low().unwrap();
-        } else {
-            // self.shdn1.set_low().unwrap();
-        }
-    }
-}
-
-macro_rules! setup_tim {
-    ($) => {};
-}
+//     /// disable a TEC channel via shutdown pin.
+//     pub fn dis_ch(&mut self, ch: u8) {
+//         if ch == 0 {
+//             self.shdn0.set_low().unwrap();
+//         } else {
+//             // self.shdn1.set_low().unwrap();
+//         }
+//     }
+// }
