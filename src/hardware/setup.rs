@@ -13,7 +13,7 @@ use super::hal::{
 
 use super::{
     adc::{Adc, AdcPins},
-    dac::Pwms,
+    dac::{Channel, Limit, Pwms},
     EthernetPhy, LEDs, NetworkStack, SRC_MAC,
 };
 
@@ -364,7 +364,18 @@ pub fn setup(
         gpioc.pc9,
     );
 
-    pwms.set(2, 0.5);
+    pwms.set(Channel::Ch0, Limit::MaxV, 0.5);
+    pwms.set(Channel::Ch1, Limit::MaxV, 0.5);
+    pwms.set(Channel::Ch2, Limit::MaxV, 0.5);
+    pwms.set(Channel::Ch3, Limit::MaxV, 0.5);
+    pwms.set(Channel::Ch0, Limit::MaxI, 0.5);
+    pwms.set(Channel::Ch1, Limit::MaxI, 0.5);
+    pwms.set(Channel::Ch2, Limit::MaxI, 0.5);
+    pwms.set(Channel::Ch3, Limit::MaxI, 0.5);
+    pwms.set(Channel::Ch0, Limit::MinI, 0.5);
+    pwms.set(Channel::Ch1, Limit::MinI, 0.5);
+    pwms.set(Channel::Ch2, Limit::MinI, 0.5);
+    pwms.set(Channel::Ch3, Limit::MinI, 0.5);
 
     info!("--- Hardware setup done.");
 

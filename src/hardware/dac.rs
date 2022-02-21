@@ -5,6 +5,8 @@
 // max output voltages/current settings are driven by PWMs of the STM32.
 // SingularitySurfer 2022
 
+// ToDo: Docstrings, Set CH fn,
+
 use super::hal::{
     gpio::{gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiog::*, Alternate, Output, PushPull, AF5},
     hal::{blocking::spi::Transfer, digital::v2::OutputPin, PwmPin},
@@ -60,22 +62,35 @@ pub struct DacPins {
     pub shdn3: PG7<Output<PushPull>>,
 }
 
+pub enum Channel {
+    Ch0,
+    Ch1,
+    Ch2,
+    Ch3,
+}
+
+pub enum Limit {
+    MaxV,
+    MaxI,
+    MinI,
+}
+
 type Pt0<T, S> = pwm::Pwm<T, S, ComplementaryDisabled, ActiveHigh, ActiveHigh>;
 type Pt1<T, S> = pwm::Pwm<T, S, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
 
 pub struct Pwms {
-    pub max_v0: Pt0<TIM1, C1>,
-    pub max_v1: Pt0<TIM1, C2>,
-    pub max_v2: Pt0<TIM1, C3>,
-    pub max_v3: Pt1<TIM1, C4>,
-    pub max_i_pos0: Pt1<TIM4, C1>,
-    pub max_i_pos1: Pt1<TIM4, C2>,
-    pub max_i_pos2: Pt1<TIM4, C3>,
-    pub max_i_pos3: Pt1<TIM4, C4>,
-    pub max_i_neg0: Pt1<TIM3, C1>,
-    pub max_i_neg1: Pt1<TIM3, C2>,
-    pub max_i_neg2: Pt1<TIM3, C3>,
-    pub max_i_neg3: Pt1<TIM3, C4>,
+    max_v0: Pt0<TIM1, C1>,
+    max_v1: Pt0<TIM1, C2>,
+    max_v2: Pt0<TIM1, C3>,
+    max_v3: Pt1<TIM1, C4>,
+    max_i0: Pt1<TIM4, C1>,
+    max_i1: Pt1<TIM4, C2>,
+    max_i2: Pt1<TIM4, C3>,
+    max_i3: Pt1<TIM4, C4>,
+    min_i0: Pt1<TIM3, C1>,
+    min_i1: Pt1<TIM3, C2>,
+    min_i2: Pt1<TIM3, C3>,
+    min_i3: Pt1<TIM3, C4>,
 }
 
 impl Pwms {
@@ -91,14 +106,14 @@ impl Pwms {
         max_v1_pin: PE11<M2>,
         max_v2_pin: PE13<M3>,
         max_v3_pin: PE14<M4>,
-        max_i_pos0_pin: PD12<M5>,
-        max_i_pos1_pin: PD13<M6>,
-        max_i_pos2_pin: PD14<M7>,
-        max_i_pos3_pin: PD15<M8>,
-        max_i_neg0_pin: PC6<M9>,
-        max_i_neg1_pin: PB5<M10>,
-        max_i_neg2_pin: PC8<M11>,
-        max_i_neg3_pin: PC9<M12>,
+        max_i0_pin: PD12<M5>,
+        max_i1_pin: PD13<M6>,
+        max_i2_pin: PD14<M7>,
+        max_i3_pin: PD15<M8>,
+        min_i0_pin: PC6<M9>,
+        min_i1_pin: PB5<M10>,
+        min_i2_pin: PC8<M11>,
+        min_i3_pin: PC9<M12>,
     ) -> Pwms {
         fn init_pwm_pin<P: PwmPin<Duty = u16>>(pin: &mut P) {
             pin.set_duty(0);
@@ -116,26 +131,26 @@ impl Pwms {
             max_v3_pin
         );
 
-        let (max_i_pos0, max_i_pos1, max_i_pos2, max_i_pos3) = setup_tim!(
+        let (max_i0, max_i1, max_i2, max_i3) = setup_tim!(
             tim4,
             clocks,
             tim4_rcc,
             into_alternate_af2,
-            max_i_pos0_pin,
-            max_i_pos1_pin,
-            max_i_pos2_pin,
-            max_i_pos3_pin
+            max_i0_pin,
+            max_i1_pin,
+            max_i2_pin,
+            max_i3_pin
         );
 
-        let (max_i_neg0, max_i_neg1, max_i_neg2, max_i_neg3) = setup_tim!(
+        let (min_i0, min_i1, min_i2, min_i3) = setup_tim!(
             tim3,
             clocks,
             tim3_rcc,
             into_alternate_af2,
-            max_i_neg0_pin,
-            max_i_neg1_pin,
-            max_i_neg2_pin,
-            max_i_neg3_pin
+            min_i0_pin,
+            min_i1_pin,
+            min_i2_pin,
+            min_i3_pin
         );
 
         Pwms {
@@ -143,53 +158,39 @@ impl Pwms {
             max_v1,
             max_v2,
             max_v3,
-            max_i_pos0,
-            max_i_pos1,
-            max_i_pos2,
-            max_i_pos3,
-            max_i_neg0,
-            max_i_neg1,
-            max_i_neg2,
-            max_i_neg3,
+            max_i0,
+            max_i1,
+            max_i2,
+            max_i3,
+            min_i0,
+            min_i1,
+            min_i2,
+            min_i3,
         }
     }
 
-    /// Set PWM channel to relative dutycycle.
-    pub fn set(&mut self, ch: u8, duty: f32) {
-        fn set<P: PwmPin<Duty = u16>>(pin: &mut P, duty: f32) {
-            let duty = i_to_pwm(duty);
+    /// Set PWM to limit current.
+    pub fn set(&mut self, ch: Channel, lim: Limit, val: f32) {
+        fn set_pwm<P: PwmPin<Duty = u16>>(pin: &mut P, duty: f32) {
             let max = pin.get_max_duty();
             let value = ((duty * (max as f32)) as u16).min(max);
             pin.set_duty(value);
         }
-        info!("ch: {:?} duty: {:?}", ch, duty);
-        match ch {
-            0 => set(&mut self.max_v0, duty),
-            1 => set(&mut self.max_v1, duty),
-            2 => set(&mut self.max_i_pos0, duty),
-            3 => set(&mut self.max_i_neg0, duty),
-            4 => set(&mut self.max_i_pos1, duty),
-            5 => set(&mut self.max_i_neg1, duty),
-            _ => unreachable!(),
-        }
-    }
 
-    /// set all PWM oututs to specified min/max currents
-    pub fn set_all(
-        &mut self,
-        min_i0: f32,
-        max_i0: f32,
-        max_v0: f32,
-        min_i1: f32,
-        max_i1: f32,
-        max_v1: f32,
-    ) {
-        self.set(0, v_to_pwm(max_v0));
-        self.set(1, v_to_pwm(max_v1));
-        self.set(2, i_to_pwm(max_i0));
-        self.set(3, i_to_pwm(min_i0));
-        self.set(4, i_to_pwm(max_i1));
-        self.set(5, i_to_pwm(min_i1));
+        match (ch, lim) {
+            (Channel::Ch0, Limit::MaxV) => set_pwm(&mut self.max_v0, v_to_pwm(val)),
+            (Channel::Ch1, Limit::MaxV) => set_pwm(&mut self.max_v1, v_to_pwm(val)),
+            (Channel::Ch2, Limit::MaxV) => set_pwm(&mut self.max_v2, v_to_pwm(val)),
+            (Channel::Ch3, Limit::MaxV) => set_pwm(&mut self.max_v3, v_to_pwm(val)),
+            (Channel::Ch0, Limit::MaxI) => set_pwm(&mut self.max_i0, i_to_pwm(val)),
+            (Channel::Ch1, Limit::MaxI) => set_pwm(&mut self.max_i1, i_to_pwm(val)),
+            (Channel::Ch2, Limit::MaxI) => set_pwm(&mut self.max_i2, i_to_pwm(val)),
+            (Channel::Ch3, Limit::MaxI) => set_pwm(&mut self.max_i3, i_to_pwm(val)),
+            (Channel::Ch0, Limit::MinI) => set_pwm(&mut self.min_i0, i_to_pwm(val)),
+            (Channel::Ch1, Limit::MinI) => set_pwm(&mut self.min_i1, i_to_pwm(val)),
+            (Channel::Ch2, Limit::MinI) => set_pwm(&mut self.min_i2, i_to_pwm(val)),
+            (Channel::Ch3, Limit::MinI) => set_pwm(&mut self.min_i3, i_to_pwm(val)),
+        }
     }
 }
 
