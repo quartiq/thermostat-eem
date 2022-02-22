@@ -24,12 +24,6 @@ use log::info;
 
 use super::unit_conversion::{i_to_dac, i_to_pwm, v_to_pwm};
 
-/// SPI Mode 1
-pub const SPI_MODE: spi::Mode = spi::Mode {
-    polarity: spi::Polarity::IdleLow,
-    phase: spi::Phase::CaptureOnSecondTransition,
-};
-
 pub const SPI_CLOCK: MegaHertz = MegaHertz(30); // DAC SPI clock speed
 pub const MAX_VALUE: u32 = 0x3FFFF; // Maximum DAC output value
 pub const F_PWM: u32 = 20; // PWM freq in kHz
@@ -213,7 +207,7 @@ impl Dac {
     pub fn new(clocks: &CoreClocks, prec: rec::Spi3, spi3: SPI3, pins: DacPins) -> Self {
         let spi = spi3.spi(
             (pins.sck, NoMiso, pins.mosi),
-            spi::MODE_0,
+            spi::MODE_1,
             1.mhz(),
             prec,
             clocks,
@@ -233,38 +227,54 @@ impl Dac {
         };
         dac.dis_ch(Channel::Ch0);
 
-        dac.sync0.set_low().unwrap();
+        // dac.sync0.set_high().unwrap();
+        // dac.sync1.set_high().unwrap();
+        // dac.sync2.set_high().unwrap();
+        // dac.sync3.set_high().unwrap();
 
         // default to zero amps
-        dac.set(i_to_dac(0.0), Channel::Ch0);
+        dac.set(0x20000, Channel::Ch0);
+        // dac.set(0x10000, Channel::Ch1);
+        // dac.set(0x30000, Channel::Ch2);
+        // dac.set(0x3ffff, Channel::Ch3);
         dac
     }
 
     /// Set the DAC output to value on a channel.
     pub fn set(&mut self, value: u32, ch: Channel) {
         let value = value.min(MAX_VALUE);
-        // 24 bit transfer. First 6 bit and last 2 bit are low.
+        info!("value: {:?}", value);
+        info!("value: {:#x}", value);
+        // 24 bit transfer. First 4 bit and last 2 bit are low.
         let mut buf = [(value >> 14) as u8, (value >> 6) as u8, (value << 2) as u8];
+        info!("buf: {:b},{:b},{:b}", buf[0], buf[1], buf[2]);
 
         // TODO sync adressing!!!!!!! atm all DACs are always adressed
 
         match ch {
             Channel::Ch0 => {
-                
+                // self.sync0.set_low().unwrap();
                 self.spi.transfer(&mut buf).unwrap();
                 self.val[0] = value;
+                // self.sync0.set_high().unwrap();
             }
             Channel::Ch1 => {
+                // self.sync1.set_low().unwrap();
                 self.spi.transfer(&mut buf).unwrap();
                 self.val[1] = value;
+                // self.sync1.set_high().unwrap();
             }
             Channel::Ch2 => {
+                // self.sync2.set_low().unwrap();
                 self.spi.transfer(&mut buf).unwrap();
                 self.val[2] = value;
+                // self.sync2.set_high().unwrap();
             }
             Channel::Ch3 => {
+                // self.sync3.set_low().unwrap();
                 self.spi.transfer(&mut buf).unwrap();
                 self.val[3] = value;
+                // self.sync3.set_high().unwrap();
             }
         }
     }

@@ -22,7 +22,7 @@ pub const MAXI: f32 = 3.0; // maximum current configurable for TEC driver
 const R_SENSE: f32 = 0.05; // TEC current sense resistor
 pub const VREF_TEC: f32 = 1.5; // TEC driver reference voltage
 const MAXCODE: f32 = (1 << 18) as _; // maximum DAC dataword
-const VREF_OS: f32 = 0.025; // Device specific offset voltage for zero current at half dac scale
+const VREF_OS: f32 = 0.0; // Device specific offset voltage for zero current at half dac scale
 pub const VREF_DAC: f32 = 3.0 + VREF_OS; // DAC reference voltage target plus offset
 const DATAWIDTH_GAIN: f32 = 0.015625; // 2**-6 LSB to LSB gain from 24 to 18 bit
 
