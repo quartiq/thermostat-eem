@@ -227,16 +227,16 @@ impl Dac {
         };
         dac.dis_ch(Channel::Ch0);
 
-        // dac.sync0.set_high().unwrap();
-        // dac.sync1.set_high().unwrap();
-        // dac.sync2.set_high().unwrap();
-        // dac.sync3.set_high().unwrap();
+        dac.sync0.set_high().unwrap();
+        dac.sync1.set_high().unwrap();
+        dac.sync2.set_high().unwrap();
+        dac.sync3.set_high().unwrap();
 
         // default to zero amps
         dac.set(0x20000, Channel::Ch0);
-        // dac.set(0x10000, Channel::Ch1);
-        // dac.set(0x30000, Channel::Ch2);
-        // dac.set(0x3ffff, Channel::Ch3);
+        dac.set(0x10000, Channel::Ch1);
+        dac.set(0x30000, Channel::Ch2);
+        dac.set(0x3ffff, Channel::Ch3);
         dac
     }
 
@@ -253,28 +253,28 @@ impl Dac {
 
         match ch {
             Channel::Ch0 => {
-                // self.sync0.set_low().unwrap();
+                self.sync0.set_low().unwrap();
                 self.spi.transfer(&mut buf).unwrap();
                 self.val[0] = value;
-                // self.sync0.set_high().unwrap();
+                self.sync0.set_high().unwrap();
             }
             Channel::Ch1 => {
-                // self.sync1.set_low().unwrap();
+                self.sync1.set_low().unwrap();
                 self.spi.transfer(&mut buf).unwrap();
                 self.val[1] = value;
-                // self.sync1.set_high().unwrap();
+                self.sync1.set_high().unwrap();
             }
             Channel::Ch2 => {
-                // self.sync2.set_low().unwrap();
+                self.sync2.set_low().unwrap();
                 self.spi.transfer(&mut buf).unwrap();
                 self.val[2] = value;
-                // self.sync2.set_high().unwrap();
+                self.sync2.set_high().unwrap();
             }
             Channel::Ch3 => {
-                // self.sync3.set_low().unwrap();
+                self.sync3.set_low().unwrap();
                 self.spi.transfer(&mut buf).unwrap();
                 self.val[3] = value;
-                // self.sync3.set_high().unwrap();
+                self.sync3.set_high().unwrap();
             }
         }
     }
