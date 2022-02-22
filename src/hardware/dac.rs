@@ -8,14 +8,14 @@
 // ToDo: Docstrings, Set CH fn,
 
 use super::hal::{
-    gpio::{gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiog::*, Alternate, Output, PushPull, AF5},
+    gpio::{gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiog::*, Alternate, Output, PushPull, AF6},
     hal::{blocking::spi::Transfer, digital::v2::OutputPin, PwmPin},
     prelude::*,
     pwm,
     pwm::*,
     rcc::{rec, CoreClocks},
     spi,
-    spi::{NoMiso, Spi},
+    spi::{Enabled, NoMiso, Spi},
     stm32::{SPI3, TIM1, TIM3, TIM4},
     time::{MegaHertz, U32Ext},
 };
@@ -47,20 +47,7 @@ macro_rules! setup_tim {
     }};
 }
 
-pub type DacSpi = Spi<SPI3, (PC10<Alternate<AF5>>, NoMiso, PC12<Alternate<AF5>>)>;
-
-pub struct DacPins {
-    pub sck: PC10<Alternate<AF5>>,
-    pub mosi: PC12<Alternate<AF5>>,
-    pub sync0: PG3<Output<PushPull>>,
-    pub sync1: PG2<Output<PushPull>>,
-    pub sync2: PG1<Output<PushPull>>,
-    pub sync3: PG0<Output<PushPull>>,
-    pub shdn0: PG4<Output<PushPull>>,
-    pub shdn1: PG5<Output<PushPull>>,
-    pub shdn2: PG6<Output<PushPull>>,
-    pub shdn3: PG7<Output<PushPull>>,
-}
+// pub type DacSpi = Spi<SPI3, (PC10<Alternate<AF6>>, NoMiso, PC12<Alternate<AF6>>)>;
 
 pub enum Channel {
     Ch0,
@@ -78,7 +65,7 @@ pub enum Limit {
 type Pt0<T, S> = pwm::Pwm<T, S, ComplementaryDisabled, ActiveHigh, ActiveHigh>;
 type Pt1<T, S> = pwm::Pwm<T, S, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
 
-pub struct Pwms {
+pub struct Pwm {
     max_v0: Pt0<TIM1, C1>,
     max_v1: Pt0<TIM1, C2>,
     max_v2: Pt0<TIM1, C3>,
@@ -93,7 +80,7 @@ pub struct Pwms {
     min_i3: Pt1<TIM3, C4>,
 }
 
-impl Pwms {
+impl Pwm {
     pub fn new<M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12>(
         clocks: &CoreClocks,
         tim1_rcc: rec::Tim1,
@@ -114,7 +101,7 @@ impl Pwms {
         min_i1_pin: PB5<M10>,
         min_i2_pin: PC8<M11>,
         min_i3_pin: PC9<M12>,
-    ) -> Pwms {
+    ) -> Pwm {
         fn init_pwm_pin<P: PwmPin<Duty = u16>>(pin: &mut P) {
             pin.set_duty(0);
             pin.enable();
@@ -153,7 +140,7 @@ impl Pwms {
             min_i3_pin
         );
 
-        Pwms {
+        Pwm {
             max_v0,
             max_v1,
             max_v2,
@@ -194,87 +181,111 @@ impl Pwms {
     }
 }
 
-// / DAC: https://www.analog.com/media/en/technical-documentation/data-sheets/AD5680.pdf
-// / Peltier Driver: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
-// pub struct Dac {
-//     spi: DacSpi,
-//     pub val: [u32; 2],
-//     sync0: PG3<Output<PushPull>>,
-//     sync1: PG2<Output<PushPull>>,
-//     sync2: PG1<Output<PushPull>>,
-//     sync3: PG0<Output<PushPull>>,
-//     shdn0: PG4<Output<PushPull>>,
-//     shdn1: PG5<Output<PushPull>>,
-//     shdn2: PG6<Output<PushPull>>,
-//     shdn3: PG7<Output<PushPull>>,
-// }
+pub struct DacPins {
+    pub sck: PC10<Alternate<AF6>>,
+    pub mosi: PC12<Alternate<AF6>>,
+    pub sync0: PG3<Output<PushPull>>,
+    pub sync1: PG2<Output<PushPull>>,
+    pub sync2: PG1<Output<PushPull>>,
+    pub sync3: PG0<Output<PushPull>>,
+    pub shdn0: PG4<Output<PushPull>>,
+    pub shdn1: PG5<Output<PushPull>>,
+    pub shdn2: PG6<Output<PushPull>>,
+    pub shdn3: PG7<Output<PushPull>>,
+}
 
-// impl Dac {
-//     pub fn new(clocks: Clocks, spi3: SPI3, pins: DacPins) -> Self {
-//         let spi = Spi::spi3(
-//             spi3,
-//             (pins.sck, NoMiso, pins.mosi),
-//             SPI_MODE,
-//             SPI_CLOCK.into(),
-//             clocks,
-//         );
+/// DAC: https://www.analog.com/media/en/technical-documentation/data-sheets/AD5680.pdf
+/// Peltier Driver: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
+pub struct Dac {
+    spi: Spi<SPI3, Enabled, u8>,
+    pub val: [u32; 4],
+    sync0: PG3<Output<PushPull>>,
+    sync1: PG2<Output<PushPull>>,
+    sync2: PG1<Output<PushPull>>,
+    sync3: PG0<Output<PushPull>>,
+    shdn0: PG4<Output<PushPull>>,
+    shdn1: PG5<Output<PushPull>>,
+    shdn2: PG6<Output<PushPull>>,
+    shdn3: PG7<Output<PushPull>>,
+}
 
-//         let mut dac = Dac {
-//             spi,
-//             val: [0, 0],
-//             sync0: pins.sync0,
-//             sync1: pins.sync1,
-//             sync2: pins.sync2,
-//             sync3: pins.sync3,
-//             shdn0: pins.shdn0,
-//             shdn1: pins.shdn1,
-//             shdn2: pins.shdn2,
-//             shdn3: pins.shdn3,
-//         };
-//         dac.dis_ch(0);
+impl Dac {
+    pub fn new(clocks: &CoreClocks, prec: rec::Spi3, spi3: SPI3, pins: DacPins) -> Self {
+        let spi = spi3.spi(
+            (pins.sck, NoMiso, pins.mosi),
+            spi::MODE_0,
+            1.mhz(),
+            prec,
+            clocks,
+        );
 
-//         dac.sync0.set_high().unwrap();
+        let mut dac = Dac {
+            spi,
+            val: [0, 0, 0, 0],
+            sync0: pins.sync0,
+            sync1: pins.sync1,
+            sync2: pins.sync2,
+            sync3: pins.sync3,
+            shdn0: pins.shdn0,
+            shdn1: pins.shdn1,
+            shdn2: pins.shdn2,
+            shdn3: pins.shdn3,
+        };
+        dac.dis_ch(Channel::Ch0);
 
-//         // default to zero amps
-//         dac.set(i_to_dac(0.0), 0);
-//         dac
-//     }
+        dac.sync0.set_low().unwrap();
 
-//     /// Set the DAC output to value on a channel.
-//     pub fn set(&mut self, value: u32, ch: u8) {
-//         let value = value.min(MAX_VALUE);
-//         // 24 bit transfer. First 6 bit and last 2 bit are low.
-//         let mut buf = [(value >> 14) as u8, (value >> 6) as u8, (value << 2) as u8];
-//         if ch == 0 {
-//             self.sync0.set_low().unwrap();
-//             self.spi0.transfer(&mut buf).unwrap();
-//             self.val[0] = value;
-//             self.sync0.set_high().unwrap();
-//         } else {
-//             // self.sync1.set_high().unwrap();
-//             // // must be high for >= 33 ns
-//             // delay(100); // 100 * 5.95ns
-//             // self.sync1.set_low().unwrap();
-//             // self.spi1.transfer(&mut buf).unwrap();
-//             // self.val[1] = value;
-//         }
-//     }
+        // default to zero amps
+        dac.set(i_to_dac(0.0), Channel::Ch0);
+        dac
+    }
 
-//     /// enable a TEC channel via shutdown pin.
-//     pub fn en_ch(&mut self, ch: u8) {
-//         if ch == 0 {
-//             self.shdn0.set_high().unwrap();
-//         } else {
-//             // self.shdn1.set_high().unwrap();
-//         }
-//     }
+    /// Set the DAC output to value on a channel.
+    pub fn set(&mut self, value: u32, ch: Channel) {
+        let value = value.min(MAX_VALUE);
+        // 24 bit transfer. First 6 bit and last 2 bit are low.
+        let mut buf = [(value >> 14) as u8, (value >> 6) as u8, (value << 2) as u8];
 
-//     /// disable a TEC channel via shutdown pin.
-//     pub fn dis_ch(&mut self, ch: u8) {
-//         if ch == 0 {
-//             self.shdn0.set_low().unwrap();
-//         } else {
-//             // self.shdn1.set_low().unwrap();
-//         }
-//     }
-// }
+        // TODO sync adressing!!!!!!! atm all DACs are always adressed
+
+        match ch {
+            Channel::Ch0 => {
+                
+                self.spi.transfer(&mut buf).unwrap();
+                self.val[0] = value;
+            }
+            Channel::Ch1 => {
+                self.spi.transfer(&mut buf).unwrap();
+                self.val[1] = value;
+            }
+            Channel::Ch2 => {
+                self.spi.transfer(&mut buf).unwrap();
+                self.val[2] = value;
+            }
+            Channel::Ch3 => {
+                self.spi.transfer(&mut buf).unwrap();
+                self.val[3] = value;
+            }
+        }
+    }
+
+    /// enable a TEC channel via shutdown pin.
+    pub fn en_ch(&mut self, ch: Channel) {
+        match ch {
+            Channel::Ch0 => self.shdn0.set_high().unwrap(),
+            Channel::Ch1 => self.shdn1.set_high().unwrap(),
+            Channel::Ch2 => self.shdn2.set_high().unwrap(),
+            Channel::Ch3 => self.shdn3.set_high().unwrap(),
+        }
+    }
+
+    /// disable a TEC channel via shutdown pin.
+    pub fn dis_ch(&mut self, ch: Channel) {
+        match ch {
+            Channel::Ch0 => self.shdn0.set_low().unwrap(),
+            Channel::Ch1 => self.shdn1.set_low().unwrap(),
+            Channel::Ch2 => self.shdn2.set_low().unwrap(),
+            Channel::Ch3 => self.shdn3.set_low().unwrap(),
+        }
+    }
+}

@@ -13,7 +13,8 @@ use super::hal::{
 
 use super::{
     adc::{Adc, AdcPins},
-    dac::{Channel, Limit, Pwms},
+    dac::{Channel, Dac, DacPins, Limit, Pwm},
+    unit_conversion::i_to_dac,
     EthernetPhy, LEDs, NetworkStack, SRC_MAC,
 };
 
@@ -342,7 +343,7 @@ pub fn setup(
 
     info!("Setup PWM");
 
-    let mut pwms = Pwms::new(
+    let mut pwm = Pwm::new(
         &ccdr.clocks,
         ccdr.peripheral.TIM1,
         ccdr.peripheral.TIM3,
@@ -364,18 +365,45 @@ pub fn setup(
         gpioc.pc9,
     );
 
-    pwms.set(Channel::Ch0, Limit::MaxV, 0.5);
-    pwms.set(Channel::Ch1, Limit::MaxV, 0.5);
-    pwms.set(Channel::Ch2, Limit::MaxV, 0.5);
-    pwms.set(Channel::Ch3, Limit::MaxV, 0.5);
-    pwms.set(Channel::Ch0, Limit::MaxI, 0.5);
-    pwms.set(Channel::Ch1, Limit::MaxI, 0.5);
-    pwms.set(Channel::Ch2, Limit::MaxI, 0.5);
-    pwms.set(Channel::Ch3, Limit::MaxI, 0.5);
-    pwms.set(Channel::Ch0, Limit::MinI, 0.5);
-    pwms.set(Channel::Ch1, Limit::MinI, 0.5);
-    pwms.set(Channel::Ch2, Limit::MinI, 0.5);
-    pwms.set(Channel::Ch3, Limit::MinI, 0.5);
+    pwm.set(Channel::Ch0, Limit::MaxV, 0.5);
+    pwm.set(Channel::Ch1, Limit::MaxV, 0.5);
+    pwm.set(Channel::Ch2, Limit::MaxV, 0.5);
+    pwm.set(Channel::Ch3, Limit::MaxV, 0.5);
+    pwm.set(Channel::Ch0, Limit::MaxI, 0.5);
+    pwm.set(Channel::Ch1, Limit::MaxI, 0.5);
+    pwm.set(Channel::Ch2, Limit::MaxI, 0.5);
+    pwm.set(Channel::Ch3, Limit::MaxI, 0.5);
+    pwm.set(Channel::Ch0, Limit::MinI, 0.5);
+    pwm.set(Channel::Ch1, Limit::MinI, 0.5);
+    pwm.set(Channel::Ch2, Limit::MinI, 0.5);
+    pwm.set(Channel::Ch3, Limit::MinI, 0.5);
+
+    info!("Setup DAC");
+
+    let dac_pins = DacPins {
+        sck: gpioc.pc10.into_alternate_af6(),
+        mosi: gpioc.pc12.into_alternate_af6(),
+        sync0: gpiog.pg3.into_push_pull_output(),
+        sync1: gpiog.pg2.into_push_pull_output(),
+        sync2: gpiog.pg1.into_push_pull_output(),
+        sync3: gpiog.pg0.into_push_pull_output(),
+        shdn0: gpiog.pg4.into_push_pull_output(),
+        shdn1: gpiog.pg5.into_push_pull_output(),
+        shdn2: gpiog.pg6.into_push_pull_output(),
+        shdn3: gpiog.pg7.into_push_pull_output(),
+    };
+
+    let mut dac = Dac::new(&ccdr.clocks, ccdr.peripheral.SPI3, device.SPI3, dac_pins);
+
+    // dac.set(i_to_dac(1.0), Channel::Ch0);
+    // dac.set(i_to_dac(1.0), Channel::Ch1);
+    // dac.set(i_to_dac(1.0), Channel::Ch2);
+    // dac.set(i_to_dac(1.0), Channel::Ch3);
+
+    dac.en_ch(Channel::Ch0);
+    dac.en_ch(Channel::Ch1);
+    dac.en_ch(Channel::Ch2);
+    dac.en_ch(Channel::Ch3);
 
     info!("--- Hardware setup done.");
 
