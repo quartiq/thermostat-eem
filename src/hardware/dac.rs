@@ -233,10 +233,10 @@ impl Dac {
         dac.sync3.set_high().unwrap();
 
         // default to zero amps
-        dac.set(0x20000, Channel::Ch0);
-        dac.set(0x10000, Channel::Ch1);
-        dac.set(0x30000, Channel::Ch2);
-        dac.set(0x3ffff, Channel::Ch3);
+        dac.set(0x00000, Channel::Ch0);
+        dac.set(0x00000, Channel::Ch1);
+        dac.set(0x00000, Channel::Ch2);
+        dac.set(0x00000, Channel::Ch3);
         dac
     }
 

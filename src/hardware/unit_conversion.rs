@@ -15,8 +15,7 @@ const T_N_INV: f32 = 1.0 / (25.0 + ZEROK); // T_n = 25°C
 const R_N: f32 = 10000.0; // TEC resistance at 25°C
 
 // PWM constants
-const MAXV: f32 = 5.0; // maximum voltage configurable for TEC driver
-pub const MAXI: f32 = 3.0; // maximum current configurable for TEC driver
+const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
 
 // DAC constants
 const R_SENSE: f32 = 0.05; // TEC current sense resistor
@@ -56,13 +55,13 @@ pub fn dac_to_i(val: u32) -> f32 {
 /// Convert maximum current to relative pulsewidth for the (analog voltage)
 /// max output current inputs of the TEC driver.
 pub fn i_to_pwm(i: f32) -> f32 {
-    i / MAXI
+    i * ((10.0 * R_SENSE) / V_PWM)
 }
 
 /// Convert maximum voltage to relative pulsewidth for the (analog voltage)
 /// max output voltage of the TEC driver.
 pub fn v_to_pwm(v: f32) -> f32 {
-    v / MAXV
+    v / (4.0 * V_PWM)
 }
 
 /// Convert a temperature in °C to an effective adc code. This can be used to

@@ -400,10 +400,10 @@ pub fn setup(
     // dac.set(i_to_dac(1.0), Channel::Ch2);
     // dac.set(i_to_dac(1.0), Channel::Ch3);
 
-    // dac.en_ch(Channel::Ch0);
-    // dac.en_ch(Channel::Ch1);
-    // dac.en_ch(Channel::Ch2);
-    // dac.en_ch(Channel::Ch3);
+    dac.en_ch(Channel::Ch0);
+    dac.en_ch(Channel::Ch1);
+    dac.en_ch(Channel::Ch2);
+    dac.en_ch(Channel::Ch3);
 
     info!("--- Hardware setup done.");
 
