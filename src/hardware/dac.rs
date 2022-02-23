@@ -225,7 +225,6 @@ impl Dac {
             shdn2: pins.shdn2,
             shdn3: pins.shdn3,
         };
-        dac.dis_ch(Channel::Ch0);
 
         dac.sync0.set_high().unwrap();
         dac.sync1.set_high().unwrap();
@@ -233,23 +232,18 @@ impl Dac {
         dac.sync3.set_high().unwrap();
 
         // default to zero amps
-        dac.set(0x00000, Channel::Ch0);
-        dac.set(0x00000, Channel::Ch1);
-        dac.set(0x00000, Channel::Ch2);
-        dac.set(0x00000, Channel::Ch3);
+        dac.set(i_to_dac(0.0), Channel::Ch0);
+        dac.set(i_to_dac(0.0), Channel::Ch1);
+        dac.set(i_to_dac(0.0), Channel::Ch2);
+        dac.set(i_to_dac(0.0), Channel::Ch3);
         dac
     }
 
     /// Set the DAC output to value on a channel.
     pub fn set(&mut self, value: u32, ch: Channel) {
         let value = value.min(MAX_VALUE);
-        info!("value: {:?}", value);
-        info!("value: {:#x}", value);
         // 24 bit transfer. First 4 bit and last 2 bit are low.
         let mut buf = [(value >> 14) as u8, (value >> 6) as u8, (value << 2) as u8];
-        info!("buf: {:b},{:b},{:b}", buf[0], buf[1], buf[2]);
-
-        // TODO sync adressing!!!!!!! atm all DACs are always adressed
 
         match ch {
             Channel::Ch0 => {
