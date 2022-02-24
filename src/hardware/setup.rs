@@ -11,7 +11,9 @@ use super::hal::{
     prelude::*,
 };
 
-use super::{EthernetPhy, LEDs, NetworkStack};
+use cortex_m::peripheral::SYST;
+
+use super::{adc_internal::AdcInternal, EthernetPhy, LEDs, NetworkStack};
 
 use defmt::info;
 
@@ -312,6 +314,21 @@ pub fn setup(
             mac_address: mac_addr,
         }
     };
+
+    info!("setup internal ADCs");
+
+    let adc_int = AdcInternal::new(
+        &mut delay,
+        &ccdr.clocks,
+        ccdr.peripheral.ADC12,
+        ccdr.peripheral.ADC3,
+        device.ADC1,
+        device.ADC2,
+        device.ADC3,
+        gpioc.pc0.into_analog(),
+    );
+
+    info!("adc_int.read(): {:?}", adc_int.read());
 
     info!("--- Hardware setup done.");
 
