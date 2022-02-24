@@ -884,7 +884,6 @@ dependencies = [
  "cortex-m-rtic",
  "defmt",
  "defmt-rtt",
- "embedded-hal",
  "embedded-time",
  "heapless",
  "log",

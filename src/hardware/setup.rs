@@ -12,7 +12,7 @@ use super::hal::{
 };
 
 use super::{
-    adc_internal::{AdcInternal, IAdc},
+    adc_internal::{AdcInternal, Channel, IAdc, Supply},
     EthernetPhy, LEDs, NetworkStack,
 };
 
@@ -330,12 +330,32 @@ pub fn setup(
         gpioc.pc2.into_analog(),
         gpiof.pf7.into_analog(),
         gpiof.pf8.into_analog(),
+        gpioc.pc3.into_analog(), // untested on HW
+        gpioa.pa0.into_analog(), // untested on HW
+        gpioa.pa3.into_analog(), // untested on HW
+        gpioa.pa4.into_analog(), // untested on HW
+        gpioa.pa5.into_analog(), // untested on HW
+        gpioa.pa6.into_analog(), // untested on HW
+        gpiob.pb0.into_analog(), // untested on HW
+        gpiob.pb1.into_analog(), // untested on HW
     );
 
-    info!("5v: {:?}", (adc_int.read(IAdc::P5v) as f32 / (1<<16) as f32) as f32 *3.0);
-    info!("3v: {:?}", (adc_int.read(IAdc::P3v) as f32 / (1<<16) as f32) as f32 *3.0);
-    info!("12v: {:?}", (adc_int.read(IAdc::P12v) as f32 / (1<<16) as f32) as f32 *3.0);
-    info!("I 12v: {:?}", (adc_int.read(IAdc::I12v) as f32 / (1<<16) as f32) as f32 *3.0);
+    info!(
+        "5v: {:?}",
+        (adc_int.read(IAdc::Supply(Supply::P5v)) as f32 / (1 << 16) as f32) as f32 * 3.0
+    );
+    info!(
+        "3v: {:?}",
+        (adc_int.read(IAdc::Supply(Supply::P3v)) as f32 / (1 << 16) as f32) as f32 * 3.0
+    );
+    info!(
+        "12v: {:?}",
+        (adc_int.read(IAdc::Supply(Supply::P12v)) as f32 / (1 << 16) as f32) as f32 * 3.0
+    );
+    info!(
+        "I 12v: {:?}",
+        (adc_int.read(IAdc::Supply(Supply::I12v)) as f32 / (1 << 16) as f32) as f32 * 3.0
+    );
 
     info!("--- Hardware setup done.");
 

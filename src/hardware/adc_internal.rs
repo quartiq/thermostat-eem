@@ -1,20 +1,31 @@
 use super::hal::{
     adc,
-    delay::Delay,
-    gpio::{gpioc::*, gpiof::*, Analog, Input},
-    pac,
+    gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*, Analog},
+    hal::blocking::delay::DelayUs,
     prelude::*,
     rcc::{rec, CoreClocks},
     stm32::{ADC1, ADC2, ADC3},
 };
-use cortex_m::peripheral::SYST;
-use embedded_hal::blocking::delay::DelayUs;
+// use embedded_hal::blocking::delay::DelayUs;
 
-pub enum IAdc {
+pub enum Channel {
+    Zero,
+    One,
+    Two,
+    Three,
+}
+
+pub enum Supply {
     P5v,
     P12v,
     P3v,
     I12v,
+}
+
+pub enum IAdc {
+    Supply(Supply),
+    TecU(Channel),
+    TecI(Channel),
 }
 
 pub struct AdcInternal {
@@ -25,6 +36,14 @@ pub struct AdcInternal {
     p12v: PC2<Analog>,
     p3v: PF7<Analog>,
     i12v: PF8<Analog>,
+    tecu0: PC3<Analog>,
+    tecu1: PA0<Analog>,
+    tecu2: PA3<Analog>,
+    tecu3: PA4<Analog>,
+    teci0: PA5<Analog>,
+    teci1: PA6<Analog>,
+    teci2: PB0<Analog>,
+    teci3: PB1<Analog>,
 }
 
 impl AdcInternal {
@@ -40,6 +59,14 @@ impl AdcInternal {
         p12v: PC2<Analog>,
         p3v: PF7<Analog>,
         i12v: PF8<Analog>,
+        tecu0: PC3<Analog>,
+        tecu1: PA0<Analog>,
+        tecu2: PA3<Analog>,
+        tecu3: PA4<Analog>,
+        teci0: PA5<Analog>,
+        teci1: PA6<Analog>,
+        teci2: PB0<Analog>,
+        teci3: PB1<Analog>,
     ) -> Self {
         // Setup ADC1 and ADC2
         let (adc1, adc2) = adc::adc12(adc1, adc2, delay, adc12_rcc, &clocks);
@@ -62,15 +89,31 @@ impl AdcInternal {
             p12v,
             p3v,
             i12v,
+            tecu0,
+            tecu1,
+            tecu2,
+            tecu3,
+            teci0,
+            teci1,
+            teci2,
+            teci3,
         }
     }
 
     pub fn read(&mut self, iadc: IAdc) -> u32 {
         match iadc {
-            IAdc::P5v => self.adc1.read(&mut self.p5v).unwrap(),
-            IAdc::P12v => self.adc1.read(&mut self.p12v).unwrap(),
-            IAdc::P3v => self.adc3.read(&mut self.p3v).unwrap(),
-            IAdc::I12v => self.adc3.read(&mut self.i12v).unwrap(),
+            IAdc::Supply(Supply::P5v) => self.adc1.read(&mut self.p5v).unwrap(),
+            IAdc::Supply(Supply::P12v) => self.adc1.read(&mut self.p12v).unwrap(),
+            IAdc::Supply(Supply::P3v) => self.adc3.read(&mut self.p3v).unwrap(),
+            IAdc::Supply(Supply::I12v) => self.adc3.read(&mut self.i12v).unwrap(),
+            IAdc::TecU(Channel::Zero) => self.adc1.read(&mut self.tecu0).unwrap(),
+            IAdc::TecU(Channel::One) => self.adc1.read(&mut self.tecu1).unwrap(),
+            IAdc::TecU(Channel::Two) => self.adc1.read(&mut self.tecu2).unwrap(),
+            IAdc::TecU(Channel::Three) => self.adc1.read(&mut self.tecu3).unwrap(),
+            IAdc::TecI(Channel::Zero) => self.adc1.read(&mut self.teci0).unwrap(),
+            IAdc::TecI(Channel::One) => self.adc1.read(&mut self.teci1).unwrap(),
+            IAdc::TecI(Channel::Two) => self.adc1.read(&mut self.teci2).unwrap(),
+            IAdc::TecI(Channel::Three) => self.adc1.read(&mut self.teci3).unwrap(),
         }
     }
 }
