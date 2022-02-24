@@ -11,9 +11,10 @@ use super::hal::{
     prelude::*,
 };
 
-use cortex_m::peripheral::SYST;
-
-use super::{adc_internal::AdcInternal, EthernetPhy, LEDs, NetworkStack};
+use super::{
+    adc_internal::{AdcInternal, IAdc},
+    EthernetPhy, LEDs, NetworkStack,
+};
 
 use defmt::info;
 
@@ -132,7 +133,7 @@ pub fn setup(
     let gpioc = device.GPIOC.split(ccdr.peripheral.GPIOC);
     // let gpiod = device.GPIOD.split(ccdr.peripheral.GPIOD);
     let gpioe = device.GPIOE.split(ccdr.peripheral.GPIOE);
-    // let gpiof = device.GPIOF.split(ccdr.peripheral.GPIOF);
+    let gpiof = device.GPIOF.split(ccdr.peripheral.GPIOF);
     let gpiog = device.GPIOG.split(ccdr.peripheral.GPIOG);
 
     // Setup LEDs
@@ -317,7 +318,7 @@ pub fn setup(
 
     info!("setup internal ADCs");
 
-    let adc_int = AdcInternal::new(
+    let mut adc_int = AdcInternal::new(
         &mut delay,
         &ccdr.clocks,
         ccdr.peripheral.ADC12,
@@ -326,9 +327,15 @@ pub fn setup(
         device.ADC2,
         device.ADC3,
         gpioc.pc0.into_analog(),
+        gpioc.pc2.into_analog(),
+        gpiof.pf7.into_analog(),
+        gpiof.pf8.into_analog(),
     );
 
-    info!("adc_int.read(): {:?}", adc_int.read());
+    info!("5v: {:?}", (adc_int.read(IAdc::P5v) as f32 / (1<<16) as f32) as f32 *3.0);
+    info!("3v: {:?}", (adc_int.read(IAdc::P3v) as f32 / (1<<16) as f32) as f32 *3.0);
+    info!("12v: {:?}", (adc_int.read(IAdc::P12v) as f32 / (1<<16) as f32) as f32 *3.0);
+    info!("I 12v: {:?}", (adc_int.read(IAdc::I12v) as f32 / (1<<16) as f32) as f32 *3.0);
 
     info!("--- Hardware setup done.");
 
