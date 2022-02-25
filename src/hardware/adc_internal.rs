@@ -30,7 +30,6 @@ pub enum IAdc {
 
 pub struct AdcInternal {
     adc1: adc::Adc<ADC1, adc::Enabled>,
-    adc2: adc::Adc<ADC2, adc::Enabled>,
     adc3: adc::Adc<ADC3, adc::Enabled>,
     p5v: PC0<Analog>,
     p12v: PC2<Analog>,
@@ -47,6 +46,7 @@ pub struct AdcInternal {
 }
 
 impl AdcInternal {
+    #![allow(clippy::too_many_arguments)]
     pub fn new(
         delay: &mut impl DelayUs<u8>,
         clocks: &CoreClocks,
@@ -69,21 +69,17 @@ impl AdcInternal {
         teci3: PB1<Analog>,
     ) -> Self {
         // Setup ADC1 and ADC2
-        let (adc1, adc2) = adc::adc12(adc1, adc2, delay, adc12_rcc, &clocks);
-        let adc3 = adc::Adc::adc3(adc3, delay, adc3_rcc, &clocks);
+        let (adc1, _) = adc::adc12(adc1, adc2, delay, adc12_rcc, clocks);
+        let adc3 = adc::Adc::adc3(adc3, delay, adc3_rcc, clocks);
 
         let mut adc1 = adc1.enable();
         adc1.set_resolution(adc::Resolution::SIXTEENBIT);
-
-        let mut adc2 = adc2.enable();
-        adc2.set_resolution(adc::Resolution::SIXTEENBIT);
 
         let mut adc3 = adc3.enable();
         adc3.set_resolution(adc::Resolution::SIXTEENBIT);
 
         AdcInternal {
             adc1,
-            adc2,
             adc3,
             p5v,
             p12v,

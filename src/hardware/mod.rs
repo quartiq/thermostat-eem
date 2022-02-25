@@ -4,9 +4,9 @@
 
 pub use stm32h7xx_hal as hal;
 
+pub mod adc_internal;
 pub mod setup;
 pub mod system_timer;
-pub mod adc_internal;
 
 // Thermostat MAC definition
 // ToDo: implement eeprom MAC

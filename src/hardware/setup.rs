@@ -12,7 +12,7 @@ use super::hal::{
 };
 
 use super::{
-    adc_internal::{AdcInternal, Channel, IAdc, Supply},
+    adc_internal::{AdcInternal, IAdc, Supply},
     EthernetPhy, LEDs, NetworkStack,
 };
 
