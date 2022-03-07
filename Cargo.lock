@@ -824,7 +824,6 @@ dependencies = [
 [[package]]
 name = "stm32h7xx-hal"
 version = "0.11.0"
-source = "git+https://github.com/stm32-rs/stm32h7xx-hal?rev=0d984a2#0d984a2a9a2bf97eae5f9811fe3c353e18af09d3"
 dependencies = [
  "bare-metal 1.0.0",
  "cast",
@@ -832,6 +831,7 @@ dependencies = [
  "embedded-dma",
  "embedded-hal",
  "fugit",
+ "log",
  "nb 1.0.0",
  "paste",
  "smoltcp",

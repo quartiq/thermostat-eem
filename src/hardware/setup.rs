@@ -119,6 +119,13 @@ pub fn setup(
     // Clear reset flags.
     device.RCC.rsr.write(|w| w.rmvf().set_bit());
 
+    static LOGGER: RTTLogger = RTTLogger::new(log::LevelFilter::Trace);
+    rtt_target::rtt_init_print!();
+    log::set_logger(&LOGGER)
+        .map(|()| log::set_max_level(log::LevelFilter::Trace))
+        .unwrap();
+    info!("--- Starting hardware setup");
+
     let rcc = device.RCC.constrain();
     let ccdr = rcc
         .use_hse(8.mhz())
@@ -128,15 +135,8 @@ pub fn setup(
         .pll2_p_ck(100.mhz())
         .pll2_q_ck(100.mhz())
         .pll1_q_ck(2.mhz())
-        .mco1_from_pll1_q_ck(2.mhz())
+        .mco1_from_hse(2.mhz())
         .freeze(vos, &device.SYSCFG);
-
-    static LOGGER: RTTLogger = RTTLogger::new(log::LevelFilter::Trace);
-    rtt_target::rtt_init_print!();
-    log::set_logger(&LOGGER)
-        .map(|()| log::set_max_level(log::LevelFilter::Trace))
-        .unwrap();
-    info!("--- Starting hardware setup");
 
     let mut delay = asm_delay::AsmDelay::new(asm_delay::bitrate::Hertz(ccdr.clocks.c_ck().0));
 
