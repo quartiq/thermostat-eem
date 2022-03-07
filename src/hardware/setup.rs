@@ -347,7 +347,7 @@ pub fn setup(
             * (5.0 / 2.02)
     );
     info!(
-        "3V: {:?}V",
+        "3.3V: {:?}V",
         (adc_int.read(IAdc::Supply(Supply::P3v)) as f32 / (1 << 16) as f32) as f32
             * 3.0
             * (3.3 / 2.67)
