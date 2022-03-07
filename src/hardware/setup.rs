@@ -341,20 +341,27 @@ pub fn setup(
     );
 
     info!(
-        "5v: {:?}",
-        (adc_int.read(IAdc::Supply(Supply::P5v)) as f32 / (1 << 16) as f32) as f32 * 3.0
+        "5V: {:?}V",
+        (adc_int.read(IAdc::Supply(Supply::P5v)) as f32 / (1 << 16) as f32) as f32
+            * 3.0
+            * (5.0 / 2.02)
     );
     info!(
-        "3v: {:?}",
-        (adc_int.read(IAdc::Supply(Supply::P3v)) as f32 / (1 << 16) as f32) as f32 * 3.0
+        "3V: {:?}V",
+        (adc_int.read(IAdc::Supply(Supply::P3v)) as f32 / (1 << 16) as f32) as f32
+            * 3.0
+            * (3.3 / 2.67)
     );
     info!(
-        "12v: {:?}",
-        (adc_int.read(IAdc::Supply(Supply::P12v)) as f32 / (1 << 16) as f32) as f32 * 3.0
+        "12V: {:?}V",
+        (adc_int.read(IAdc::Supply(Supply::P12v)) as f32 / (1 << 16) as f32) as f32
+            * 3.0
+            * (12.0 / 2.28)
     );
     info!(
-        "I 12v: {:?}",
+        "I 12V: {:?}A",
         (adc_int.read(IAdc::Supply(Supply::I12v)) as f32 / (1 << 16) as f32) as f32 * 3.0
+            / ((10000.0 / 100.0) * 0.005) // (R_out / R_in) * R_sense   This is lower than expected for me.
     );
 
     info!("--- Hardware setup done.");

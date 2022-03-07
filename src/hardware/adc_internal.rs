@@ -6,7 +6,6 @@ use super::hal::{
     rcc::{rec, CoreClocks},
     stm32::{ADC1, ADC2, ADC3},
 };
-// use embedded_hal::blocking::delay::DelayUs;
 
 pub enum Channel {
     Zero,
