@@ -12,7 +12,7 @@ use super::hal::{
 };
 
 use super::{
-    adc_internal::{AdcInternal, IAdc, Supply},
+    adc_internal::{AdcInternal, TecUPins, TecIPins},
     EthernetPhy, LEDs, NetworkStack,
 };
 
@@ -318,6 +318,19 @@ pub fn setup(
 
     info!("setup internal ADCs");
 
+    let tecupins: TecUPins = (
+        gpioc.pc3.into_analog(),
+        gpioa.pa0.into_analog(),
+        gpioa.pa3.into_analog(),
+        gpioa.pa4.into_analog(),
+    );
+    let tecipins: TecIPins = (
+        gpioa.pa5.into_analog(),
+        gpioa.pa6.into_analog(),
+        gpiob.pb0.into_analog(),
+        gpiob.pb1.into_analog(),
+    );
+
     let mut adc_int = AdcInternal::new(
         &mut delay,
         &ccdr.clocks,
@@ -330,39 +343,14 @@ pub fn setup(
         gpioc.pc2.into_analog(),
         gpiof.pf7.into_analog(),
         gpiof.pf8.into_analog(),
-        gpioc.pc3.into_analog(), // untested on HW
-        gpioa.pa0.into_analog(), // untested on HW
-        gpioa.pa3.into_analog(), // untested on HW
-        gpioa.pa4.into_analog(), // untested on HW
-        gpioa.pa5.into_analog(), // untested on HW
-        gpioa.pa6.into_analog(), // untested on HW
-        gpiob.pb0.into_analog(), // untested on HW
-        gpiob.pb1.into_analog(), // untested on HW
+        tecupins,
+        tecipins,
     );
 
-    info!(
-        "5V: {:?}V",
-        (adc_int.read(IAdc::Supply(Supply::P5v)) as f32 / (1 << 16) as f32) as f32
-            * 3.0
-            * (5.0 / 2.02)
-    );
-    info!(
-        "3.3V: {:?}V",
-        (adc_int.read(IAdc::Supply(Supply::P3v)) as f32 / (1 << 16) as f32) as f32
-            * 3.0
-            * (3.3 / 2.67)
-    );
-    info!(
-        "12V: {:?}V",
-        (adc_int.read(IAdc::Supply(Supply::P12v)) as f32 / (1 << 16) as f32) as f32
-            * 3.0
-            * (12.0 / 2.28)
-    );
-    info!(
-        "I 12V: {:?}A",
-        (adc_int.read(IAdc::Supply(Supply::I12v)) as f32 / (1 << 16) as f32) as f32 * 3.0
-            / ((10000.0 / 100.0) * 0.005) // (R_out / R_in) * R_sense   This is lower than expected for me.
-    );
+    info!("P12v: {:?} V", adc_int.read_p12v());
+    info!("P5v: {:?} V", adc_int.read_p5v());
+    info!("P3v3: {:?} V", adc_int.read_p3v3());
+    info!("I12v: {:?} A", adc_int.read_i12v());
 
     info!("--- Hardware setup done.");
 
