@@ -12,7 +12,7 @@ use super::hal::{
 };
 
 use super::{
-    adc_internal::{AdcInternal, TecUPins, TecIPins},
+    adc_internal::{AdcInternal, TecIPins, TecUPins},
     EthernetPhy, LEDs, NetworkStack,
 };
 
@@ -120,7 +120,7 @@ pub fn setup(
         .hclk(200.mhz())
         .per_ck(100.mhz())
         .pll2_p_ck(100.mhz())
-        .pll2_q_ck(100.mhz())
+        .pll2_q_ck(4.mhz())
         .freeze(vos, &device.SYSCFG);
 
     info!("--- Starting hardware setup");
@@ -351,6 +351,13 @@ pub fn setup(
     info!("P5v: {:?} V", adc_int.read_p5v());
     info!("P3v3: {:?} V", adc_int.read_p3v3());
     info!("I12v: {:?} A", adc_int.read_i12v());
+    loop {
+        info!(
+            "MCU internal temperature: {:?} °C",
+            adc_int.read_temp_internal()
+        );
+        cortex_m::asm::delay(400000000);
+    }
 
     info!("--- Hardware setup done.");
 

@@ -4,6 +4,7 @@ use super::hal::{
     hal::blocking::delay::DelayUs,
     prelude::*,
     rcc::{rec, CoreClocks},
+    signature::{TS_CAL_110, TS_CAL_30},
     stm32::{ADC1, ADC2, ADC3},
 };
 
@@ -29,7 +30,8 @@ pub struct AdcInternal {
     p3v3: PF7<Analog>,
     i12v: PF8<Analog>,
     tecu: TecUPins,
-    teci: TecIPins
+    teci: TecIPins,
+    temp_internal: adc::Temperature,
 }
 
 const V_REF: f32 = 3.0; // ADC reference voltage
@@ -56,17 +58,20 @@ impl AdcInternal {
         p3v3: PF7<Analog>,
         i12v: PF8<Analog>,
         tecu: TecUPins,
-        teci: TecIPins
+        teci: TecIPins,
     ) -> Self {
         // Setup ADC1 and ADC2
         let (adc1, _) = adc::adc12(adc1, adc2, delay, adc12_rcc, clocks);
         let adc3 = adc::Adc::adc3(adc3, delay, adc3_rcc, clocks);
 
-        let mut adc1 = adc1.enable();
-        adc1.set_resolution(adc::Resolution::SIXTEENBIT);
-
+        let mut temp_internal = adc::Temperature::new();
+        temp_internal.enable(&adc3);
+        delay.delay_us(25_u8);
         let mut adc3 = adc3.enable();
         adc3.set_resolution(adc::Resolution::SIXTEENBIT);
+
+        let mut adc1 = adc1.enable();
+        adc1.set_resolution(adc::Resolution::SIXTEENBIT);
 
         AdcInternal {
             adc1,
@@ -76,7 +81,8 @@ impl AdcInternal {
             p3v3,
             i12v,
             tecu,
-            teci
+            teci,
+            temp_internal,
         }
     }
 
@@ -129,5 +135,16 @@ impl AdcInternal {
         // reads the 12V rail current and returns the result in amperes
         let factor = (V_REF / self.adc1.max_sample() as f32) / CONF_I12V;
         self.read_supply(Supply::I12v) as f32 * factor
+    }
+
+    pub fn read_temp_internal(&mut self) -> f32 {
+        // reads the internal temperature sensor and returns the result in °C
+
+        // Average slope
+        let cal = (110.0 - 30.0) / (TS_CAL_110::read() - TS_CAL_30::read()) as f32;
+        // Calibration values are measured at VDDA = 3.3 V ± 10 mV
+        let word: u32 = self.adc3.read(&mut self.temp_internal).unwrap();
+        // Linear interpolation
+        cal * (word as f32 - TS_CAL_30::read() as f32) + 30.0
     }
 }
