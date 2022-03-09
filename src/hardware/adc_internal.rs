@@ -29,7 +29,7 @@ pub struct AdcInternal {
     p3v3: PF7<Analog>,
     i12v: PF8<Analog>,
     tecu: TecUPins,
-    teci: TecIPins
+    teci: TecIPins,
 }
 
 const V_REF: f32 = 3.0; // ADC reference voltage
@@ -56,7 +56,7 @@ impl AdcInternal {
         p3v3: PF7<Analog>,
         i12v: PF8<Analog>,
         tecu: TecUPins,
-        teci: TecIPins
+        teci: TecIPins,
     ) -> Self {
         // Setup ADC1 and ADC2
         let (adc1, _) = adc::adc12(adc1, adc2, delay, adc12_rcc, clocks);
@@ -76,7 +76,7 @@ impl AdcInternal {
             p3v3,
             i12v,
             tecu,
-            teci
+            teci,
         }
     }
 
