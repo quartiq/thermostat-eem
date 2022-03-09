@@ -7,7 +7,7 @@ authors = ["Norman Krackow <nk@quartiq.de>", "Robert Jördens", "Ryan Summers"]
 [dependencies]
 cortex-m = { version = "0.7" }
 cortex-m-rt = { version = "0.7", features = ["device"] }
-stm32h7xx-hal = {version = "0.11.0", features = ["stm32h743v", "rt", "ethernet"]}
+stm32h7xx-hal = {git = "https://github.com/stm32-rs/stm32h7xx-hal", rev = "0d984a2", features = ["stm32h743v", "rt", "ethernet"]}
 panic-halt = "0.2.0"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
 asm-delay = "0.9.0"
@@ -23,6 +23,8 @@ serde-json-core = "0.4"
 num_enum = { version = "0.5.6", default-features = false }
 defmt = "0.3.0"
 defmt-rtt = "0.3.0"
+num-traits = { version = "0.2", default-features = false, features = ["libm"] }
+
 
 [profile.dev]
 opt-level = 3
