@@ -12,7 +12,7 @@ use super::hal::{
 };
 
 use super::{
-    dac::{Channel, Dac, DacPins, Limit, Pwm},
+    dac::{Dac, DacGpio, Pwm, PwmPins},
     EthernetPhy, LEDs, NetworkStack,
 };
 
@@ -319,7 +319,22 @@ pub fn setup(
 
     info!("Setup PWM");
 
-    let mut pwm = Pwm::new(
+    let pwm_pins = PwmPins {
+        max_v0_pin: gpioe.pe9.into_alternate_af1(),
+        max_v1_pin: gpioe.pe11.into_alternate_af1(),
+        max_v2_pin: gpioe.pe13.into_alternate_af1(),
+        max_v3_pin: gpioe.pe14.into_alternate_af1(),
+        max_i_pos0_pin: gpiod.pd12.into_alternate_af2(),
+        max_i_pos1_pin: gpiod.pd13.into_alternate_af2(),
+        max_i_pos2_pin: gpiod.pd14.into_alternate_af2(),
+        max_i_pos3_pin: gpiod.pd15.into_alternate_af2(),
+        max_i_neg0_pin: gpioc.pc6.into_alternate_af2(),
+        max_i_neg1_pin: gpiob.pb5.into_alternate_af2(),
+        max_i_neg2_pin: gpioc.pc8.into_alternate_af2(),
+        max_i_neg3_pin: gpioc.pc9.into_alternate_af2(),
+    };
+
+    let pwm = Pwm::new(
         &ccdr.clocks,
         ccdr.peripheral.TIM1,
         ccdr.peripheral.TIM3,
@@ -327,39 +342,12 @@ pub fn setup(
         device.TIM1,
         device.TIM3,
         device.TIM4,
-        gpioe.pe9,
-        gpioe.pe11,
-        gpioe.pe13,
-        gpioe.pe14,
-        gpiod.pd12,
-        gpiod.pd13,
-        gpiod.pd14,
-        gpiod.pd15,
-        gpioc.pc6,
-        gpiob.pb5,
-        gpioc.pc8,
-        gpioc.pc9,
+        pwm_pins,
     );
-
-    // TODO loop
-    pwm.set(Channel::Ch0, Limit::MaxV, 0.5);
-    pwm.set(Channel::Ch1, Limit::MaxV, 0.5);
-    pwm.set(Channel::Ch2, Limit::MaxV, 0.5);
-    pwm.set(Channel::Ch3, Limit::MaxV, 0.5);
-    pwm.set(Channel::Ch0, Limit::MaxIPos, 0.5);
-    pwm.set(Channel::Ch1, Limit::MaxIPos, 0.5);
-    pwm.set(Channel::Ch2, Limit::MaxIPos, 0.5);
-    pwm.set(Channel::Ch3, Limit::MaxIPos, 0.5);
-    pwm.set(Channel::Ch0, Limit::MaxINeg, 0.5);
-    pwm.set(Channel::Ch1, Limit::MaxINeg, 0.5);
-    pwm.set(Channel::Ch2, Limit::MaxINeg, 0.5);
-    pwm.set(Channel::Ch3, Limit::MaxINeg, 0.5);
 
     info!("Setup DAC");
 
-    let dac_pins = DacPins {
-        sck: gpioc.pc10.into_alternate_af6(),
-        mosi: gpioc.pc12.into_alternate_af6(),
+    let dac_pins = DacGpio {
         sync0: gpiog.pg3.into_push_pull_output(),
         sync1: gpiog.pg2.into_push_pull_output(),
         sync2: gpiog.pg1.into_push_pull_output(),
@@ -370,7 +358,14 @@ pub fn setup(
         shdn3: gpiog.pg7.into_push_pull_output(),
     };
 
-    let dac = Dac::new(&ccdr.clocks, ccdr.peripheral.SPI3, device.SPI3, dac_pins);
+    let dac = Dac::new(
+        &ccdr.clocks,
+        ccdr.peripheral.SPI3,
+        device.SPI3,
+        gpioc.pc10.into_alternate_af6(),
+        gpioc.pc12.into_alternate_af6(),
+        dac_pins,
+    );
 
     info!("--- Hardware setup done.");
 
