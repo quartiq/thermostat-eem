@@ -12,7 +12,7 @@ use super::hal::{
 };
 
 use super::{
-    adc_internal::{AdcInternal, TecIPins, TecUPins},
+    adc_internal::{AdcInternal, TecIPins, TecUPins, SupplyPins},
     EthernetPhy, LEDs, NetworkStack,
 };
 
@@ -330,6 +330,12 @@ pub fn setup(
         gpiob.pb0.into_analog(),
         gpiob.pb1.into_analog(),
     );
+    let supplypins: SupplyPins = (
+        gpioc.pc0.into_analog(),
+        gpioc.pc2.into_analog(),
+        gpiof.pf7.into_analog(),
+        gpiof.pf8.into_analog(),
+    );
 
     let mut adc_int = AdcInternal::new(
         &mut delay,
@@ -339,10 +345,7 @@ pub fn setup(
         device.ADC1,
         device.ADC2,
         device.ADC3,
-        gpioc.pc0.into_analog(),
-        gpioc.pc2.into_analog(),
-        gpiof.pf7.into_analog(),
-        gpiof.pf8.into_analog(),
+        supplypins,
         tecupins,
         tecipins,
     );

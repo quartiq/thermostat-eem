@@ -21,17 +21,6 @@ pub enum Supply {
     I12v,
 }
 
-pub struct AdcInternal {
-    adc1: adc::Adc<ADC1, adc::Enabled>,
-    adc3: adc::Adc<ADC3, adc::Enabled>,
-    p5v: PC0<Analog>,
-    p12v: PC2<Analog>,
-    p3v3: PF7<Analog>,
-    i12v: PF8<Analog>,
-    tecu: TecUPins,
-    teci: TecIPins,
-}
-
 const V_REF: f32 = 3.0; // ADC reference voltage
 const DIV_P12V: f32 = 1.6 / (1.6 + 6.8); // Resistor divider 12V rail
 const DIV_P5V: f32 = 6.8 / (10.0 + 6.8); // Resistor divider 5V rail
@@ -40,9 +29,17 @@ const CONF_I12V: f32 = 0.005 * (10000.0 / 100.0); // 12V current measurement res
 
 pub type TecUPins = (PC3<Analog>, PA0<Analog>, PA3<Analog>, PA4<Analog>);
 pub type TecIPins = (PA5<Analog>, PA6<Analog>, PB0<Analog>, PB1<Analog>);
+pub type SupplyPins = (PC0<Analog>, PC2<Analog>, PF7<Analog>, PF8<Analog>);
+
+pub struct AdcInternal {
+    adc1: adc::Adc<ADC1, adc::Enabled>,
+    adc3: adc::Adc<ADC3, adc::Enabled>,
+    supply: SupplyPins,
+    tecu: TecUPins,
+    teci: TecIPins,
+}
 
 impl AdcInternal {
-    #![allow(clippy::too_many_arguments)]
     pub fn new(
         delay: &mut impl DelayUs<u8>,
         clocks: &CoreClocks,
@@ -51,10 +48,7 @@ impl AdcInternal {
         adc1: ADC1,
         adc2: ADC2,
         adc3: ADC3,
-        p5v: PC0<Analog>,
-        p12v: PC2<Analog>,
-        p3v3: PF7<Analog>,
-        i12v: PF8<Analog>,
+        supply: SupplyPins,
         tecu: TecUPins,
         teci: TecIPins,
     ) -> Self {
@@ -71,10 +65,7 @@ impl AdcInternal {
         AdcInternal {
             adc1,
             adc3,
-            p5v,
-            p12v,
-            p3v3,
-            i12v,
+            supply,
             tecu,
             teci,
         }
@@ -100,10 +91,10 @@ impl AdcInternal {
 
     pub fn read_supply(&mut self, supply: Supply) -> u32 {
         match supply {
-            Supply::P5v => self.adc1.read(&mut self.p5v).unwrap(),
-            Supply::P12v => self.adc1.read(&mut self.p12v).unwrap(),
-            Supply::P3v3 => self.adc3.read(&mut self.p3v3).unwrap(),
-            Supply::I12v => self.adc3.read(&mut self.i12v).unwrap(),
+            Supply::P5v => self.adc1.read(&mut self.supply.0).unwrap(),
+            Supply::P12v => self.adc1.read(&mut self.supply.1).unwrap(),
+            Supply::P3v3 => self.adc3.read(&mut self.supply.2).unwrap(),
+            Supply::I12v => self.adc3.read(&mut self.supply.3).unwrap(),
         }
     }
 
