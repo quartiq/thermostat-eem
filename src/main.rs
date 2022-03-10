@@ -11,7 +11,7 @@ pub mod net;
 use defmt::{info, Format};
 use defmt_rtt as _; // global logger
 
-extern crate panic_halt;
+extern crate panic_probe;
 pub extern crate stm32h7xx_hal;
 use hardware::{
     dac::{Channel, Dac, Limit, Pwm},

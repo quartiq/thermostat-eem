@@ -577,10 +577,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "panic-halt"
-version = "0.2.0"
+name = "panic-probe"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de96540e0ebde571dc55c73d60ef407c653844e6f9a1e2fdbd40c07b9252d812"
+checksum = "3ab1f00eac22bd18f8e5cae9555f2820b3a0c166b5b556ee3e203746ea6dcf3a"
+dependencies = [
+ "cortex-m 0.7.4",
+ "defmt",
+]
 
 [[package]]
 name = "paste"
@@ -898,7 +902,7 @@ dependencies = [
  "minimq",
  "num-traits",
  "num_enum",
- "panic-halt",
+ "panic-probe",
  "serde",
  "serde-json-core",
  "smoltcp-nal",
