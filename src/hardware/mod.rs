@@ -5,6 +5,7 @@
 pub use stm32h7xx_hal as hal;
 
 pub mod dac;
+pub mod adc_internal;
 pub mod setup;
 pub mod system_timer;
 pub mod unit_conversion;
