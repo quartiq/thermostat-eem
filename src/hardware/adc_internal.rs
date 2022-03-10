@@ -39,18 +39,15 @@ impl AdcInternal {
     pub fn new(
         delay: &mut impl DelayUs<u8>,
         clocks: &CoreClocks,
-        adc12_rcc: rec::Adc12,
-        adc3_rcc: rec::Adc3,
-        adc1: ADC1,
-        adc2: ADC2,
-        adc3: ADC3,
+        adc_rcc: (rec::Adc12, rec::Adc3),
+        adc: (ADC1, ADC2, ADC3),
         supply: SupplyPins,
         outu: OutUPins,
         outi: OutIPins,
     ) -> Self {
         // Setup ADC1 and ADC2
-        let (adc1, _) = adc::adc12(adc1, adc2, delay, adc12_rcc, clocks);
-        let adc3 = adc::Adc::adc3(adc3, delay, adc3_rcc, clocks);
+        let (adc1, _) = adc::adc12(adc.0, adc.1, delay, adc_rcc.0, clocks);
+        let adc3 = adc::Adc::adc3(adc.2, delay, adc_rcc.1, clocks);
 
         let mut adc1 = adc1.enable();
         adc1.set_resolution(adc::Resolution::SIXTEENBIT);

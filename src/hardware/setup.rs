@@ -340,11 +340,8 @@ pub fn setup(
     let mut adc_int = AdcInternal::new(
         &mut delay,
         &ccdr.clocks,
-        ccdr.peripheral.ADC12,
-        ccdr.peripheral.ADC3,
-        device.ADC1,
-        device.ADC2,
-        device.ADC3,
+        (ccdr.peripheral.ADC12, ccdr.peripheral.ADC3),
+        (device.ADC1, device.ADC2, device.ADC3),
         supply_pins,
         out_u_pins,
         out_i_pins,
