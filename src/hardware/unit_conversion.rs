@@ -1,6 +1,5 @@
 // Thermostat unit and data description conversion
-// SingularitySurfer 2021
-
+// TODO: Refactor to use the rust type system like stabilizer
 use core::f32;
 use num_traits::float::Float;
 

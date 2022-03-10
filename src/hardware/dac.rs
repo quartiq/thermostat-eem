@@ -1,9 +1,8 @@
-// Thermostat DAC/TEC driver
-//
-// This file contains all of the drivers to convert an 18 bit word to an analog current.
-// On Thermostat this used the ad5680 DAC and the MAX1968 PWM TEC driver. The (analog voltage)
-// max output voltages/current settings are driven by PWMs of the STM32.
-
+///! Thermostat DAC/TEC driver
+///!
+///! This file contains all of the drivers to convert an 18 bit word to an analog current.
+///! On Thermostat this used the ad5680 DAC and the MAX1968 TEC driver. The (analog voltage)
+///! max output voltages/current settings are driven by PWMs of the STM32.
 use num_enum::TryFromPrimitive;
 
 use super::hal::{
@@ -13,11 +12,9 @@ use super::hal::{
     },
     hal::{blocking::spi::Transfer, digital::v2::OutputPin, PwmPin},
     prelude::*,
-    pwm,
-    pwm::*,
+    pwm::{ActiveHigh, ComplementaryDisabled, ComplementaryImpossible, C1, C2, C3, C4},
     rcc::{rec, CoreClocks},
-    spi,
-    spi::{Enabled, NoMiso, Spi},
+    spi::{Enabled, NoMiso, Spi, MODE_1},
     stm32::{SPI3, TIM1, TIM3, TIM4},
     time::{MegaHertz, U32Ext},
 };
@@ -58,8 +55,8 @@ pub struct PwmPins {
     pub max_i_neg3_pin: PC9<Alternate<AF2>>,
 }
 
-type Pt0<T, S> = pwm::Pwm<T, S, ComplementaryDisabled, ActiveHigh, ActiveHigh>;
-type Pt1<T, S> = pwm::Pwm<T, S, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
+type Pt0<T, S> = super::hal::pwm::Pwm<T, S, ComplementaryDisabled, ActiveHigh, ActiveHigh>;
+type Pt1<T, S> = super::hal::pwm::Pwm<T, S, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
 
 pub struct Pwm {
     max_v0: Pt0<TIM1, C1>,
@@ -92,40 +89,49 @@ impl Pwm {
             pin.enable();
         }
 
-        let channels = (
-            pins.max_v0_pin,
-            pins.max_v1_pin,
-            pins.max_v2_pin,
-            pins.max_v3_pin,
+        let (mut max_v0, mut max_v1, mut max_v2, mut max_v3) = tim1.pwm(
+            (
+                pins.max_v0_pin,
+                pins.max_v1_pin,
+                pins.max_v2_pin,
+                pins.max_v3_pin,
+            ),
+            F_PWM.khz(),
+            tim1_rcc,
+            clocks,
         );
-        let (mut max_v0, mut max_v1, mut max_v2, mut max_v3) =
-            tim1.pwm(channels, F_PWM.khz(), tim1_rcc, clocks);
         init_pwm_pin(&mut max_v0);
         init_pwm_pin(&mut max_v1);
         init_pwm_pin(&mut max_v2);
         init_pwm_pin(&mut max_v3);
 
-        let channels = (
-            pins.max_i_pos0_pin,
-            pins.max_i_pos1_pin,
-            pins.max_i_pos2_pin,
-            pins.max_i_pos3_pin,
+        let (mut max_i_pos0, mut max_i_pos1, mut max_i_pos2, mut max_i_pos3) = tim4.pwm(
+            (
+                pins.max_i_pos0_pin,
+                pins.max_i_pos1_pin,
+                pins.max_i_pos2_pin,
+                pins.max_i_pos3_pin,
+            ),
+            F_PWM.khz(),
+            tim4_rcc,
+            clocks,
         );
-        let (mut max_i_pos0, mut max_i_pos1, mut max_i_pos2, mut max_i_pos3) =
-            tim4.pwm(channels, F_PWM.khz(), tim4_rcc, clocks);
         init_pwm_pin(&mut max_i_pos0);
         init_pwm_pin(&mut max_i_pos1);
         init_pwm_pin(&mut max_i_pos2);
         init_pwm_pin(&mut max_i_pos3);
 
-        let channels = (
-            pins.max_i_neg0_pin,
-            pins.max_i_neg1_pin,
-            pins.max_i_neg2_pin,
-            pins.max_i_neg3_pin,
+        let (mut max_i_neg0, mut max_i_neg1, mut max_i_neg2, mut max_i_neg3) = tim3.pwm(
+            (
+                pins.max_i_neg0_pin,
+                pins.max_i_neg1_pin,
+                pins.max_i_neg2_pin,
+                pins.max_i_neg3_pin,
+            ),
+            F_PWM.khz(),
+            tim3_rcc,
+            clocks,
         );
-        let (mut max_i_neg0, mut max_i_neg1, mut max_i_neg2, mut max_i_neg3) =
-            tim3.pwm(channels, F_PWM.khz(), tim3_rcc, clocks);
         init_pwm_pin(&mut max_i_neg0);
         init_pwm_pin(&mut max_i_neg1);
         init_pwm_pin(&mut max_i_neg2);
@@ -201,7 +207,7 @@ impl Dac {
     ) -> Self {
         let spi = spi3.spi(
             (sck, NoMiso, mosi),
-            spi::MODE_1,
+            MODE_1,
             SPI_CLOCK,
             prec,
             clocks, // default pll1_q clock source
