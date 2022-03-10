@@ -4,7 +4,6 @@
 // On Thermostat this used the ad5680 DAC and the MAX1968 PWM TEC driver. The (analog voltage)
 // max output voltages/current settings are driven by PWMs of the STM32.
 
-use defmt::info;
 use num_enum::TryFromPrimitive;
 
 use super::hal::{
@@ -206,7 +205,7 @@ impl Dac {
         let spi = spi3.spi(
             (pins.sck, NoMiso, pins.mosi),
             spi::MODE_1,
-            1.mhz(),
+            SPI_CLOCK,
             prec,
             clocks, // default pll1_q clock source
         );

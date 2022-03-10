@@ -121,7 +121,7 @@ pub fn setup(
         .sysclk(400.mhz())
         .hclk(200.mhz())
         .per_ck(100.mhz())
-        .pll1_q_ck(2.mhz())
+        .pll1_q_ck(60.mhz())
         .freeze(vos, &device.SYSCFG);
 
     info!("--- Starting hardware setup");
