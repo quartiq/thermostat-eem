@@ -11,7 +11,10 @@ use super::hal::{
     prelude::*,
 };
 
-use super::{EthernetPhy, LEDs, NetworkStack};
+use super::{
+    adc_internal::{AdcInternal, OutIPins, OutUPins, SupplyPins},
+    EthernetPhy, LEDs, NetworkStack,
+};
 
 use defmt::info;
 
@@ -130,7 +133,7 @@ pub fn setup(
     let gpioc = device.GPIOC.split(ccdr.peripheral.GPIOC);
     // let gpiod = device.GPIOD.split(ccdr.peripheral.GPIOD);
     let gpioe = device.GPIOE.split(ccdr.peripheral.GPIOE);
-    // let gpiof = device.GPIOF.split(ccdr.peripheral.GPIOF);
+    let gpiof = device.GPIOF.split(ccdr.peripheral.GPIOF);
     let gpiog = device.GPIOG.split(ccdr.peripheral.GPIOG);
 
     // Setup LEDs
@@ -312,6 +315,42 @@ pub fn setup(
             mac_address: mac_addr,
         }
     };
+
+    info!("setup internal ADCs");
+
+    let out_u_pins: OutUPins = (
+        gpioc.pc3.into_analog(),
+        gpioa.pa0.into_analog(),
+        gpioa.pa3.into_analog(),
+        gpioa.pa4.into_analog(),
+    );
+    let out_i_pins: OutIPins = (
+        gpioa.pa5.into_analog(),
+        gpioa.pa6.into_analog(),
+        gpiob.pb0.into_analog(),
+        gpiob.pb1.into_analog(),
+    );
+    let supply_pins: SupplyPins = (
+        gpioc.pc0.into_analog(),
+        gpioc.pc2.into_analog(),
+        gpiof.pf7.into_analog(),
+        gpiof.pf8.into_analog(),
+    );
+
+    let mut adc_int = AdcInternal::new(
+        &mut delay,
+        &ccdr.clocks,
+        (ccdr.peripheral.ADC12, ccdr.peripheral.ADC3),
+        (device.ADC1, device.ADC2, device.ADC3),
+        supply_pins,
+        out_u_pins,
+        out_i_pins,
+    );
+
+    info!("P12v: {:?} V", adc_int.read_p12v());
+    info!("P5v: {:?} V", adc_int.read_p5v());
+    info!("P3v3: {:?} V", adc_int.read_p3v3());
+    info!("I12v: {:?} A", adc_int.read_i12v());
 
     info!("--- Hardware setup done.");
 
