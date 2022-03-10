@@ -339,12 +339,12 @@ pub fn setup(
 
     let pwm = Pwm::new(
         &ccdr.clocks,
-        ccdr.peripheral.TIM1,
-        ccdr.peripheral.TIM3,
-        ccdr.peripheral.TIM4,
-        device.TIM1,
-        device.TIM3,
-        device.TIM4,
+        (
+            ccdr.peripheral.TIM1,
+            ccdr.peripheral.TIM3,
+            ccdr.peripheral.TIM4,
+        ),
+        (device.TIM1, device.TIM3, device.TIM4),
         pwm_pins,
     );
 

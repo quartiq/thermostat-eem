@@ -76,12 +76,8 @@ pub struct Pwm {
 impl Pwm {
     pub fn new(
         clocks: &CoreClocks,
-        tim1_rcc: rec::Tim1,
-        tim3_rcc: rec::Tim3,
-        tim4_rcc: rec::Tim4,
-        tim1: TIM1,
-        tim3: TIM3,
-        tim4: TIM4,
+        tim_rcc: (rec::Tim1, rec::Tim3, rec::Tim4),
+        tim: (TIM1, TIM3, TIM4),
         pins: PwmPins,
     ) -> Pwm {
         fn init_pwm_pin<P: PwmPin<Duty = u16>>(pin: &mut P) {
@@ -89,7 +85,7 @@ impl Pwm {
             pin.enable();
         }
 
-        let (mut max_v0, mut max_v1, mut max_v2, mut max_v3) = tim1.pwm(
+        let (mut max_v0, mut max_v1, mut max_v2, mut max_v3) = tim.0.pwm(
             (
                 pins.max_v0_pin,
                 pins.max_v1_pin,
@@ -97,7 +93,7 @@ impl Pwm {
                 pins.max_v3_pin,
             ),
             F_PWM.khz(),
-            tim1_rcc,
+            tim_rcc.0,
             clocks,
         );
         init_pwm_pin(&mut max_v0);
@@ -105,7 +101,7 @@ impl Pwm {
         init_pwm_pin(&mut max_v2);
         init_pwm_pin(&mut max_v3);
 
-        let (mut max_i_pos0, mut max_i_pos1, mut max_i_pos2, mut max_i_pos3) = tim4.pwm(
+        let (mut max_i_pos0, mut max_i_pos1, mut max_i_pos2, mut max_i_pos3) = tim.2.pwm(
             (
                 pins.max_i_pos0_pin,
                 pins.max_i_pos1_pin,
@@ -113,7 +109,7 @@ impl Pwm {
                 pins.max_i_pos3_pin,
             ),
             F_PWM.khz(),
-            tim4_rcc,
+            tim_rcc.2,
             clocks,
         );
         init_pwm_pin(&mut max_i_pos0);
@@ -121,7 +117,7 @@ impl Pwm {
         init_pwm_pin(&mut max_i_pos2);
         init_pwm_pin(&mut max_i_pos3);
 
-        let (mut max_i_neg0, mut max_i_neg1, mut max_i_neg2, mut max_i_neg3) = tim3.pwm(
+        let (mut max_i_neg0, mut max_i_neg1, mut max_i_neg2, mut max_i_neg3) = tim.1.pwm(
             (
                 pins.max_i_neg0_pin,
                 pins.max_i_neg1_pin,
@@ -129,7 +125,7 @@ impl Pwm {
                 pins.max_i_neg3_pin,
             ),
             F_PWM.khz(),
-            tim3_rcc,
+            tim_rcc.1,
             clocks,
         );
         init_pwm_pin(&mut max_i_neg0);
