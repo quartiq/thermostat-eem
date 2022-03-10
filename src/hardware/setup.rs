@@ -12,7 +12,7 @@ use super::hal::{
 };
 
 use super::{
-    adc_internal::{AdcInternal, TecIPins, TecUPins, SupplyPins},
+    adc_internal::{AdcInternal, SupplyPins, TecIPins, TecUPins},
     EthernetPhy, LEDs, NetworkStack,
 };
 
@@ -318,19 +318,19 @@ pub fn setup(
 
     info!("setup internal ADCs");
 
-    let tecupins: TecUPins = (
+    let out_u_pins: TecUPins = (
         gpioc.pc3.into_analog(),
         gpioa.pa0.into_analog(),
         gpioa.pa3.into_analog(),
         gpioa.pa4.into_analog(),
     );
-    let tecipins: TecIPins = (
+    let out_i_pins: TecIPins = (
         gpioa.pa5.into_analog(),
         gpioa.pa6.into_analog(),
         gpiob.pb0.into_analog(),
         gpiob.pb1.into_analog(),
     );
-    let supplypins: SupplyPins = (
+    let supply_pins: SupplyPins = (
         gpioc.pc0.into_analog(),
         gpioc.pc2.into_analog(),
         gpiof.pf7.into_analog(),
@@ -345,9 +345,9 @@ pub fn setup(
         device.ADC1,
         device.ADC2,
         device.ADC3,
-        supplypins,
-        tecupins,
-        tecipins,
+        supply_pins,
+        out_u_pins,
+        out_i_pins,
     );
 
     info!("P12v: {:?} V", adc_int.read_p12v());

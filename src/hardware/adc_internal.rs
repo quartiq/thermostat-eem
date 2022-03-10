@@ -7,7 +7,9 @@ use super::hal::{
     stm32::{ADC1, ADC2, ADC3},
 };
 
-pub enum TecChannel {
+const V_REF: f32 = 3.0; // ADC reference voltage
+
+pub enum OutChannel {
     Zero,
     One,
     Two,
@@ -21,22 +23,16 @@ pub enum Supply {
     I12v,
 }
 
-const V_REF: f32 = 3.0; // ADC reference voltage
-const DIV_P12V: f32 = 1.6 / (1.6 + 6.8); // Resistor divider 12V rail
-const DIV_P5V: f32 = 6.8 / (10.0 + 6.8); // Resistor divider 5V rail
-const DIV_P3V3: f32 = 6.8 / (1.6 + 6.8); // Resistor divider 3V3 rail
-const CONF_I12V: f32 = 0.005 * (10000.0 / 100.0); // 12V current measurement resistor configuration for LT6106
-
-pub type TecUPins = (PC3<Analog>, PA0<Analog>, PA3<Analog>, PA4<Analog>);
-pub type TecIPins = (PA5<Analog>, PA6<Analog>, PB0<Analog>, PB1<Analog>);
+pub type OutUPins = (PC3<Analog>, PA0<Analog>, PA3<Analog>, PA4<Analog>);
+pub type OutIPins = (PA5<Analog>, PA6<Analog>, PB0<Analog>, PB1<Analog>);
 pub type SupplyPins = (PC0<Analog>, PC2<Analog>, PF7<Analog>, PF8<Analog>);
 
 pub struct AdcInternal {
     adc1: adc::Adc<ADC1, adc::Enabled>,
     adc3: adc::Adc<ADC3, adc::Enabled>,
     supply: SupplyPins,
-    tecu: TecUPins,
-    teci: TecIPins,
+    outu: OutUPins,
+    outi: OutIPins,
 }
 
 impl AdcInternal {
@@ -49,8 +45,8 @@ impl AdcInternal {
         adc2: ADC2,
         adc3: ADC3,
         supply: SupplyPins,
-        tecu: TecUPins,
-        teci: TecIPins,
+        outu: OutUPins,
+        outi: OutIPins,
     ) -> Self {
         // Setup ADC1 and ADC2
         let (adc1, _) = adc::adc12(adc1, adc2, delay, adc12_rcc, clocks);
@@ -66,26 +62,26 @@ impl AdcInternal {
             adc1,
             adc3,
             supply,
-            tecu,
-            teci,
+            outu,
+            outi,
         }
     }
 
-    pub fn read_tecu(&mut self, tecu: TecChannel) -> u32 {
-        match tecu {
-            TecChannel::Zero => self.adc1.read(&mut self.tecu.0).unwrap(),
-            TecChannel::One => self.adc1.read(&mut self.tecu.1).unwrap(),
-            TecChannel::Two => self.adc1.read(&mut self.tecu.2).unwrap(),
-            TecChannel::Three => self.adc1.read(&mut self.tecu.3).unwrap(),
+    pub fn read_outu(&mut self, outu: OutChannel) -> u32 {
+        match outu {
+            OutChannel::Zero => self.adc1.read(&mut self.outu.0).unwrap(),
+            OutChannel::One => self.adc1.read(&mut self.outu.1).unwrap(),
+            OutChannel::Two => self.adc1.read(&mut self.outu.2).unwrap(),
+            OutChannel::Three => self.adc1.read(&mut self.outu.3).unwrap(),
         }
     }
 
-    pub fn read_teci(&mut self, teci: TecChannel) -> u32 {
-        match teci {
-            TecChannel::Zero => self.adc1.read(&mut self.teci.0).unwrap(),
-            TecChannel::One => self.adc1.read(&mut self.teci.1).unwrap(),
-            TecChannel::Two => self.adc1.read(&mut self.teci.2).unwrap(),
-            TecChannel::Three => self.adc1.read(&mut self.teci.3).unwrap(),
+    pub fn read_outi(&mut self, outi: OutChannel) -> u32 {
+        match outi {
+            OutChannel::Zero => self.adc1.read(&mut self.outi.0).unwrap(),
+            OutChannel::One => self.adc1.read(&mut self.outi.1).unwrap(),
+            OutChannel::Two => self.adc1.read(&mut self.outi.2).unwrap(),
+            OutChannel::Three => self.adc1.read(&mut self.outi.3).unwrap(),
         }
     }
 
@@ -98,27 +94,31 @@ impl AdcInternal {
         }
     }
 
+    /// reads the 12V rail voltage in volt
     pub fn read_p12v(&mut self) -> f32 {
-        // reads the 12V rail voltage and returns the result in volts
-        let factor = (V_REF / self.adc1.max_sample() as f32) / DIV_P12V;
+        let div_p12v: f32 = 1.6 / (1.6 + 6.8); // Resistor divider 12V rail
+        let factor = (V_REF / self.adc1.max_sample() as f32) / div_p12v;
         self.read_supply(Supply::P12v) as f32 * factor
     }
 
+    /// reads the 5V rail voltage in volt
     pub fn read_p5v(&mut self) -> f32 {
-        // reads the 5V rail voltage and returns the result in volts
-        let factor = (V_REF / self.adc1.max_sample() as f32) / DIV_P5V;
+        let div_p5v: f32 = 6.8 / (10.0 + 6.8); // Resistor divider 5V rail
+        let factor = (V_REF / self.adc1.max_sample() as f32) / div_p5v;
         self.read_supply(Supply::P5v) as f32 * factor
     }
 
+    /// reads the 3.3V rail voltage in volt
     pub fn read_p3v3(&mut self) -> f32 {
-        // reads the 3.3V rail voltage and returns the result in volts
-        let factor = (V_REF / self.adc1.max_sample() as f32) / DIV_P3V3;
+        let div_p3v3: f32 = 6.8 / (1.6 + 6.8); // Resistor divider 3V3 rail
+        let factor = (V_REF / self.adc1.max_sample() as f32) / div_p3v3;
         self.read_supply(Supply::P3v3) as f32 * factor
     }
 
+    /// reads the 12V rail current in ampere
     pub fn read_i12v(&mut self) -> f32 {
-        // reads the 12V rail current and returns the result in amperes
-        let factor = (V_REF / self.adc1.max_sample() as f32) / CONF_I12V;
+        let gain_i12v: f32 = 0.005 * (10000.0 / 100.0); // 12V current measurement resistor configuration for LT6106
+        let factor = (V_REF / self.adc1.max_sample() as f32) / gain_i12v;
         self.read_supply(Supply::I12v) as f32 * factor
     }
 }
