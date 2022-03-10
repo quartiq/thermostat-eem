@@ -12,8 +12,8 @@ use super::hal::{
 };
 
 use super::{
-    dac::{Dac, DacGpio, Pwm, PwmPins},
     adc_internal::{AdcInternal, OutIPins, OutUPins, SupplyPins},
+    dac::{Dac, DacGpio, Pwm, PwmPins},
     EthernetPhy, LEDs, NetworkStack,
 };
 
@@ -122,6 +122,8 @@ pub fn setup(
         .sysclk(400.mhz())
         .hclk(200.mhz())
         .per_ck(100.mhz())
+        .pll2_p_ck(100.mhz())
+        .pll2_q_ck(100.mhz())
         .pll1_q_ck(60.mhz())
         .freeze(vos, &device.SYSCFG);
 
