@@ -22,7 +22,6 @@ pub const VREF_TEC: f32 = 1.5; // TEC driver reference voltage
 const MAXCODE: f32 = (1 << 18) as _; // maximum DAC dataword
 const VREF_OS: f32 = 0.0; // Device specific offset voltage for zero current at half dac scale
 pub const VREF_DAC: f32 = 3.0 + VREF_OS; // DAC reference voltage target plus offset
-const DATAWIDTH_GAIN: f32 = 0.015625; // 2**-6 LSB to LSB gain from 24 to 18 bit
 
 // IIR constants
 const SCALE: f32 = (1 << 23) as _; // half the ADC maximum dataword
@@ -76,25 +75,3 @@ pub fn temp_to_iiroffset(temp: f32) -> f32 {
     (-data * GAIN as f32) / (0.5 * 0x400000 as f32)
 }
 
-/// Convert PID controller gains [kp, ki, kd] to IIR coefficients.
-pub fn pid_to_iir(pid: [f32; 3]) -> [f32; 5] {
-    let kp = pid[0] * DATAWIDTH_GAIN;
-    let ki = pid[1] * DATAWIDTH_GAIN;
-    let kd = pid[2] * DATAWIDTH_GAIN;
-    //PID
-    if (ki > f32::EPSILON) & (kd > f32::EPSILON) {
-        [kp + ki + kd, -(kp + 2.0 * kd), kd, 1.0, 0.0]
-    }
-    // PI
-    else if ki > f32::EPSILON {
-        [kp + ki, -kp, 0.0, 1.0, 0.0]
-    }
-    // PD
-    else if kd > f32::EPSILON {
-        [kd + kp, -kd, 0.0, 0.0, 0.0]
-    }
-    // P
-    else {
-        [kp, 0.0, 0.0, 0.0, 0.0]
-    }
-}
