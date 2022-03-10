@@ -8,11 +8,17 @@
 pub mod hardware;
 pub mod net;
 
+use defmt::{info, Format};
 use defmt_rtt as _; // global logger
 
 extern crate panic_halt;
 pub extern crate stm32h7xx_hal;
-use hardware::{hal, system_timer::SystemTimer, LEDs};
+use hardware::{
+    dac::{Channel, Dac, Limit, Pwm},
+    hal,
+    system_timer::SystemTimer,
+    LEDs,
+};
 use net::{
     miniconf::Miniconf,
     telemetry::{Telemetry, TelemetryBuffer},
@@ -20,6 +26,64 @@ use net::{
 };
 use stm32h7xx_hal::hal::digital::v2::OutputPin;
 use systick_monotonic::*;
+
+#[derive(Copy, Clone, Debug, Miniconf, Format)]
+pub struct OutputSettings {
+    /// En-/Disables the TEC driver.
+    ///
+    /// # Path
+    /// `output_settings/<n>/enable`
+    ///
+    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
+    ///
+    /// # Value
+    /// true to enable, false to disable.
+    pub enable: bool,
+
+    /// Maximum negative TEC current in ampere.
+    ///
+    /// # Path
+    /// `output_settings/<n>/max_i_neg
+    ///
+    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
+    ///
+    /// # Value
+    /// 0.0 to 3.0
+    pub max_i_neg: f32,
+
+    /// Maximum positive TEC current in ampere.
+    ///
+    /// # Path
+    /// `output_settings/<n>/max_i_pos
+    ///
+    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
+    ///
+    /// # Value
+    /// 0.0 to 3.0
+    pub max_i_pos: f32,
+
+    /// Maximum absolute TEC voltage in ampere.
+    ///
+    /// # Path
+    /// `output_settings/<n>/max_v
+    ///
+    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
+    ///
+    /// # Value
+    /// 0.0 to 5.0
+    pub max_v: f32,
+
+    /// TEC current in ampere.
+    ///
+    /// # Path
+    /// `output_settings/<n>/current
+    ///
+    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
+    ///
+    /// # Value
+    /// -3.0 to 3.0
+    pub current: f32,
+}
 
 #[derive(Clone, Copy, Debug, Miniconf)]
 pub struct Settings {
@@ -31,6 +95,15 @@ pub struct Settings {
     /// # Value
     /// Any positive non-zero value. Will be rounded to milliseconds.
     telemetry_period: f32,
+
+    ///
+    ///
+    /// # Path
+    /// `telemetry_period`
+    ///
+    /// # Value
+    /// Any positive non-zero value. Will be rounded to milliseconds.
+    output_settings: [OutputSettings; 4],
 
     /// LED0 state.
     ///
@@ -46,6 +119,13 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
+            output_settings: [OutputSettings {
+                enable: false,
+                max_i_neg: 0.5,
+                max_i_pos: 0.5,
+                max_v: 0.5,
+                current: 0.0,
+            }; 4],
             led: false,
         }
     }
@@ -67,6 +147,8 @@ mod app {
     #[local]
     struct Local {
         leds: LEDs,
+        dac: Dac,
+        pwm: Pwm,
     }
 
     #[init]
@@ -97,6 +179,8 @@ mod app {
 
         let local = Local {
             leds: thermostat.leds,
+            dac: thermostat.dac,
+            pwm: thermostat.pwm,
         };
 
         let shared = Shared {
@@ -119,7 +203,7 @@ mod app {
         }
     }
 
-    #[task(priority = 1, local=[leds], shared=[settings, network, telemetry])]
+    #[task(priority = 1, local=[leds, dac, pwm], shared=[settings, network, telemetry])]
     fn settings_update(mut c: settings_update::Context) {
         let settings = c
             .shared
@@ -132,6 +216,19 @@ mod app {
             c.local.leds.led0.set_high().unwrap();
         } else {
             c.local.leds.led0.set_low().unwrap();
+        }
+
+        // update DAC state
+        let dac = c.local.dac;
+        let pwm = c.local.pwm;
+        for (i, s) in settings.output_settings.iter().enumerate() {
+            let ch = Channel::try_from(i).unwrap();
+            pwm.set(ch, Limit::MaxV, s.max_v);
+            pwm.set(ch, Limit::MaxIPos, s.max_i_pos);
+            pwm.set(ch, Limit::MaxINeg, s.max_i_neg);
+            dac.set(s.current, ch);
+            dac.en_dis_ch(ch, s.enable);
+            info!("DAC channel no {:?}: {:?}", i, s);
         }
 
         c.shared.telemetry.lock(|tele| tele.led = settings.led);

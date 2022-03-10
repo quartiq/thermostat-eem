@@ -3,9 +3,8 @@
 // This file contains all of the drivers to convert an 18 bit word to an analog current.
 // On Thermostat this used the ad5680 DAC and the MAX1968 PWM TEC driver. The (analog voltage)
 // max output voltages/current settings are driven by PWMs of the STM32.
-// SingularitySurfer 2022
 
-// ToDo: Docstrings, Set CH fn,
+use num_enum::TryFromPrimitive;
 
 use super::hal::{
     gpio::{gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiog::*, Alternate, Output, PushPull, AF6},
@@ -19,8 +18,6 @@ use super::hal::{
     stm32::{SPI3, TIM1, TIM3, TIM4},
     time::{MegaHertz, U32Ext},
 };
-
-use log::info;
 
 use super::unit_conversion::{i_to_dac, i_to_pwm, v_to_pwm};
 
@@ -41,19 +38,19 @@ macro_rules! setup_tim {
     }};
 }
 
-// pub type DacSpi = Spi<SPI3, (PC10<Alternate<AF6>>, NoMiso, PC12<Alternate<AF6>>)>;
-
+#[derive(Clone, Copy, TryFromPrimitive)]
+#[repr(usize)]
 pub enum Channel {
-    Ch0,
-    Ch1,
-    Ch2,
-    Ch3,
+    Ch0 = 0,
+    Ch1 = 1,
+    Ch2 = 2,
+    Ch3 = 3,
 }
 
 pub enum Limit {
     MaxV,
-    MaxI,
-    MinI,
+    MaxIPos,
+    MaxINeg,
 }
 
 type Pt0<T, S> = pwm::Pwm<T, S, ComplementaryDisabled, ActiveHigh, ActiveHigh>;
@@ -163,14 +160,14 @@ impl Pwm {
             (Channel::Ch1, Limit::MaxV) => set_pwm(&mut self.max_v1, v_to_pwm(val)),
             (Channel::Ch2, Limit::MaxV) => set_pwm(&mut self.max_v2, v_to_pwm(val)),
             (Channel::Ch3, Limit::MaxV) => set_pwm(&mut self.max_v3, v_to_pwm(val)),
-            (Channel::Ch0, Limit::MaxI) => set_pwm(&mut self.max_i0, i_to_pwm(val)),
-            (Channel::Ch1, Limit::MaxI) => set_pwm(&mut self.max_i1, i_to_pwm(val)),
-            (Channel::Ch2, Limit::MaxI) => set_pwm(&mut self.max_i2, i_to_pwm(val)),
-            (Channel::Ch3, Limit::MaxI) => set_pwm(&mut self.max_i3, i_to_pwm(val)),
-            (Channel::Ch0, Limit::MinI) => set_pwm(&mut self.min_i0, i_to_pwm(val)),
-            (Channel::Ch1, Limit::MinI) => set_pwm(&mut self.min_i1, i_to_pwm(val)),
-            (Channel::Ch2, Limit::MinI) => set_pwm(&mut self.min_i2, i_to_pwm(val)),
-            (Channel::Ch3, Limit::MinI) => set_pwm(&mut self.min_i3, i_to_pwm(val)),
+            (Channel::Ch0, Limit::MaxIPos) => set_pwm(&mut self.max_i0, i_to_pwm(val)),
+            (Channel::Ch1, Limit::MaxIPos) => set_pwm(&mut self.max_i1, i_to_pwm(val)),
+            (Channel::Ch2, Limit::MaxIPos) => set_pwm(&mut self.max_i2, i_to_pwm(val)),
+            (Channel::Ch3, Limit::MaxIPos) => set_pwm(&mut self.max_i3, i_to_pwm(val)),
+            (Channel::Ch0, Limit::MaxINeg) => set_pwm(&mut self.min_i0, i_to_pwm(val)),
+            (Channel::Ch1, Limit::MaxINeg) => set_pwm(&mut self.min_i1, i_to_pwm(val)),
+            (Channel::Ch2, Limit::MaxINeg) => set_pwm(&mut self.min_i2, i_to_pwm(val)),
+            (Channel::Ch3, Limit::MaxINeg) => set_pwm(&mut self.min_i3, i_to_pwm(val)),
         }
     }
 }
@@ -232,15 +229,16 @@ impl Dac {
         dac.sync3.set_high().unwrap();
 
         // default to zero amps
-        dac.set(i_to_dac(0.0), Channel::Ch0);
-        dac.set(i_to_dac(0.0), Channel::Ch1);
-        dac.set(i_to_dac(0.0), Channel::Ch2);
-        dac.set(i_to_dac(0.0), Channel::Ch3);
+        dac.set(0.0, Channel::Ch0);
+        dac.set(0.0, Channel::Ch1);
+        dac.set(0.0, Channel::Ch2);
+        dac.set(0.0, Channel::Ch3);
         dac
     }
 
-    /// Set the DAC output to value on a channel.
-    pub fn set(&mut self, value: u32, ch: Channel) {
+    /// Set the DAC output to current on a channel.
+    pub fn set(&mut self, curr: f32, ch: Channel) {
+        let value = i_to_dac(curr);
         let value = value.min(MAX_VALUE);
         // 24 bit transfer. First 4 bit and last 2 bit are low.
         let mut buf = [(value >> 14) as u8, (value >> 6) as u8, (value << 2) as u8];
@@ -273,23 +271,17 @@ impl Dac {
         }
     }
 
-    /// enable a TEC channel via shutdown pin.
-    pub fn en_ch(&mut self, ch: Channel) {
-        match ch {
-            Channel::Ch0 => self.shdn0.set_high().unwrap(),
-            Channel::Ch1 => self.shdn1.set_high().unwrap(),
-            Channel::Ch2 => self.shdn2.set_high().unwrap(),
-            Channel::Ch3 => self.shdn3.set_high().unwrap(),
-        }
-    }
-
-    /// disable a TEC channel via shutdown pin.
-    pub fn dis_ch(&mut self, ch: Channel) {
-        match ch {
-            Channel::Ch0 => self.shdn0.set_low().unwrap(),
-            Channel::Ch1 => self.shdn1.set_low().unwrap(),
-            Channel::Ch2 => self.shdn2.set_low().unwrap(),
-            Channel::Ch3 => self.shdn3.set_low().unwrap(),
+    /// enable or disable a TEC channel via shutdown pin.
+    pub fn en_dis_ch(&mut self, ch: Channel, en: bool) {
+        match (ch, en) {
+            (Channel::Ch0, true) => self.shdn0.set_high().unwrap(),
+            (Channel::Ch1, true) => self.shdn1.set_high().unwrap(),
+            (Channel::Ch2, true) => self.shdn2.set_high().unwrap(),
+            (Channel::Ch3, true) => self.shdn3.set_high().unwrap(),
+            (Channel::Ch0, false) => self.shdn0.set_low().unwrap(),
+            (Channel::Ch1, false) => self.shdn1.set_low().unwrap(),
+            (Channel::Ch2, false) => self.shdn2.set_low().unwrap(),
+            (Channel::Ch3, false) => self.shdn3.set_low().unwrap(),
         }
     }
 }
