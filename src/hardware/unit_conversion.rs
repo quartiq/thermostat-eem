@@ -74,4 +74,3 @@ pub fn temp_to_iiroffset(temp: f32) -> f32 {
     let data = 0.75 * SCALE * v;
     (-data * GAIN as f32) / (0.5 * 0x400000 as f32)
 }
-
