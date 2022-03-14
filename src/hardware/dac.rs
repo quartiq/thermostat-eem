@@ -96,29 +96,26 @@ impl Dac {
         if !(0..1 << 20).contains(&value) {
             return Err(Bounds);
         }
-        info!("value: {:?}", value);
-        // 24 bit transfer. First 4 bit and last 2 bit are ignored for a 20 bit DAC output.
-        let mut buf = (value << 2).to_be_bytes();
 
         match ch {
             Channel::Ch0 => {
                 self.gpio.sync0.set_low().unwrap();
-                self.spi.write(&mut buf); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
+                self.spi.write(&mut (value << 2).to_be_bytes()[1..]); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
                 self.gpio.sync0.set_high().unwrap();
             }
             Channel::Ch1 => {
                 self.gpio.sync1.set_low().unwrap();
-                self.spi.write(&mut buf); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
+                self.spi.write(&mut (value << 2).to_be_bytes()[1..]); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
                 self.gpio.sync1.set_high().unwrap();
             }
             Channel::Ch2 => {
                 self.gpio.sync2.set_low().unwrap();
-                self.spi.write(&mut buf); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
+                self.spi.write(&mut (value << 2).to_be_bytes()[1..]); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
                 self.gpio.sync2.set_high().unwrap();
             }
             Channel::Ch3 => {
                 self.gpio.sync3.set_low().unwrap();
-                self.spi.write(&mut buf); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
+                self.spi.write(&mut (value << 2).to_be_bytes()[1..]); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
                 self.gpio.sync3.set_high().unwrap();
             }
         }
