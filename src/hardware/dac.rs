@@ -1,5 +1,3 @@
-use defmt::info;
-
 ///! Thermostat DAC/TEC driver
 ///!
 ///! This file contains all of the drivers to convert an 18 bit word to an analog current.
@@ -13,7 +11,7 @@ use super::{
         rcc::{rec, CoreClocks},
         spi::{Enabled, NoMiso, Spi, MODE_1},
         stm32::SPI3,
-        time::{KiloHertz, MegaHertz},
+        time::MegaHertz,
     },
     MAXCODE, R_SENSE, VREF_DAC, VREF_TEC,
 };
@@ -21,8 +19,6 @@ use super::{
 use super::Channel;
 
 const SPI_CLOCK: MegaHertz = MegaHertz(30); // DAC SPI clock speed
-const MAX_VALUE: u32 = 0x3FFFF; // Maximum DAC output value
-const F_PWM: KiloHertz = KiloHertz(20); // PWM freqency. 20kHz is ~80dB down with the installed second order 160Hz lowpass
 
 /// Convert TEC drive current to dac code.
 fn i_to_dac(i: f32) -> u32 {
@@ -30,11 +26,11 @@ fn i_to_dac(i: f32) -> u32 {
     ((v * MAXCODE) / VREF_DAC) as u32
 }
 
-/// Convert dac code to TEC drive current.
-fn dac_to_i(val: u32) -> f32 {
-    let v = VREF_DAC * (val as f32 / MAXCODE);
-    (v - VREF_TEC) / (10.0 * R_SENSE)
-}
+// /// Convert dac code to TEC drive current.
+// fn dac_to_i(val: u32) -> f32 {
+//     let v = VREF_DAC * (val as f32 / MAXCODE);
+//     (v - VREF_TEC) / (10.0 * R_SENSE)
+// }
 
 /// DAC value out of bounds error.
 #[derive(Debug)]
@@ -83,10 +79,10 @@ impl Dac {
         dac.gpio.sync3.set_high().unwrap();
 
         // default to zero amps
-        dac.set(0.0, Channel::Ch0);
-        dac.set(0.0, Channel::Ch1);
-        dac.set(0.0, Channel::Ch2);
-        dac.set(0.0, Channel::Ch3);
+        dac.set(0.0, Channel::Ch0).unwrap();
+        dac.set(0.0, Channel::Ch1).unwrap();
+        dac.set(0.0, Channel::Ch2).unwrap();
+        dac.set(0.0, Channel::Ch3).unwrap();
         dac
     }
 
@@ -100,22 +96,30 @@ impl Dac {
         match ch {
             Channel::Ch0 => {
                 self.gpio.sync0.set_low().unwrap();
-                self.spi.write(&mut (value << 2).to_be_bytes()[1..]); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
+                self.spi
+                    .transfer(&mut (value << 2).to_be_bytes()[1..])
+                    .unwrap(); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
                 self.gpio.sync0.set_high().unwrap();
             }
             Channel::Ch1 => {
                 self.gpio.sync1.set_low().unwrap();
-                self.spi.write(&mut (value << 2).to_be_bytes()[1..]); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
+                self.spi
+                    .transfer(&mut (value << 2).to_be_bytes()[1..])
+                    .unwrap(); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
                 self.gpio.sync1.set_high().unwrap();
             }
             Channel::Ch2 => {
                 self.gpio.sync2.set_low().unwrap();
-                self.spi.write(&mut (value << 2).to_be_bytes()[1..]); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
+                self.spi
+                    .transfer(&mut (value << 2).to_be_bytes()[1..])
+                    .unwrap(); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
                 self.gpio.sync2.set_high().unwrap();
             }
             Channel::Ch3 => {
                 self.gpio.sync3.set_low().unwrap();
-                self.spi.write(&mut (value << 2).to_be_bytes()[1..]); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
+                self.spi
+                    .transfer(&mut (value << 2).to_be_bytes()[1..])
+                    .unwrap(); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
                 self.gpio.sync3.set_high().unwrap();
             }
         }

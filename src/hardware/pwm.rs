@@ -9,13 +9,11 @@ use super::{
         pwm::{ActiveHigh, ComplementaryDisabled, ComplementaryImpossible, C1, C2, C3, C4},
         rcc::{rec, CoreClocks},
         stm32::{TIM1, TIM3, TIM4},
-        time::{KiloHertz, MegaHertz},
+        time::KiloHertz,
     },
     Channel, R_SENSE, V_PWM,
 };
 
-const SPI_CLOCK: MegaHertz = MegaHertz(30); // DAC SPI clock speed
-const MAX_VALUE: u32 = 0x3FFFF; // Maximum DAC output value
 const F_PWM: KiloHertz = KiloHertz(20); // PWM freqency. 20kHz is ~80dB down with the installed second order 160Hz lowpass
 
 /// Convert maximum current to relative pulsewidth for the (analog voltage)

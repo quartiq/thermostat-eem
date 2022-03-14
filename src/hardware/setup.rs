@@ -114,6 +114,8 @@ pub fn setup(
     // Enable SRAM3 for the ethernet descriptor ring.
     device.RCC.ahb2enr.modify(|_, w| w.sram3en().set_bit());
 
+    // device.RCC.d2ccip1r.modify(|_, w| w.spi123sel().per());
+
     // Clear reset flags.
     device.RCC.rsr.write(|w| w.rmvf().set_bit());
 

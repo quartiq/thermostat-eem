@@ -203,7 +203,7 @@ mod app {
             pwm.set(ch, Limit::MaxV, s.max_v);
             pwm.set(ch, Limit::MaxIPos, s.current_limit_upper);
             pwm.set(ch, Limit::MaxINeg, s.current_limit_lower);
-            dac.set(s.current, ch);
+            dac.set(s.current, ch).unwrap(); // TODO: implement what happens if user chooses invalid value
             dac.set_shutdown(ch, s.enable);
             info!("DAC channel no {:?}: {:?}", i, s);
         }
