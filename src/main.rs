@@ -10,14 +10,15 @@ pub mod net;
 
 use defmt::{info, Format};
 use defmt_rtt as _; // global logger
+#[allow(unused_imports)]
+use panic_probe; // necessary to explicitly import
 
-extern crate panic_probe;
-pub extern crate stm32h7xx_hal;
 use hardware::{
-    dac::{Channel, Dac, Limit, Pwm},
+    dac::Dac,
     hal,
+    pwm::{Limit, Pwm},
     system_timer::SystemTimer,
-    LEDs,
+    Channel, LEDs,
 };
 use net::{
     miniconf::Miniconf,
@@ -31,54 +32,29 @@ use systick_monotonic::*;
 pub struct OutputSettings {
     /// En-/Disables the TEC driver.
     ///
-    /// # Path
-    /// `output_settings/<n>/enable`
-    ///
-    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
-    ///
     /// # Value
     /// true to enable, false to disable.
     pub enable: bool,
 
-    /// Maximum negative TEC current in ampere.
-    ///
-    /// # Path
-    /// `output_settings/<n>/max_i_neg
-    ///
-    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
+    /// TEC current lower bound in ampere.
     ///
     /// # Value
     /// 0.0 to 3.0
-    pub max_i_neg: f32,
+    pub current_limit_upper: f32,
 
-    /// Maximum positive TEC current in ampere.
-    ///
-    /// # Path
-    /// `output_settings/<n>/max_i_pos
-    ///
-    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
+    /// TEC current lower bound in ampere.
     ///
     /// # Value
-    /// 0.0 to 3.0
-    pub max_i_pos: f32,
+    /// -3.0 to 0.0
+    pub current_limit_lower: f32,
 
-    /// Maximum absolute TEC voltage in ampere.
-    ///
-    /// # Path
-    /// `output_settings/<n>/max_v
-    ///
-    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
+    /// Maximum absolute (positive and negative) TEC voltage in volt.
     ///
     /// # Value
     /// 0.0 to 5.0
     pub max_v: f32,
 
     /// TEC current in ampere.
-    ///
-    /// # Path
-    /// `output_settings/<n>/current
-    ///
-    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
     ///
     /// # Value
     /// -3.0 to 3.0
@@ -96,10 +72,11 @@ pub struct Settings {
     /// Any positive non-zero value. Will be rounded to milliseconds.
     telemetry_period: f32,
 
-    ///
+    /// Array of settings for the Thermostat output channels.
     ///
     /// # Path
-    /// `telemetry_period`
+    /// `output_settings/<n>`
+    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
     ///
     /// # Value
     /// Any positive non-zero value. Will be rounded to milliseconds.
@@ -121,8 +98,8 @@ impl Default for Settings {
             telemetry_period: 1.0,
             output_settings: [OutputSettings {
                 enable: false,
-                max_i_neg: 0.5,
-                max_i_pos: 0.5,
+                current_limit_lower: 0.5,
+                current_limit_upper: 0.5,
                 max_v: 0.5,
                 current: 0.0,
             }; 4],
@@ -224,10 +201,10 @@ mod app {
         for (i, s) in settings.output_settings.iter().enumerate() {
             let ch = Channel::try_from(i).unwrap();
             pwm.set(ch, Limit::MaxV, s.max_v);
-            pwm.set(ch, Limit::MaxIPos, s.max_i_pos);
-            pwm.set(ch, Limit::MaxINeg, s.max_i_neg);
+            pwm.set(ch, Limit::MaxIPos, s.current_limit_upper);
+            pwm.set(ch, Limit::MaxINeg, s.current_limit_lower);
             dac.set(s.current, ch);
-            dac.en_dis_ch(ch, s.enable);
+            dac.set_shutdown(ch, s.enable);
             info!("DAC channel no {:?}: {:?}", i, s);
         }
 

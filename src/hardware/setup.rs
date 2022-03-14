@@ -13,7 +13,8 @@ use super::hal::{
 
 use super::{
     adc_internal::{AdcInternal, OutIPins, OutUPins, SupplyPins},
-    dac::{Dac, DacGpio, Pwm, PwmPins},
+    dac::{Dac, DacGpio},
+    pwm::{Pwm, PwmPins},
     EthernetPhy, LEDs, NetworkStack,
 };
 

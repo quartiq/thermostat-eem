@@ -1,177 +1,44 @@
+use defmt::info;
+
 ///! Thermostat DAC/TEC driver
 ///!
 ///! This file contains all of the drivers to convert an 18 bit word to an analog current.
 ///! On Thermostat this used the ad5680 DAC and the MAX1968 TEC driver. The (analog voltage)
 ///! max output voltages/current settings are driven by PWMs of the STM32.
-use num_enum::TryFromPrimitive;
-
-use super::hal::{
-    gpio::{
-        gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiog::*, Alternate, Output, PushPull, AF1, AF2,
-        AF6,
+use super::{
+    hal::{
+        gpio::{gpioc::*, gpiog::*, Alternate, Output, PushPull, AF6},
+        hal::{blocking::spi::Write, digital::v2::OutputPin},
+        prelude::*,
+        rcc::{rec, CoreClocks},
+        spi::{Enabled, NoMiso, Spi, MODE_1},
+        stm32::SPI3,
+        time::{KiloHertz, MegaHertz},
     },
-    hal::{blocking::spi::Transfer, digital::v2::OutputPin, PwmPin},
-    prelude::*,
-    pwm::{ActiveHigh, ComplementaryDisabled, ComplementaryImpossible, C1, C2, C3, C4},
-    rcc::{rec, CoreClocks},
-    spi::{Enabled, NoMiso, Spi, MODE_1},
-    stm32::{SPI3, TIM1, TIM3, TIM4},
-    time::{MegaHertz, U32Ext},
+    MAXCODE, R_SENSE, VREF_DAC, VREF_TEC,
 };
 
-use super::unit_conversion::{i_to_dac, i_to_pwm, v_to_pwm};
+use super::Channel;
 
-pub const SPI_CLOCK: MegaHertz = MegaHertz(30); // DAC SPI clock speed
-pub const MAX_VALUE: u32 = 0x3FFFF; // Maximum DAC output value
-pub const F_PWM: u32 = 20; // PWM freq in kHz
+const SPI_CLOCK: MegaHertz = MegaHertz(30); // DAC SPI clock speed
+const MAX_VALUE: u32 = 0x3FFFF; // Maximum DAC output value
+const F_PWM: KiloHertz = KiloHertz(20); // PWM freqency. 20kHz is ~80dB down with the installed second order 160Hz lowpass
 
-#[derive(Clone, Copy, TryFromPrimitive)]
-#[repr(usize)]
-pub enum Channel {
-    Ch0 = 0,
-    Ch1 = 1,
-    Ch2 = 2,
-    Ch3 = 3,
+/// Convert TEC drive current to dac code.
+fn i_to_dac(i: f32) -> u32 {
+    let v = (i * 10.0 * R_SENSE) + VREF_TEC;
+    ((v * MAXCODE) / VREF_DAC) as u32
 }
 
-pub enum Limit {
-    MaxV,
-    MaxIPos,
-    MaxINeg,
+/// Convert dac code to TEC drive current.
+fn dac_to_i(val: u32) -> f32 {
+    let v = VREF_DAC * (val as f32 / MAXCODE);
+    (v - VREF_TEC) / (10.0 * R_SENSE)
 }
 
-pub struct PwmPins {
-    pub max_v0_pin: PE9<Alternate<AF1>>,
-    pub max_v1_pin: PE11<Alternate<AF1>>,
-    pub max_v2_pin: PE13<Alternate<AF1>>,
-    pub max_v3_pin: PE14<Alternate<AF1>>,
-    pub max_i_pos0_pin: PD12<Alternate<AF2>>,
-    pub max_i_pos1_pin: PD13<Alternate<AF2>>,
-    pub max_i_pos2_pin: PD14<Alternate<AF2>>,
-    pub max_i_pos3_pin: PD15<Alternate<AF2>>,
-    pub max_i_neg0_pin: PC6<Alternate<AF2>>,
-    pub max_i_neg1_pin: PB5<Alternate<AF2>>,
-    pub max_i_neg2_pin: PC8<Alternate<AF2>>,
-    pub max_i_neg3_pin: PC9<Alternate<AF2>>,
-}
-
-type Pt0<T, S> = super::hal::pwm::Pwm<T, S, ComplementaryDisabled, ActiveHigh, ActiveHigh>;
-type Pt1<T, S> = super::hal::pwm::Pwm<T, S, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
-
-pub struct Pwm {
-    max_v0: Pt0<TIM1, C1>,
-    max_v1: Pt0<TIM1, C2>,
-    max_v2: Pt0<TIM1, C3>,
-    max_v3: Pt1<TIM1, C4>,
-    max_i_pos0: Pt1<TIM4, C1>,
-    max_i_pos1: Pt1<TIM4, C2>,
-    max_i_pos2: Pt1<TIM4, C3>,
-    max_i_pos3: Pt1<TIM4, C4>,
-    max_i_neg0: Pt1<TIM3, C1>,
-    max_i_neg1: Pt1<TIM3, C2>,
-    max_i_neg2: Pt1<TIM3, C3>,
-    max_i_neg3: Pt1<TIM3, C4>,
-}
-
-impl Pwm {
-    pub fn new(
-        clocks: &CoreClocks,
-        tim_rcc: (rec::Tim1, rec::Tim3, rec::Tim4),
-        tim: (TIM1, TIM3, TIM4),
-        pins: PwmPins,
-    ) -> Pwm {
-        fn init_pwm_pin<P: PwmPin<Duty = u16>>(pin: &mut P) {
-            pin.set_duty(0);
-            pin.enable();
-        }
-
-        let (mut max_v0, mut max_v1, mut max_v2, mut max_v3) = tim.0.pwm(
-            (
-                pins.max_v0_pin,
-                pins.max_v1_pin,
-                pins.max_v2_pin,
-                pins.max_v3_pin,
-            ),
-            F_PWM.khz(),
-            tim_rcc.0,
-            clocks,
-        );
-        init_pwm_pin(&mut max_v0);
-        init_pwm_pin(&mut max_v1);
-        init_pwm_pin(&mut max_v2);
-        init_pwm_pin(&mut max_v3);
-
-        let (mut max_i_pos0, mut max_i_pos1, mut max_i_pos2, mut max_i_pos3) = tim.2.pwm(
-            (
-                pins.max_i_pos0_pin,
-                pins.max_i_pos1_pin,
-                pins.max_i_pos2_pin,
-                pins.max_i_pos3_pin,
-            ),
-            F_PWM.khz(),
-            tim_rcc.2,
-            clocks,
-        );
-        init_pwm_pin(&mut max_i_pos0);
-        init_pwm_pin(&mut max_i_pos1);
-        init_pwm_pin(&mut max_i_pos2);
-        init_pwm_pin(&mut max_i_pos3);
-
-        let (mut max_i_neg0, mut max_i_neg1, mut max_i_neg2, mut max_i_neg3) = tim.1.pwm(
-            (
-                pins.max_i_neg0_pin,
-                pins.max_i_neg1_pin,
-                pins.max_i_neg2_pin,
-                pins.max_i_neg3_pin,
-            ),
-            F_PWM.khz(),
-            tim_rcc.1,
-            clocks,
-        );
-        init_pwm_pin(&mut max_i_neg0);
-        init_pwm_pin(&mut max_i_neg1);
-        init_pwm_pin(&mut max_i_neg2);
-        init_pwm_pin(&mut max_i_neg3);
-
-        Pwm {
-            max_v0,
-            max_v1,
-            max_v2,
-            max_v3,
-            max_i_pos0,
-            max_i_pos1,
-            max_i_pos2,
-            max_i_pos3,
-            max_i_neg0,
-            max_i_neg1,
-            max_i_neg2,
-            max_i_neg3,
-        }
-    }
-
-    /// Set PWM to limit current.
-    pub fn set(&mut self, ch: Channel, lim: Limit, val: f32) {
-        fn set_pwm<P: PwmPin<Duty = u16>>(pin: &mut P, duty: f32) {
-            let max = pin.get_max_duty();
-            let value = ((duty * (max as f32)) as u16).min(max);
-            pin.set_duty(value);
-        }
-        match (ch, lim) {
-            (Channel::Ch0, Limit::MaxV) => set_pwm(&mut self.max_v0, v_to_pwm(val)),
-            (Channel::Ch1, Limit::MaxV) => set_pwm(&mut self.max_v1, v_to_pwm(val)),
-            (Channel::Ch2, Limit::MaxV) => set_pwm(&mut self.max_v2, v_to_pwm(val)),
-            (Channel::Ch3, Limit::MaxV) => set_pwm(&mut self.max_v3, v_to_pwm(val)),
-            (Channel::Ch0, Limit::MaxIPos) => set_pwm(&mut self.max_i_pos0, i_to_pwm(val)),
-            (Channel::Ch1, Limit::MaxIPos) => set_pwm(&mut self.max_i_pos1, i_to_pwm(val)),
-            (Channel::Ch2, Limit::MaxIPos) => set_pwm(&mut self.max_i_pos2, i_to_pwm(val)),
-            (Channel::Ch3, Limit::MaxIPos) => set_pwm(&mut self.max_i_pos3, i_to_pwm(val)),
-            (Channel::Ch0, Limit::MaxINeg) => set_pwm(&mut self.max_i_neg0, i_to_pwm(val)),
-            (Channel::Ch1, Limit::MaxINeg) => set_pwm(&mut self.max_i_neg1, i_to_pwm(val)),
-            (Channel::Ch2, Limit::MaxINeg) => set_pwm(&mut self.max_i_neg2, i_to_pwm(val)),
-            (Channel::Ch3, Limit::MaxINeg) => set_pwm(&mut self.max_i_neg3, i_to_pwm(val)),
-        }
-    }
-}
+/// DAC value out of bounds error.
+#[derive(Debug)]
+pub struct Bounds;
 
 pub struct DacGpio {
     pub sync0: PG3<Output<PushPull>>,
@@ -188,7 +55,6 @@ pub struct DacGpio {
 /// Peltier Driver: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
 pub struct Dac {
     spi: Spi<SPI3, Enabled, u8>,
-    pub val: [u32; 4],
     gpio: DacGpio,
 }
 
@@ -209,11 +75,7 @@ impl Dac {
             clocks, // default pll1_q clock source
         );
 
-        let mut dac = Dac {
-            spi,
-            val: [0, 0, 0, 0],
-            gpio,
-        };
+        let mut dac = Dac { spi, gpio };
 
         dac.gpio.sync0.set_high().unwrap();
         dac.gpio.sync1.set_high().unwrap();
@@ -229,43 +91,43 @@ impl Dac {
     }
 
     /// Set the DAC output to current on a channel.
-    pub fn set(&mut self, curr: f32, ch: Channel) {
+    pub fn set(&mut self, curr: f32, ch: Channel) -> Result<(), Bounds> {
         let value = i_to_dac(curr);
-        let value = value.min(MAX_VALUE);
-        // 24 bit transfer. First 4 bit and last 2 bit are low.
-        let mut buf = [(value >> 14) as u8, (value >> 6) as u8, (value << 2) as u8];
+        if !(0..1 << 20).contains(&value) {
+            return Err(Bounds);
+        }
+        info!("value: {:?}", value);
+        // 24 bit transfer. First 4 bit and last 2 bit are ignored for a 20 bit DAC output.
+        let mut buf = (value << 2).to_be_bytes();
 
         match ch {
             Channel::Ch0 => {
                 self.gpio.sync0.set_low().unwrap();
-                self.spi.transfer(&mut buf).unwrap();
-                self.val[0] = value;
+                self.spi.write(&mut buf); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
                 self.gpio.sync0.set_high().unwrap();
             }
             Channel::Ch1 => {
                 self.gpio.sync1.set_low().unwrap();
-                self.spi.transfer(&mut buf).unwrap();
-                self.val[1] = value;
+                self.spi.write(&mut buf); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
                 self.gpio.sync1.set_high().unwrap();
             }
             Channel::Ch2 => {
                 self.gpio.sync2.set_low().unwrap();
-                self.spi.transfer(&mut buf).unwrap();
-                self.val[2] = value;
+                self.spi.write(&mut buf); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
                 self.gpio.sync2.set_high().unwrap();
             }
             Channel::Ch3 => {
                 self.gpio.sync3.set_low().unwrap();
-                self.spi.transfer(&mut buf).unwrap();
-                self.val[3] = value;
+                self.spi.write(&mut buf); // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
                 self.gpio.sync3.set_high().unwrap();
             }
         }
+        Ok(())
     }
 
-    /// enable or disable a TEC channel via shutdown pin.
-    pub fn en_dis_ch(&mut self, ch: Channel, en: bool) {
-        match (ch, en) {
+    /// Sets or resets the shutdown pin of an output channel.
+    pub fn set_shutdown(&mut self, ch: Channel, shutdown: bool) {
+        match (ch, shutdown) {
             (Channel::Ch0, true) => self.gpio.shdn0.set_high().unwrap(),
             (Channel::Ch1, true) => self.gpio.shdn1.set_high().unwrap(),
             (Channel::Ch2, true) => self.gpio.shdn2.set_high().unwrap(),

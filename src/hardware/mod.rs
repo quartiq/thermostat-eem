@@ -2,13 +2,14 @@
 //!
 //! Hardware specific setup etc.
 
+use num_enum::TryFromPrimitive;
 pub use stm32h7xx_hal as hal;
 
 pub mod adc_internal;
 pub mod dac;
+pub mod pwm;
 pub mod setup;
 pub mod system_timer;
-pub mod unit_conversion;
 
 // Thermostat MAC definition
 // ToDo: implement eeprom MAC
@@ -19,6 +20,26 @@ const TX_DESRING_CNT: usize = 4;
 
 // Number of RX descriptors in the ethernet descriptor ring.
 const RX_DESRING_CNT: usize = 4;
+
+// // ADC constants
+// const GAIN: u32 = 0x555555; // default ADC gain from datasheet
+// const R_INNER: f32 = 2.0 * 5100.0; // ratiometric resistor setup. 5.1k high and low side.
+
+// // Steinhart-Hart Parameters
+// const ZEROK: f32 = 273.15; // 0°C in °K
+// const B: f32 = 3988.0; // NTC beta value
+// const T_N_INV: f32 = 1.0 / (25.0 + ZEROK); // T_n = 25°C
+// const R_N: f32 = 10000.0; // TEC resistance at 25°C
+
+// PWM constants
+const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
+
+// DAC constants
+const R_SENSE: f32 = 0.05; // TEC current sense resistor
+pub const VREF_TEC: f32 = 1.5; // TEC driver reference voltage
+const MAXCODE: f32 = (1 << 18) as _; // maximum DAC dataword
+const VREF_OS: f32 = 0.0; // Device specific offset voltage for zero current at half dac scale
+pub const VREF_DAC: f32 = 3.0 + VREF_OS; // DAC reference voltage target plus offset
 
 pub type NetworkStack = smoltcp_nal::NetworkStack<
     'static,
@@ -44,4 +65,13 @@ pub struct LEDs {
     pub led5: hal::gpio::gpiog::PG15<hal::gpio::Output<hal::gpio::PushPull>>,
     pub led6: hal::gpio::gpioe::PE15<hal::gpio::Output<hal::gpio::PushPull>>,
     pub led7: hal::gpio::gpiog::PG8<hal::gpio::Output<hal::gpio::PushPull>>,
+}
+
+#[derive(Clone, Copy, TryFromPrimitive)]
+#[repr(usize)]
+pub enum Channel {
+    Ch0 = 0,
+    Ch1 = 1,
+    Ch2 = 2,
+    Ch3 = 3,
 }
