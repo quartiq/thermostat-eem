@@ -18,7 +18,8 @@ use super::{
 
 use super::Channel;
 
-const SPI_CLOCK: MegaHertz = MegaHertz(30); // DAC SPI clock speed
+// Note: 30MHz clock valid according to DAC datasheet. This lead to spurious RxFIFO overruns on the STM side when probing the spi clock with a scope probe.
+const SPI_CLOCK: MegaHertz = MegaHertz(10);
 
 /// Convert TEC drive current to dac code.
 fn i_to_dac(i: f32) -> u32 {
