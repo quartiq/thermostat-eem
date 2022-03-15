@@ -117,22 +117,6 @@ impl Pwm {
         init_pwm_pin(&mut lim_v2);
         init_pwm_pin(&mut lim_v3);
 
-        let (mut lim_i_up0, mut lim_i_up1, mut lim_i_up2, mut lim_i_up3) = tim.2.pwm(
-            (
-                pins.lim_i_up0_pin,
-                pins.lim_i_up1_pin,
-                pins.lim_i_up2_pin,
-                pins.lim_i_up3_pin,
-            ),
-            F_PWM,
-            tim_rec.2,
-            clocks,
-        );
-        init_pwm_pin(&mut lim_i_up0);
-        init_pwm_pin(&mut lim_i_up1);
-        init_pwm_pin(&mut lim_i_up2);
-        init_pwm_pin(&mut lim_i_up3);
-
         let (mut lim_i_low0, mut lim_i_low1, mut lim_i_low2, mut lim_i_low3) = tim.1.pwm(
             (
                 pins.lim_i_low0_pin,
@@ -148,6 +132,22 @@ impl Pwm {
         init_pwm_pin(&mut lim_i_low1);
         init_pwm_pin(&mut lim_i_low2);
         init_pwm_pin(&mut lim_i_low3);
+
+        let (mut lim_i_up0, mut lim_i_up1, mut lim_i_up2, mut lim_i_up3) = tim.2.pwm(
+            (
+                pins.lim_i_up0_pin,
+                pins.lim_i_up1_pin,
+                pins.lim_i_up2_pin,
+                pins.lim_i_up3_pin,
+            ),
+            F_PWM,
+            tim_rec.2,
+            clocks,
+        );
+        init_pwm_pin(&mut lim_i_up0);
+        init_pwm_pin(&mut lim_i_up1);
+        init_pwm_pin(&mut lim_i_up2);
+        init_pwm_pin(&mut lim_i_up3);
 
         Pwm {
             lim_v0,
