@@ -110,26 +110,28 @@ impl Dac {
             return Err(Bounds);
         }
 
+        let buf = &(value << 2).to_be_bytes()[1..];
+
         match ch {
             Channel::Ch0 => {
                 self.gpio.sync0.set_low().unwrap();
                 // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
-                self.spi.write(&(value << 2).to_be_bytes()[1..]).unwrap();
+                self.spi.write(buf).unwrap();
                 self.gpio.sync0.set_high().unwrap();
             }
             Channel::Ch1 => {
                 self.gpio.sync1.set_low().unwrap();
-                self.spi.write(&(value << 2).to_be_bytes()[1..]).unwrap();
+                self.spi.write(buf).unwrap();
                 self.gpio.sync1.set_high().unwrap();
             }
             Channel::Ch2 => {
                 self.gpio.sync2.set_low().unwrap();
-                self.spi.write(&(value << 2).to_be_bytes()[1..]).unwrap();
+                self.spi.write(buf).unwrap();
                 self.gpio.sync2.set_high().unwrap();
             }
             Channel::Ch3 => {
                 self.gpio.sync3.set_low().unwrap();
-                self.spi.write(&(value << 2).to_be_bytes()[1..]).unwrap();
+                self.spi.write(buf).unwrap();
                 self.gpio.sync3.set_high().unwrap();
             }
         }
