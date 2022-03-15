@@ -14,17 +14,14 @@
 ///! DAC datasheet: https://www.analog.com/media/en/technical-documentation/data-sheets/AD5680.pdf
 ///! TEC driver datasheet: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
 ///!
-use super::{
-    hal::{
-        gpio::{gpioc::*, gpiog::*, Alternate, Output, PushPull, AF6},
-        hal::{blocking::spi::Write, digital::v2::OutputPin},
-        prelude::*,
-        rcc::{rec, CoreClocks},
-        spi::{Enabled, NoMiso, Spi, MODE_1},
-        stm32::SPI3,
-        time::MegaHertz,
-    },
-    MAXCODE, R_SENSE, VREF_DAC, VREF_TEC,
+use super::hal::{
+    gpio::{gpioc::*, gpiog::*, Alternate, Output, PushPull, AF6},
+    hal::{blocking::spi::Write, digital::v2::OutputPin},
+    prelude::*,
+    rcc::{rec, CoreClocks},
+    spi::{Enabled, NoMiso, Spi, MODE_1},
+    stm32::SPI3,
+    time::MegaHertz,
 };
 
 use super::Channel;
@@ -32,11 +29,12 @@ use super::Channel;
 // Note: 30MHz clock valid according to DAC datasheet. This lead to spurious RxFIFO overruns on the STM side when probing the spi clock with a scope probe.
 const SPI_CLOCK: MegaHertz = MegaHertz(8);
 
-/// Convert TEC drive current to dac code.
-fn i_to_dac(i: f32) -> u32 {
-    let v = (i * 10.0 * R_SENSE) + VREF_TEC;
-    ((v * MAXCODE) / VREF_DAC) as u32
-}
+// DAC constants
+const R_SENSE: f32 = 0.05; // TEC current sense resistor
+const VREF_TEC: f32 = 1.5; // TEC driver reference voltage
+const MAXCODE: f32 = (1 << 18) as _; // maximum DAC dataword
+const VREF_OS: f32 = 0.0; // Device specific offset voltage for zero current at half dac scale
+const VREF_DAC: f32 = 3.0 + VREF_OS; // DAC reference voltage target plus offset
 
 /// DAC value out of bounds error.
 #[derive(Debug)]
@@ -105,7 +103,10 @@ impl Dac {
     /// * `curr` - Set current in ampere
     /// * `ch` - Thermostat output channel
     pub fn set(&mut self, curr: f32, ch: Channel) -> Result<(), Bounds> {
-        let value = i_to_dac(curr);
+        // current to DAC word conversion
+        let v = (curr * 10.0 * R_SENSE) + VREF_TEC;
+        let value = ((v * MAXCODE) / VREF_DAC) as u32;
+
         if !(0..1 << 20).contains(&value) {
             return Err(Bounds);
         }

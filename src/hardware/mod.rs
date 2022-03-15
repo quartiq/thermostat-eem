@@ -34,12 +34,7 @@ const RX_DESRING_CNT: usize = 4;
 // PWM constants
 const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
 
-// DAC constants
-const R_SENSE: f32 = 0.05; // TEC current sense resistor
-pub const VREF_TEC: f32 = 1.5; // TEC driver reference voltage
-const MAXCODE: f32 = (1 << 18) as _; // maximum DAC dataword
-const VREF_OS: f32 = 0.0; // Device specific offset voltage for zero current at half dac scale
-pub const VREF_DAC: f32 = 3.0 + VREF_OS; // DAC reference voltage target plus offset
+
 
 pub type NetworkStack = smoltcp_nal::NetworkStack<
     'static,
