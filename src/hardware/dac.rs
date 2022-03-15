@@ -1,7 +1,7 @@
 ///! Thermostat DAC driver
 ///!
 ///! This file contains the driver for the 4 Thermostat DAC output channels.
-///! To convert a 20 bit word into an analog current Thermostat uses a DAC to
+///! To convert a 18 bit word into an analog current Thermostat uses a DAC to
 ///! convert the word into a voltage and a subsequent TEC driver IC that produces
 ///! a current proportional to the DAC voltage.
 ///!
@@ -107,7 +107,7 @@ impl Dac {
         let v = (curr * 10.0 * R_SENSE) + VREF_TEC;
         let value = ((v * MAXCODE) / VREF_DAC) as u32;
 
-        if !(0..1 << 20).contains(&value) {
+        if !(0..1 << 18).contains(&value) {
             return Err(Bounds);
         }
 
@@ -116,7 +116,7 @@ impl Dac {
         match ch {
             Channel::Ch0 => {
                 self.gpio.sync0.set_low().unwrap();
-                // 24 bit write. 4 MSB and 2 LSB are ignored for a 20 bit DAC output.
+                // 24 bit write. 4 MSB and 2 LSB are ignored for a 18 bit DAC output.
                 self.spi.write(buf).unwrap();
                 self.gpio.sync0.set_high().unwrap();
             }
