@@ -100,11 +100,11 @@ impl Dac {
     /// Set the DAC output to current on a channel.
     ///
     /// # Args
-    /// * `curr` - Set current in ampere
+    /// * `current` - Set current in ampere
     /// * `ch` - Thermostat output channel
-    pub fn set(&mut self, curr: f32, ch: Channel) -> Result<(), Bounds> {
+    pub fn set(&mut self, current: f32, ch: Channel) -> Result<(), Bounds> {
         // current to DAC word conversion
-        let v = (curr * 10.0 * R_SENSE) + VREF_TEC;
+        let v = (current * 10.0 * R_SENSE) + VREF_TEC;
         let value = ((v * MAXCODE) / VREF_DAC) as u32;
 
         if !(0..1 << 18).contains(&value) {
