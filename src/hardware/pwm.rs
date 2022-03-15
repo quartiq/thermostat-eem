@@ -13,7 +13,7 @@ use super::{
         stm32::{TIM1, TIM3, TIM4},
         time::KiloHertz,
     },
-    Channel
+    Channel,
 };
 
 // PWM freqency. 20kHz is ~80dB down with the installed second order 160Hz lowpass.
