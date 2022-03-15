@@ -31,8 +31,7 @@ const RX_DESRING_CNT: usize = 4;
 // const T_N_INV: f32 = 1.0 / (25.0 + ZEROK); // T_n = 25°C
 // const R_N: f32 = 10000.0; // TEC resistance at 25°C
 
-// PWM constants
-const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
+
 
 
 

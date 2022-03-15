@@ -13,11 +13,15 @@ use super::{
         stm32::{TIM1, TIM3, TIM4},
         time::KiloHertz,
     },
-    Channel, R_SENSE, V_PWM,
+    Channel
 };
 
 // PWM freqency. 20kHz is ~80dB down with the installed second order 160Hz lowpass.
 const F_PWM: KiloHertz = KiloHertz(20);
+
+// PWM constants
+const R_SENSE: f32 = 0.05; // TEC current sense resistor
+const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
 
 /// Convert maximum current to relative pulsewidth for the (analog voltage)
 /// max output current inputs of the TEC driver.
