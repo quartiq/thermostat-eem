@@ -32,7 +32,7 @@ const SPI_CLOCK: MegaHertz = MegaHertz(8);
 // DAC constants
 const R_SENSE: f32 = 0.05; // TEC current sense resistor
 const VREF_TEC: f32 = 1.5; // TEC driver reference voltage
-const MAXCODE: f32 = (1 << 18) as _; // maximum DAC dataword
+const MAX_DAC_WORD: f32 = (1 << 20) as _; // maximum DAC dataword plus 2 bit due to interface alignment
 const VREF_OS: f32 = 0.0; // Device specific offset voltage for zero current at half dac scale
 const VREF_DAC: f32 = 3.0 + VREF_OS; // DAC reference voltage target plus offset
 
@@ -103,15 +103,16 @@ impl Dac {
     /// * `current` - Set current in ampere
     /// * `ch` - Thermostat output channel
     pub fn set(&mut self, current: f32, ch: Channel) -> Result<(), Bounds> {
-        // current to DAC word conversion
-        let v = (current * 10.0 * R_SENSE) + VREF_TEC;
-        let value = ((v * MAXCODE) / VREF_DAC) as u32;
-
-        if !(0..1 << 18).contains(&value) {
+        // current set should be bigger than -3.0 A and smaller than 3.0 A
+        if (current < -3.0) | (current > 3.0) {
             return Err(Bounds);
         }
 
-        let buf = &(value << 2).to_be_bytes()[1..];
+        // current to DAC word conversion
+        let v = (current * 10.0 * R_SENSE) + VREF_TEC;
+        let value = ((v * MAX_DAC_WORD) / VREF_DAC) as u32;
+
+        let buf = &value.to_be_bytes()[1..];
 
         match ch {
             Channel::Ch0 => {
