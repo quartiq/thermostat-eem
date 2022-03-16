@@ -104,15 +104,15 @@ impl Dac {
     /// * `ch` - Thermostat output channel
     pub fn set(&mut self, current: f32, ch: Channel) -> Result<(), Error> {
         // DAC constants
-        const MAX_DAC_WORD: f32 = (1 << 20) as _; // maximum DAC dataword plus 2 bit due to interface alignment
+        const MAX_DAC_WORD: i32 = 1 << 20; // maximum DAC dataword plus 2 bit due to interface alignment
         const VREF_OS: f32 = 0.0; // Device specific offset voltage for zero current at half dac scale
         const VREF_DAC: f32 = 3.0 + VREF_OS; // DAC reference voltage target plus offset
 
         // current to DAC word conversion
         let v = (current * 10.0 * R_SENSE) + VREF_TEC;
-        let value = (v * MAX_DAC_WORD) / VREF_DAC;
+        let value = ((v * MAX_DAC_WORD as f32) / VREF_DAC) as i32;
 
-        if !(0.0..MAX_DAC_WORD as f32).contains(&value) {
+        if !(0..MAX_DAC_WORD).contains(&value) {
             return Err(Error::Bounds);
         };
 

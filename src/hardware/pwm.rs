@@ -138,9 +138,9 @@ impl Pwm {
         }
 
         fn set_pwm<P: PwmPin<Duty = u16>>(pin: &mut P, duty: f32) -> Result<(), Error> {
-            let max = pin.get_max_duty() as f32;
-            let value = duty * max;
-            if !(0.0..max).contains(&value) {
+            let max = pin.get_max_duty();
+            let value = (duty * max as f32) as i32;
+            if !(0..max as _).contains(&value) {
                 return Err(Error::Bounds);
             }
             pin.set_duty(value as u16);
