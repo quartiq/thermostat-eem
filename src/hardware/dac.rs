@@ -146,17 +146,17 @@ impl Dac {
     ///
     /// # Args
     /// * `ch` - Thermostat output channel
-    /// * `shutdown` - TEC driver shutdown. True to set shutdown mode, false to reset shutdown mode.
+    /// * `shutdown` - TEC driver shutdown. True to set shutdown mode, false to enable the driver.
     pub fn set_shutdown(&mut self, ch: Channel, shutdown: bool) {
         match (ch, shutdown) {
-            (Channel::Ch0, true) => self.gpio.shdn.0.set_high().unwrap(),
-            (Channel::Ch1, true) => self.gpio.shdn.1.set_high().unwrap(),
-            (Channel::Ch2, true) => self.gpio.shdn.2.set_high().unwrap(),
-            (Channel::Ch3, true) => self.gpio.shdn.3.set_high().unwrap(),
-            (Channel::Ch0, false) => self.gpio.shdn.0.set_low().unwrap(),
-            (Channel::Ch1, false) => self.gpio.shdn.1.set_low().unwrap(),
-            (Channel::Ch2, false) => self.gpio.shdn.2.set_low().unwrap(),
-            (Channel::Ch3, false) => self.gpio.shdn.3.set_low().unwrap(),
+            (Channel::Ch0, false) => self.gpio.shdn.0.set_high().unwrap(),
+            (Channel::Ch1, false) => self.gpio.shdn.1.set_high().unwrap(),
+            (Channel::Ch2, false) => self.gpio.shdn.2.set_high().unwrap(),
+            (Channel::Ch3, false) => self.gpio.shdn.3.set_high().unwrap(),
+            (Channel::Ch0, true) => self.gpio.shdn.0.set_low().unwrap(),
+            (Channel::Ch1, true) => self.gpio.shdn.1.set_low().unwrap(),
+            (Channel::Ch2, true) => self.gpio.shdn.2.set_low().unwrap(),
+            (Channel::Ch3, true) => self.gpio.shdn.3.set_low().unwrap(),
         }
     }
 }

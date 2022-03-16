@@ -32,8 +32,8 @@ pub struct OutputSettings {
     /// En-/Disables the TEC driver.
     ///
     /// # Value
-    /// true to enable, false to disable.
-    pub enable: bool,
+    /// true to shut the driver down, false to enable the driver.
+    pub shutdown: bool,
 
     /// TEC positive current limit in ampere.
     ///
@@ -96,7 +96,7 @@ impl Default for Settings {
         Self {
             telemetry_period: 1.0,
             output_settings: [OutputSettings {
-                enable: false,
+                shutdown: false,
                 current_limit_negative: -0.5,
                 current_limit_positive: 0.5,
                 voltage_limit: 0.5,
@@ -206,7 +206,7 @@ mod app {
             pwm.set(Limit::NegativeCurrent(ch), s.current_limit_negative)
                 .unwrap();
             dac.set(ch, s.current).unwrap();
-            dac.set_shutdown(ch, s.enable);
+            dac.set_shutdown(ch, s.shutdown);
             info!("DAC channel no {:?}: {:?}", i, s);
         }
 
