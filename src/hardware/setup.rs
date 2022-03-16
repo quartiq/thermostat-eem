@@ -12,8 +12,8 @@ use super::hal::{
 };
 
 use super::{
-    adc_internal::{AdcInternal, OutIPins, OutUPins, SupplyPins},
-    dac::{Dac, DacGpio},
+    adc_internal::{AdcInternal, AdcPins},
+    dac::{Dac, DacPins},
     pwm::{Pwm, PwmPins},
     EthernetPhy, LEDs, NetworkStack,
 };
@@ -325,18 +325,24 @@ pub fn setup(
     info!("Setup PWM");
 
     let pwm_pins = PwmPins {
-        voltage0: gpioe.pe9.into_alternate_af1(),
-        voltage1: gpioe.pe11.into_alternate_af1(),
-        voltage2: gpioe.pe13.into_alternate_af1(),
-        voltage3: gpioe.pe14.into_alternate_af1(),
-        positive_current0: gpiod.pd12.into_alternate_af2(),
-        positive_current1: gpiod.pd13.into_alternate_af2(),
-        positive_current2: gpiod.pd14.into_alternate_af2(),
-        positive_current3: gpiod.pd15.into_alternate_af2(),
-        negative_current0: gpioc.pc6.into_alternate_af2(),
-        negative_current1: gpiob.pb5.into_alternate_af2(),
-        negative_current2: gpioc.pc8.into_alternate_af2(),
-        negative_current3: gpioc.pc9.into_alternate_af2(),
+        voltage: (
+            gpioe.pe9.into_alternate_af1(),
+            gpioe.pe11.into_alternate_af1(),
+            gpioe.pe13.into_alternate_af1(),
+            gpioe.pe14.into_alternate_af1(),
+        ),
+        positive_current: (
+            gpiod.pd12.into_alternate_af2(),
+            gpiod.pd13.into_alternate_af2(),
+            gpiod.pd14.into_alternate_af2(),
+            gpiod.pd15.into_alternate_af2(),
+        ),
+        negative_current: (
+            gpioc.pc6.into_alternate_af2(),
+            gpiob.pb5.into_alternate_af2(),
+            gpioc.pc8.into_alternate_af2(),
+            gpioc.pc9.into_alternate_af2(),
+        ),
     };
 
     let pwm = Pwm::new(
@@ -352,15 +358,19 @@ pub fn setup(
 
     info!("Setup DAC");
 
-    let dac_pins = DacGpio {
-        sync0: gpiog.pg3.into_push_pull_output(),
-        sync1: gpiog.pg2.into_push_pull_output(),
-        sync2: gpiog.pg1.into_push_pull_output(),
-        sync3: gpiog.pg0.into_push_pull_output(),
-        shdn0: gpiog.pg4.into_push_pull_output(),
-        shdn1: gpiog.pg5.into_push_pull_output(),
-        shdn2: gpiog.pg6.into_push_pull_output(),
-        shdn3: gpiog.pg7.into_push_pull_output(),
+    let dac_pins = DacPins {
+        sync: (
+            gpiog.pg3.into_push_pull_output(),
+            gpiog.pg2.into_push_pull_output(),
+            gpiog.pg1.into_push_pull_output(),
+            gpiog.pg0.into_push_pull_output(),
+        ),
+        shdn: (
+            gpiog.pg4.into_push_pull_output(),
+            gpiog.pg5.into_push_pull_output(),
+            gpiog.pg6.into_push_pull_output(),
+            gpiog.pg7.into_push_pull_output(),
+        ),
     };
 
     let dac = Dac::new(
@@ -374,33 +384,33 @@ pub fn setup(
 
     info!("setup internal ADCs");
 
-    let out_u_pins: OutUPins = (
-        gpioc.pc3.into_analog(),
-        gpioa.pa0.into_analog(),
-        gpioa.pa3.into_analog(),
-        gpioa.pa4.into_analog(),
-    );
-    let out_i_pins: OutIPins = (
-        gpioa.pa5.into_analog(),
-        gpioa.pa6.into_analog(),
-        gpiob.pb0.into_analog(),
-        gpiob.pb1.into_analog(),
-    );
-    let supply_pins: SupplyPins = (
-        gpioc.pc0.into_analog(),
-        gpioc.pc2.into_analog(),
-        gpiof.pf7.into_analog(),
-        gpiof.pf8.into_analog(),
-    );
+    let adc_pins = AdcPins {
+        supply: (
+            gpioc.pc0.into_analog(),
+            gpioc.pc2.into_analog(),
+            gpiof.pf7.into_analog(),
+            gpiof.pf8.into_analog(),
+        ),
+        output_voltage: (
+            gpioc.pc3.into_analog(),
+            gpioa.pa0.into_analog(),
+            gpioa.pa3.into_analog(),
+            gpioa.pa4.into_analog(),
+        ),
+        output_current: (
+            gpioa.pa5.into_analog(),
+            gpioa.pa6.into_analog(),
+            gpiob.pb0.into_analog(),
+            gpiob.pb1.into_analog(),
+        ),
+    };
 
     let mut adc_int = AdcInternal::new(
         &mut delay,
         &ccdr.clocks,
         (ccdr.peripheral.ADC12, ccdr.peripheral.ADC3),
         (device.ADC1, device.ADC2, device.ADC3),
-        supply_pins,
-        out_u_pins,
-        out_i_pins,
+        adc_pins,
     );
 
     info!("P12v: {:?} V", adc_int.read_p12v());

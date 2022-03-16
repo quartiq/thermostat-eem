@@ -40,21 +40,26 @@ pub enum Error {
 /// sync<n> - DAC IC adressing signals
 /// shdn<n> - TEC driver shutdown signals
 /// * <n> specifies Thermostat output channel
-pub struct DacGpio {
-    pub sync0: PG3<Output<PushPull>>,
-    pub sync1: PG2<Output<PushPull>>,
-    pub sync2: PG1<Output<PushPull>>,
-    pub sync3: PG0<Output<PushPull>>,
-    pub shdn0: PG4<Output<PushPull>>,
-    pub shdn1: PG5<Output<PushPull>>,
-    pub shdn2: PG6<Output<PushPull>>,
-    pub shdn3: PG7<Output<PushPull>>,
+#[allow(clippy::type_complexity)]
+pub struct DacPins {
+    pub sync: (
+        PG3<Output<PushPull>>,
+        PG2<Output<PushPull>>,
+        PG1<Output<PushPull>>,
+        PG0<Output<PushPull>>,
+    ),
+    pub shdn: (
+        PG4<Output<PushPull>>,
+        PG5<Output<PushPull>>,
+        PG6<Output<PushPull>>,
+        PG7<Output<PushPull>>,
+    ),
 }
 
 /// DAC driver struct containing the SPI bus and the gpio pins.
 pub struct Dac {
     spi: Spi<SPI3, Enabled, u8>,
-    gpio: DacGpio,
+    gpio: DacPins,
 }
 
 impl Dac {
@@ -73,16 +78,16 @@ impl Dac {
         spi3: SPI3,
         sck: PC10<Alternate<AF6>>,
         mosi: PC12<Alternate<AF6>>,
-        gpio: DacGpio,
+        gpio: DacPins,
     ) -> Self {
         let spi = spi3.spi((sck, NoMiso, mosi), MODE_1, SPI_CLOCK, spi3_rec, clocks);
 
         let mut dac = Dac { spi, gpio };
 
-        dac.gpio.sync0.set_high().unwrap();
-        dac.gpio.sync1.set_high().unwrap();
-        dac.gpio.sync2.set_high().unwrap();
-        dac.gpio.sync3.set_high().unwrap();
+        dac.gpio.sync.0.set_high().unwrap();
+        dac.gpio.sync.1.set_high().unwrap();
+        dac.gpio.sync.2.set_high().unwrap();
+        dac.gpio.sync.3.set_high().unwrap();
 
         // default to zero amps
         dac.set(0.0, Channel::Ch0).unwrap();
@@ -115,25 +120,25 @@ impl Dac {
 
         match ch {
             Channel::Ch0 => {
-                self.gpio.sync0.set_low().unwrap();
+                self.gpio.sync.0.set_low().unwrap();
                 // 24 bit write. 4 MSB and 2 LSB are ignored for a 18 bit DAC output.
                 self.spi.write(buf).unwrap();
-                self.gpio.sync0.set_high().unwrap();
+                self.gpio.sync.0.set_high().unwrap();
             }
             Channel::Ch1 => {
-                self.gpio.sync1.set_low().unwrap();
+                self.gpio.sync.1.set_low().unwrap();
                 self.spi.write(buf).unwrap();
-                self.gpio.sync1.set_high().unwrap();
+                self.gpio.sync.1.set_high().unwrap();
             }
             Channel::Ch2 => {
-                self.gpio.sync2.set_low().unwrap();
+                self.gpio.sync.2.set_low().unwrap();
                 self.spi.write(buf).unwrap();
-                self.gpio.sync2.set_high().unwrap();
+                self.gpio.sync.2.set_high().unwrap();
             }
             Channel::Ch3 => {
-                self.gpio.sync3.set_low().unwrap();
+                self.gpio.sync.3.set_low().unwrap();
                 self.spi.write(buf).unwrap();
-                self.gpio.sync3.set_high().unwrap();
+                self.gpio.sync.3.set_high().unwrap();
             }
         }
         Ok(())
@@ -146,14 +151,14 @@ impl Dac {
     /// * `shutdown` - TEC driver shutdown. True to set shutdown mode, false to reset shutdown mode.
     pub fn set_shutdown(&mut self, ch: Channel, shutdown: bool) {
         match (ch, shutdown) {
-            (Channel::Ch0, true) => self.gpio.shdn0.set_high().unwrap(),
-            (Channel::Ch1, true) => self.gpio.shdn1.set_high().unwrap(),
-            (Channel::Ch2, true) => self.gpio.shdn2.set_high().unwrap(),
-            (Channel::Ch3, true) => self.gpio.shdn3.set_high().unwrap(),
-            (Channel::Ch0, false) => self.gpio.shdn0.set_low().unwrap(),
-            (Channel::Ch1, false) => self.gpio.shdn1.set_low().unwrap(),
-            (Channel::Ch2, false) => self.gpio.shdn2.set_low().unwrap(),
-            (Channel::Ch3, false) => self.gpio.shdn3.set_low().unwrap(),
+            (Channel::Ch0, true) => self.gpio.shdn.0.set_high().unwrap(),
+            (Channel::Ch1, true) => self.gpio.shdn.1.set_high().unwrap(),
+            (Channel::Ch2, true) => self.gpio.shdn.2.set_high().unwrap(),
+            (Channel::Ch3, true) => self.gpio.shdn.3.set_high().unwrap(),
+            (Channel::Ch0, false) => self.gpio.shdn.0.set_low().unwrap(),
+            (Channel::Ch1, false) => self.gpio.shdn.1.set_low().unwrap(),
+            (Channel::Ch2, false) => self.gpio.shdn.2.set_low().unwrap(),
+            (Channel::Ch3, false) => self.gpio.shdn.3.set_low().unwrap(),
         }
     }
 }

@@ -23,16 +23,16 @@ pub enum Supply {
     I12v,
 }
 
-pub type OutUPins = (PC3<Analog>, PA0<Analog>, PA3<Analog>, PA4<Analog>);
-pub type OutIPins = (PA5<Analog>, PA6<Analog>, PB0<Analog>, PB1<Analog>);
-pub type SupplyPins = (PC0<Analog>, PC2<Analog>, PF7<Analog>, PF8<Analog>);
+pub struct AdcPins {
+    pub output_voltage: (PC3<Analog>, PA0<Analog>, PA3<Analog>, PA4<Analog>),
+    pub output_current: (PA5<Analog>, PA6<Analog>, PB0<Analog>, PB1<Analog>),
+    pub supply: (PC0<Analog>, PC2<Analog>, PF7<Analog>, PF8<Analog>),
+}
 
 pub struct AdcInternal {
     adc1: adc::Adc<ADC1, adc::Enabled>,
     adc3: adc::Adc<ADC3, adc::Enabled>,
-    supply: SupplyPins,
-    outu: OutUPins,
-    outi: OutIPins,
+    pins: AdcPins,
 }
 
 impl AdcInternal {
@@ -41,9 +41,7 @@ impl AdcInternal {
         clocks: &CoreClocks,
         adc_rcc: (rec::Adc12, rec::Adc3),
         adc: (ADC1, ADC2, ADC3),
-        supply: SupplyPins,
-        outu: OutUPins,
-        outi: OutIPins,
+        pins: AdcPins,
     ) -> Self {
         // Setup ADC1 and ADC2
         let (adc1, _) = adc::adc12(adc.0, adc.1, delay, adc_rcc.0, clocks);
@@ -55,39 +53,36 @@ impl AdcInternal {
         let mut adc3 = adc3.enable();
         adc3.set_resolution(adc::Resolution::SIXTEENBIT);
 
-        AdcInternal {
-            adc1,
-            adc3,
-            supply,
-            outu,
-            outi,
-        }
+        AdcInternal { adc1, adc3, pins }
     }
 
     pub fn read_outu(&mut self, outu: OutChannel) -> u32 {
+        let p = &mut self.pins.output_voltage;
         match outu {
-            OutChannel::Zero => self.adc1.read(&mut self.outu.0).unwrap(),
-            OutChannel::One => self.adc1.read(&mut self.outu.1).unwrap(),
-            OutChannel::Two => self.adc1.read(&mut self.outu.2).unwrap(),
-            OutChannel::Three => self.adc1.read(&mut self.outu.3).unwrap(),
+            OutChannel::Zero => self.adc1.read(&mut p.0).unwrap(),
+            OutChannel::One => self.adc1.read(&mut p.1).unwrap(),
+            OutChannel::Two => self.adc1.read(&mut p.2).unwrap(),
+            OutChannel::Three => self.adc1.read(&mut p.3).unwrap(),
         }
     }
 
     pub fn read_outi(&mut self, outi: OutChannel) -> u32 {
+        let p = &mut self.pins.output_current;
         match outi {
-            OutChannel::Zero => self.adc1.read(&mut self.outi.0).unwrap(),
-            OutChannel::One => self.adc1.read(&mut self.outi.1).unwrap(),
-            OutChannel::Two => self.adc1.read(&mut self.outi.2).unwrap(),
-            OutChannel::Three => self.adc1.read(&mut self.outi.3).unwrap(),
+            OutChannel::Zero => self.adc1.read(&mut p.0).unwrap(),
+            OutChannel::One => self.adc1.read(&mut p.1).unwrap(),
+            OutChannel::Two => self.adc1.read(&mut p.2).unwrap(),
+            OutChannel::Three => self.adc1.read(&mut p.3).unwrap(),
         }
     }
 
     pub fn read_supply(&mut self, supply: Supply) -> u32 {
+        let p = &mut self.pins.supply;
         match supply {
-            Supply::P5v => self.adc1.read(&mut self.supply.0).unwrap(),
-            Supply::P12v => self.adc1.read(&mut self.supply.1).unwrap(),
-            Supply::P3v3 => self.adc3.read(&mut self.supply.2).unwrap(),
-            Supply::I12v => self.adc3.read(&mut self.supply.3).unwrap(),
+            Supply::P5v => self.adc1.read(&mut p.0).unwrap(),
+            Supply::P12v => self.adc1.read(&mut p.1).unwrap(),
+            Supply::P3v3 => self.adc3.read(&mut p.2).unwrap(),
+            Supply::I12v => self.adc3.read(&mut p.3).unwrap(),
         }
     }
 
