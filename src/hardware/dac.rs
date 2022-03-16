@@ -103,14 +103,13 @@ impl Dac {
     /// * `current` - Set current in ampere
     /// * `ch` - Thermostat output channel
     pub fn set(&mut self, current: f32, ch: Channel) -> Result<(), Bounds> {
-        // current set should be bigger than -3.0 A and smaller than 3.0 A
-        if (current < -3.0) | (current > 3.0) {
-            return Err(Bounds);
-        }
-
         // current to DAC word conversion
         let v = (current * 10.0 * R_SENSE) + VREF_TEC;
-        let value = ((v * MAX_DAC_WORD) / VREF_DAC) as u32;
+        let value = (v * MAX_DAC_WORD) / VREF_DAC;
+
+        if !(0.0..MAX_DAC_WORD as f32).contains(&value) {
+            return Err(Bounds);
+        };
 
         let buf = &value.to_be_bytes()[1..];
 
