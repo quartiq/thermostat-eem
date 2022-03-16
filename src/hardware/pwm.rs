@@ -23,8 +23,8 @@ use super::{
 /// NegativeCurrent - Lower current limit
 pub enum Limit {
     Voltage(Channel),
-    PositiveCurrent(Channel),
     NegativeCurrent(Channel),
+    PositiveCurrent(Channel),
 }
 
 /// PWM value out of bounds error.
@@ -47,17 +47,17 @@ pub struct PwmPins {
         PE13<Alternate<AF1>>,
         PE14<Alternate<AF1>>,
     ),
-    pub positive_current: (
-        PD12<Alternate<AF2>>,
-        PD13<Alternate<AF2>>,
-        PD14<Alternate<AF2>>,
-        PD15<Alternate<AF2>>,
-    ),
     pub negative_current: (
         PC6<Alternate<AF2>>,
         PB5<Alternate<AF2>>,
         PC8<Alternate<AF2>>,
         PC9<Alternate<AF2>>,
+    ),
+    pub positive_current: (
+        PD12<Alternate<AF2>>,
+        PD13<Alternate<AF2>>,
+        PD14<Alternate<AF2>>,
+        PD15<Alternate<AF2>>,
     ),
 }
 
@@ -151,18 +151,6 @@ impl Pwm {
             Limit::Voltage(Channel::Ch1) => set_pwm(&mut self.voltage.1, v_to_pwm(val)),
             Limit::Voltage(Channel::Ch2) => set_pwm(&mut self.voltage.2, v_to_pwm(val)),
             Limit::Voltage(Channel::Ch3) => set_pwm(&mut self.voltage.3, v_to_pwm(val)),
-            Limit::PositiveCurrent(Channel::Ch0) => {
-                set_pwm(&mut self.positive_current.0, i_to_pwm(val))
-            }
-            Limit::PositiveCurrent(Channel::Ch1) => {
-                set_pwm(&mut self.positive_current.1, i_to_pwm(val))
-            }
-            Limit::PositiveCurrent(Channel::Ch2) => {
-                set_pwm(&mut self.positive_current.2, i_to_pwm(val))
-            }
-            Limit::PositiveCurrent(Channel::Ch3) => {
-                set_pwm(&mut self.positive_current.3, i_to_pwm(val))
-            }
             Limit::NegativeCurrent(Channel::Ch0) => {
                 set_pwm(&mut self.negative_current.0, i_to_pwm(-val))
             }
@@ -174,6 +162,18 @@ impl Pwm {
             }
             Limit::NegativeCurrent(Channel::Ch3) => {
                 set_pwm(&mut self.negative_current.3, i_to_pwm(-val))
+            }
+            Limit::PositiveCurrent(Channel::Ch0) => {
+                set_pwm(&mut self.positive_current.0, i_to_pwm(val))
+            }
+            Limit::PositiveCurrent(Channel::Ch1) => {
+                set_pwm(&mut self.positive_current.1, i_to_pwm(val))
+            }
+            Limit::PositiveCurrent(Channel::Ch2) => {
+                set_pwm(&mut self.positive_current.2, i_to_pwm(val))
+            }
+            Limit::PositiveCurrent(Channel::Ch3) => {
+                set_pwm(&mut self.positive_current.3, i_to_pwm(val))
             }
         }
     }

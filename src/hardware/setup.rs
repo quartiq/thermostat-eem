@@ -331,17 +331,17 @@ pub fn setup(
             gpioe.pe13.into_alternate_af1(),
             gpioe.pe14.into_alternate_af1(),
         ),
-        positive_current: (
-            gpiod.pd12.into_alternate_af2(),
-            gpiod.pd13.into_alternate_af2(),
-            gpiod.pd14.into_alternate_af2(),
-            gpiod.pd15.into_alternate_af2(),
-        ),
         negative_current: (
             gpioc.pc6.into_alternate_af2(),
             gpiob.pb5.into_alternate_af2(),
             gpioc.pc8.into_alternate_af2(),
             gpioc.pc9.into_alternate_af2(),
+        ),
+        positive_current: (
+            gpiod.pd12.into_alternate_af2(),
+            gpiod.pd13.into_alternate_af2(),
+            gpiod.pd14.into_alternate_af2(),
+            gpiod.pd15.into_alternate_af2(),
         ),
     };
 
@@ -385,12 +385,6 @@ pub fn setup(
     info!("setup internal ADCs");
 
     let adc_pins = AdcPins {
-        supply: (
-            gpioc.pc0.into_analog(),
-            gpioc.pc2.into_analog(),
-            gpiof.pf7.into_analog(),
-            gpiof.pf8.into_analog(),
-        ),
         output_voltage: (
             gpioc.pc3.into_analog(),
             gpioa.pa0.into_analog(),
@@ -402,6 +396,12 @@ pub fn setup(
             gpioa.pa6.into_analog(),
             gpiob.pb0.into_analog(),
             gpiob.pb1.into_analog(),
+        ),
+        supply: (
+            gpioc.pc0.into_analog(),
+            gpioc.pc2.into_analog(),
+            gpiof.pf7.into_analog(),
+            gpiof.pf8.into_analog(),
         ),
     };
 

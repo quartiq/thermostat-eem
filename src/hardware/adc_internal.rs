@@ -11,16 +11,16 @@ use super::Channel;
 const V_REF: f32 = 3.0; // ADC reference voltage
 
 pub enum Supply {
+    P3v3,
     P5v,
     P12v,
-    P3v3,
     I12v,
 }
 
 pub enum AdcChannel {
-    Supply(Supply),
-    OutputCurrent(Channel),
     OutputVoltage(Channel),
+    OutputCurrent(Channel),
+    Supply(Supply),
 }
 
 pub struct AdcPins {
@@ -87,18 +87,18 @@ impl AdcInternal {
     pub fn read_supply(&mut self, ch: Supply) -> u32 {
         let p = &mut self.pins.supply;
         match ch {
+            Supply::P3v3 => self.adc3.read(&mut p.2).unwrap(),
             Supply::P5v => self.adc1.read(&mut p.0).unwrap(),
             Supply::P12v => self.adc1.read(&mut p.1).unwrap(),
-            Supply::P3v3 => self.adc3.read(&mut p.2).unwrap(),
             Supply::I12v => self.adc3.read(&mut p.3).unwrap(),
         }
     }
 
-    /// reads the 12V rail voltage in volt
-    pub fn read_p12v(&mut self) -> f32 {
-        const DIV: f32 = 1.6 / (1.6 + 6.8); // Resistor divider 12V rail
+    /// reads the 3.3V rail voltage in volt
+    pub fn read_p3v3(&mut self) -> f32 {
+        const DIV: f32 = 6.8 / (1.6 + 6.8); // Resistor divider 3V3 rail
         let factor = (V_REF / DIV) / self.adc1.max_sample() as f32;
-        self.read_supply(Supply::P12v) as f32 * factor
+        self.read_supply(Supply::P3v3) as f32 * factor
     }
 
     /// reads the 5V rail voltage in volt
@@ -108,11 +108,11 @@ impl AdcInternal {
         self.read_supply(Supply::P5v) as f32 * factor
     }
 
-    /// reads the 3.3V rail voltage in volt
-    pub fn read_p3v3(&mut self) -> f32 {
-        const DIV: f32 = 6.8 / (1.6 + 6.8); // Resistor divider 3V3 rail
+    /// reads the 12V rail voltage in volt
+    pub fn read_p12v(&mut self) -> f32 {
+        const DIV: f32 = 1.6 / (1.6 + 6.8); // Resistor divider 12V rail
         let factor = (V_REF / DIV) / self.adc1.max_sample() as f32;
-        self.read_supply(Supply::P3v3) as f32 * factor
+        self.read_supply(Supply::P12v) as f32 * factor
     }
 
     /// reads the 12V rail current in ampere
