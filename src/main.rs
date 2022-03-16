@@ -8,11 +8,17 @@
 pub mod hardware;
 pub mod net;
 
+use defmt::{info, Format};
 use defmt_rtt as _; // global logger
+use panic_probe as _; // necessary to explicitly import
 
-extern crate panic_halt;
-pub extern crate stm32h7xx_hal;
-use hardware::{hal, system_timer::SystemTimer, LEDs};
+use hardware::{
+    dac::Dac,
+    hal,
+    pwm::{Limit, Pwm},
+    system_timer::SystemTimer,
+    Channel, LEDs,
+};
 use net::{
     miniconf::Miniconf,
     telemetry::{Telemetry, TelemetryBuffer},
@@ -20,6 +26,39 @@ use net::{
 };
 use stm32h7xx_hal::hal::digital::v2::OutputPin;
 use systick_monotonic::*;
+
+#[derive(Copy, Clone, Debug, Miniconf, Format)]
+pub struct OutputSettings {
+    /// En-/Disables the TEC driver.
+    ///
+    /// # Value
+    /// true to enable, false to disable.
+    pub enable: bool,
+
+    /// TEC positive current limit in ampere.
+    ///
+    /// # Value
+    /// 0.0 to 3.0
+    pub current_limit_positive: f32,
+
+    /// TEC negative current limit in ampere.
+    ///
+    /// # Value
+    /// -3.0 to 0.0
+    pub current_limit_negative: f32,
+
+    /// Maximum absolute (positive and negative) TEC voltage in volt.
+    ///
+    /// # Value
+    /// 0.0 to 5.0
+    pub voltage_limit: f32,
+
+    /// TEC current in ampere.
+    ///
+    /// # Value
+    /// -3.0 to a bit less than 3.0
+    pub current: f32,
+}
 
 #[derive(Clone, Copy, Debug, Miniconf)]
 pub struct Settings {
@@ -31,6 +70,16 @@ pub struct Settings {
     /// # Value
     /// Any positive non-zero value. Will be rounded to milliseconds.
     telemetry_period: f32,
+
+    /// Array of settings for the Thermostat output channels.
+    ///
+    /// # Path
+    /// `output_settings/<n>`
+    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
+    ///
+    /// # Value
+    /// Any positive non-zero value. Will be rounded to milliseconds.
+    output_settings: [OutputSettings; 4],
 
     /// LED0 state.
     ///
@@ -46,6 +95,13 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
+            output_settings: [OutputSettings {
+                enable: false,
+                current_limit_negative: -0.5,
+                current_limit_positive: 0.5,
+                voltage_limit: 0.5,
+                current: 0.0,
+            }; 4],
             led: false,
         }
     }
@@ -67,6 +123,8 @@ mod app {
     #[local]
     struct Local {
         leds: LEDs,
+        dac: Dac,
+        pwm: Pwm,
     }
 
     #[init]
@@ -97,6 +155,8 @@ mod app {
 
         let local = Local {
             leds: thermostat.leds,
+            dac: thermostat.dac,
+            pwm: thermostat.pwm,
         };
 
         let shared = Shared {
@@ -119,7 +179,7 @@ mod app {
         }
     }
 
-    #[task(priority = 1, local=[leds], shared=[settings, network, telemetry])]
+    #[task(priority = 1, local=[leds, dac, pwm], shared=[settings, network, telemetry])]
     fn settings_update(mut c: settings_update::Context) {
         let settings = c
             .shared
@@ -132,6 +192,22 @@ mod app {
             c.local.leds.led0.set_high().unwrap();
         } else {
             c.local.leds.led0.set_low().unwrap();
+        }
+
+        // update DAC state
+        let dac = c.local.dac;
+        let pwm = c.local.pwm;
+        for (i, s) in settings.output_settings.iter().enumerate() {
+            let ch = Channel::try_from(i).unwrap();
+            // TODO: implement what happens if user chooses invalid value
+            pwm.set(ch, Limit::Voltage, s.voltage_limit).unwrap();
+            pwm.set(ch, Limit::PositiveCurrent, s.current_limit_positive)
+                .unwrap();
+            pwm.set(ch, Limit::NegativeCurrent, s.current_limit_negative)
+                .unwrap();
+            dac.set(s.current, ch).unwrap();
+            dac.set_shutdown(ch, s.enable);
+            info!("DAC channel no {:?}: {:?}", i, s);
         }
 
         c.shared.telemetry.lock(|tele| tele.led = settings.led);

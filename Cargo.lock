@@ -253,9 +253,9 @@ dependencies = [
 
 [[package]]
 name = "embedded-dma"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46c8c02e4347a0267ca60813c952017f4c5948c232474c6010a381a337f1bda4"
+checksum = "994f7e5b5cb23521c22304927195f236813053eb9c065dd2226a32ba64695446"
 dependencies = [
  "stable_deref_trait",
 ]
@@ -399,6 +399,12 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
+name = "libm"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33a33a362ce288760ec6a508b94caaec573ae7d3bbbd91b87aa0bad4456839db"
 
 [[package]]
 name = "lock_api"
@@ -547,6 +553,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
 dependencies = [
  "autocfg",
+ "libm",
 ]
 
 [[package]]
@@ -570,10 +577,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "panic-halt"
-version = "0.2.0"
+name = "panic-probe"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de96540e0ebde571dc55c73d60ef407c653844e6f9a1e2fdbd40c07b9252d812"
+checksum = "3ab1f00eac22bd18f8e5cae9555f2820b3a0c166b5b556ee3e203746ea6dcf3a"
+dependencies = [
+ "cortex-m 0.7.4",
+ "defmt",
+]
 
 [[package]]
 name = "paste"
@@ -837,14 +848,14 @@ dependencies = [
 [[package]]
 name = "stm32h7xx-hal"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "926bfa26b1d97aa0579ade46411cbf5d0680704323c8b9db9a2413e3feae8d3b"
+source = "git+https://github.com/stm32-rs/stm32h7xx-hal?rev=0d984a2#0d984a2a9a2bf97eae5f9811fe3c353e18af09d3"
 dependencies = [
  "bare-metal 1.0.0",
  "cast",
  "cortex-m 0.7.4",
  "embedded-dma",
  "embedded-hal",
+ "fugit",
  "nb 1.0.0",
  "paste",
  "smoltcp",
@@ -889,8 +900,9 @@ dependencies = [
  "log",
  "miniconf",
  "minimq",
+ "num-traits",
  "num_enum",
- "panic-halt",
+ "panic-probe",
  "serde",
  "serde-json-core",
  "smoltcp-nal",

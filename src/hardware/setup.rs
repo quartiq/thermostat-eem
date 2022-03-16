@@ -13,6 +13,8 @@ use super::hal::{
 
 use super::{
     adc_internal::{AdcInternal, OutIPins, OutUPins, SupplyPins},
+    dac::{Dac, DacGpio},
+    pwm::{Pwm, PwmPins},
     EthernetPhy, LEDs, NetworkStack,
 };
 
@@ -92,6 +94,8 @@ pub struct NetworkDevices {
 /// The available hardware interfaces on Thermostat.
 pub struct ThermostatDevices {
     pub net: NetworkDevices,
+    pub dac: Dac,
+    pub pwm: Pwm,
     pub leds: LEDs,
 }
 
@@ -109,6 +113,8 @@ pub fn setup(
 
     // Enable SRAM3 for the ethernet descriptor ring.
     device.RCC.ahb2enr.modify(|_, w| w.sram3en().set_bit());
+
+    device.RCC.d2ccip1r.modify(|_, w| w.spi123sel().per());
 
     // Clear reset flags.
     device.RCC.rsr.write(|w| w.rmvf().set_bit());
@@ -131,7 +137,7 @@ pub fn setup(
     let gpioa = device.GPIOA.split(ccdr.peripheral.GPIOA);
     let gpiob = device.GPIOB.split(ccdr.peripheral.GPIOB);
     let gpioc = device.GPIOC.split(ccdr.peripheral.GPIOC);
-    // let gpiod = device.GPIOD.split(ccdr.peripheral.GPIOD);
+    let gpiod = device.GPIOD.split(ccdr.peripheral.GPIOD);
     let gpioe = device.GPIOE.split(ccdr.peripheral.GPIOE);
     let gpiof = device.GPIOF.split(ccdr.peripheral.GPIOF);
     let gpiog = device.GPIOG.split(ccdr.peripheral.GPIOG);
@@ -316,6 +322,56 @@ pub fn setup(
         }
     };
 
+    info!("Setup PWM");
+
+    let pwm_pins = PwmPins {
+        voltage0: gpioe.pe9.into_alternate_af1(),
+        voltage1: gpioe.pe11.into_alternate_af1(),
+        voltage2: gpioe.pe13.into_alternate_af1(),
+        voltage3: gpioe.pe14.into_alternate_af1(),
+        positive_current0: gpiod.pd12.into_alternate_af2(),
+        positive_current1: gpiod.pd13.into_alternate_af2(),
+        positive_current2: gpiod.pd14.into_alternate_af2(),
+        positive_current3: gpiod.pd15.into_alternate_af2(),
+        negative_current0: gpioc.pc6.into_alternate_af2(),
+        negative_current1: gpiob.pb5.into_alternate_af2(),
+        negative_current2: gpioc.pc8.into_alternate_af2(),
+        negative_current3: gpioc.pc9.into_alternate_af2(),
+    };
+
+    let pwm = Pwm::new(
+        &ccdr.clocks,
+        (
+            ccdr.peripheral.TIM1,
+            ccdr.peripheral.TIM3,
+            ccdr.peripheral.TIM4,
+        ),
+        (device.TIM1, device.TIM3, device.TIM4),
+        pwm_pins,
+    );
+
+    info!("Setup DAC");
+
+    let dac_pins = DacGpio {
+        sync0: gpiog.pg3.into_push_pull_output(),
+        sync1: gpiog.pg2.into_push_pull_output(),
+        sync2: gpiog.pg1.into_push_pull_output(),
+        sync3: gpiog.pg0.into_push_pull_output(),
+        shdn0: gpiog.pg4.into_push_pull_output(),
+        shdn1: gpiog.pg5.into_push_pull_output(),
+        shdn2: gpiog.pg6.into_push_pull_output(),
+        shdn3: gpiog.pg7.into_push_pull_output(),
+    };
+
+    let dac = Dac::new(
+        &ccdr.clocks,
+        ccdr.peripheral.SPI3,
+        device.SPI3,
+        gpioc.pc10.into_alternate_af6(),
+        gpioc.pc12.into_alternate_af6(),
+        dac_pins,
+    );
+
     info!("setup internal ADCs");
 
     let out_u_pins: OutUPins = (
@@ -354,5 +410,10 @@ pub fn setup(
 
     info!("--- Hardware setup done.");
 
-    ThermostatDevices { net, leds }
+    ThermostatDevices {
+        net,
+        dac,
+        pwm,
+        leds,
+    }
 }
