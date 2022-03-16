@@ -38,7 +38,9 @@ const VREF_DAC: f32 = 3.0 + VREF_OS; // DAC reference voltage target plus offset
 
 /// DAC value out of bounds error.
 #[derive(Debug)]
-pub struct Bounds;
+pub enum Error {
+    Bounds,
+}
 
 /// DAC gpio pins.
 ///
@@ -102,13 +104,13 @@ impl Dac {
     /// # Args
     /// * `current` - Set current in ampere
     /// * `ch` - Thermostat output channel
-    pub fn set(&mut self, current: f32, ch: Channel) -> Result<(), Bounds> {
+    pub fn set(&mut self, current: f32, ch: Channel) -> Result<(), Error> {
         // current to DAC word conversion
         let v = (current * 10.0 * R_SENSE) + VREF_TEC;
         let value = (v * MAX_DAC_WORD) / VREF_DAC;
 
         if !(0.0..MAX_DAC_WORD as f32).contains(&value) {
-            return Err(Bounds);
+            return Err(Error::Bounds);
         };
 
         let buf = &(value as u32).to_be_bytes()[1..];
