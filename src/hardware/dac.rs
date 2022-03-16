@@ -103,23 +103,23 @@ impl Dac {
     /// * `current` - Set current in Ampere
     pub fn set(&mut self, ch: Channel, current: f32) -> Result<(), Error> {
         // DAC constants
-        const MAX_DAC_WORD: i32 = 1 << 20; // maximum DAC dataword plus 2 bit due to interface alignment
-        const VREF_DAC: f32 = 3.0; // DAC reference voltage target plus offset
+        const MAX_DAC_WORD: i32 = 1 << 20; // maximum DAC dataword (exclusive) plus 2 bit due to interface alignment
+        const VREF_DAC: f32 = 3.0; // DAC reference voltage
 
-        // current to DAC word conversion
-        let v = (current * 10.0 * R_SENSE) + VREF_TEC;
-        let value = (v * (MAX_DAC_WORD as f32 / VREF_DAC)) as i32;
+        // Current to DAC word conversion
+        let ctli_voltage = (current * 10.0 * R_SENSE) + VREF_TEC;
+        let dac_code = (ctli_voltage * (MAX_DAC_WORD as f32 / VREF_DAC)) as i32;
 
-        if !(0..MAX_DAC_WORD).contains(&value) {
+        if !(0..MAX_DAC_WORD).contains(&dac_code) {
             return Err(Error::Bounds);
         };
 
-        let buf = &(value as u32).to_be_bytes()[1..];
+        let buf = &(dac_code as u32).to_be_bytes()[1..];
 
         match ch {
             Channel::Ch0 => {
                 self.gpio.sync.0.set_low().unwrap();
-                // 24 bit write. 4 MSB and 2 LSB are ignored for a 18 bit DAC output.
+                // 24 bit write. 4 MSB are zero and 2 LSB are ignored for a 18 bit DAC output.
                 self.spi.write(buf).unwrap();
                 self.gpio.sync.0.set_high().unwrap();
             }
