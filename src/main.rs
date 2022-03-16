@@ -205,7 +205,7 @@ mod app {
                 .unwrap();
             pwm.set(Limit::NegativeCurrent(ch), s.current_limit_negative)
                 .unwrap();
-            dac.set(s.current, ch).unwrap();
+            dac.set(ch, s.current).unwrap();
             dac.set_shutdown(ch, s.enable);
             info!("DAC channel no {:?}: {:?}", i, s);
         }

@@ -90,19 +90,18 @@ impl Dac {
         dac.gpio.sync.3.set_high().unwrap();
 
         // default to zero amps
-        dac.set(0.0, Channel::Ch0).unwrap();
-        dac.set(0.0, Channel::Ch1).unwrap();
-        dac.set(0.0, Channel::Ch2).unwrap();
-        dac.set(0.0, Channel::Ch3).unwrap();
+        for i in 0..4 {
+            dac.set(Channel::try_from(i).unwrap(), 0.0).unwrap();
+        }
         dac
     }
 
     /// Set the DAC output to current on a channel.
     ///
     /// # Args
-    /// * `current` - Set current in ampere
     /// * `ch` - Thermostat output channel
-    pub fn set(&mut self, current: f32, ch: Channel) -> Result<(), Error> {
+    /// * `current` - Set current in Ampere
+    pub fn set(&mut self, ch: Channel, current: f32) -> Result<(), Error> {
         // DAC constants
         const MAX_DAC_WORD: i32 = 1 << 20; // maximum DAC dataword plus 2 bit due to interface alignment
         const VREF_DAC: f32 = 3.0; // DAC reference voltage target plus offset
