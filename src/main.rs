@@ -200,10 +200,13 @@ mod app {
         let pwm = c.local.pwm;
         for (i, s) in settings.output_settings.iter().enumerate() {
             let ch = Channel::try_from(i).unwrap();
-            pwm.set(ch, Limit::Voltage, s.voltage_limit);
-            pwm.set(ch, Limit::PositiveCurrent, s.current_limit_positive);
-            pwm.set(ch, Limit::NegativeCurrent, s.current_limit_negative);
-            dac.set(s.current, ch).unwrap(); // TODO: implement what happens if user chooses invalid value
+            // TODO: implement what happens if user chooses invalid value
+            pwm.set(ch, Limit::Voltage, s.voltage_limit).unwrap();
+            pwm.set(ch, Limit::PositiveCurrent, s.current_limit_positive)
+                .unwrap();
+            pwm.set(ch, Limit::NegativeCurrent, s.current_limit_negative)
+                .unwrap();
+            dac.set(s.current, ch).unwrap();
             dac.set_shutdown(ch, s.enable);
             info!("DAC channel no {:?}: {:?}", i, s);
         }

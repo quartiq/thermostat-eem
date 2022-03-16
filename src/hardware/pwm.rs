@@ -27,6 +27,12 @@ pub enum Limit {
     NegativeCurrent,
 }
 
+/// PWM value out of bounds error.
+#[derive(Debug)]
+pub enum Error {
+    Bounds,
+}
+
 /// Pwm pins.
 ///
 /// voltage<n> - voltage limit pin
@@ -84,11 +90,6 @@ impl Pwm {
         // PWM freqency. 20kHz is ~80dB down with the installed second order 160Hz lowpass.
         const F_PWM: KiloHertz = KiloHertz(20);
 
-        fn init_pwm_pin<P: PwmPin<Duty = u16>>(pin: &mut P) {
-            pin.set_duty(0);
-            pin.enable();
-        }
-
         let (mut voltage0, mut voltage1, mut voltage2, mut voltage3) = tim.0.pwm(
             (pins.voltage0, pins.voltage1, pins.voltage2, pins.voltage3),
             F_PWM,
@@ -127,6 +128,10 @@ impl Pwm {
             tim_rec.2,
             clocks,
         );
+        fn init_pwm_pin<P: PwmPin<Duty = u16>>(pin: &mut P) {
+            pin.set_duty(0);
+            pin.enable();
+        }
         init_pwm_pin(&mut voltage0);
         init_pwm_pin(&mut voltage1);
         init_pwm_pin(&mut voltage2);
@@ -161,7 +166,7 @@ impl Pwm {
     /// # Args
     /// * `ch` - Thermostat output channel
     /// * `limit` - TEC limit type
-    pub fn set(&mut self, ch: Channel, lim: Limit, val: f32) {
+    pub fn set(&mut self, ch: Channel, lim: Limit, val: f32) -> Result<(), Error> {
         // PWM constants
         const R_SENSE: f32 = 0.05; // TEC current sense resistor
         const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
@@ -178,10 +183,14 @@ impl Pwm {
             v * (1.0 / 4.0 / V_PWM)
         }
 
-        fn set_pwm<P: PwmPin<Duty = u16>>(pin: &mut P, duty: f32) {
-            let max = pin.get_max_duty();
-            let value = ((duty * (max as f32)) as u16).min(max);
-            pin.set_duty(value);
+        fn set_pwm<P: PwmPin<Duty = u16>>(pin: &mut P, duty: f32) -> Result<(), Error> {
+            let max = pin.get_max_duty() as f32;
+            let value = duty * max;
+            if !(0.0..max).contains(&value) {
+                return Err(Error::Bounds);
+            }
+            pin.set_duty(value as u16);
+            Ok(())
         }
         match (ch, lim) {
             (Channel::Ch0, Limit::Voltage) => set_pwm(&mut self.voltage0, v_to_pwm(val)),
