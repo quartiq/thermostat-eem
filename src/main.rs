@@ -200,10 +200,10 @@ mod app {
         for (i, s) in settings.output_settings.iter().enumerate() {
             let ch = Channel::try_from(i).unwrap();
             // TODO: implement what happens if user chooses invalid value
-            pwm.set(ch, Limit::Voltage, s.voltage_limit).unwrap();
-            pwm.set(ch, Limit::PositiveCurrent, s.current_limit_positive)
+            pwm.set(Limit::Voltage(ch), s.voltage_limit).unwrap();
+            pwm.set(Limit::PositiveCurrent(ch), s.current_limit_positive)
                 .unwrap();
-            pwm.set(ch, Limit::NegativeCurrent, s.current_limit_negative)
+            pwm.set(Limit::NegativeCurrent(ch), s.current_limit_negative)
                 .unwrap();
             dac.set(s.current, ch).unwrap();
             dac.set_shutdown(ch, s.enable);
