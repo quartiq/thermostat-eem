@@ -397,12 +397,10 @@ pub fn setup(
             gpiob.pb0.into_analog(),
             gpiob.pb1.into_analog(),
         ),
-        supply: (
-            gpiof.pf7.into_analog(),
-            gpioc.pc0.into_analog(),
-            gpioc.pc2.into_analog(),
-            gpiof.pf8.into_analog(),
-        ),
+        p3v3_voltage: gpiof.pf7.into_analog(),
+        p5v_voltage: gpioc.pc0.into_analog(),
+        p12v_voltage: gpioc.pc2.into_analog(),
+        p12v_current: gpiof.pf8.into_analog(),
     };
 
     let mut adc_int = AdcInternal::new(
@@ -413,10 +411,13 @@ pub fn setup(
         adc_pins,
     );
 
-    info!("P12v: {:?} V", adc_int.read_p12v());
-    info!("P5v: {:?} V", adc_int.read_p5v());
-    info!("P3v3: {:?} V", adc_int.read_p3v3());
-    info!("I12v: {:?} A", adc_int.read_i12v());
+    info!("P3V3: {:?} V", adc_int.read_p3v3_voltage());
+    info!("P5V: {:?} V", adc_int.read_p5v_voltage());
+    info!(
+        "P12V: {:?} V, {:?} A",
+        adc_int.read_p12v_voltage(),
+        adc_int.read_p12v_current()
+    );
 
     info!("--- Hardware setup done.");
 
