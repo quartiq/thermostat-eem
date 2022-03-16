@@ -24,7 +24,7 @@ use super::hal::{
     time::MegaHertz,
 };
 
-use super::Channel;
+use super::{Channel, R_SENSE, VREF_TEC};
 
 // Note: 30MHz clock valid according to DAC datasheet. This lead to spurious RxFIFO overruns on the STM side when probing the spi clock with a scope probe.
 const SPI_CLOCK: MegaHertz = MegaHertz(8);
@@ -99,8 +99,6 @@ impl Dac {
     /// * `ch` - Thermostat output channel
     pub fn set(&mut self, current: f32, ch: Channel) -> Result<(), Error> {
         // DAC constants
-        const R_SENSE: f32 = 0.05; // TEC current sense resistor
-        const VREF_TEC: f32 = 1.5; // TEC driver reference voltage
         const MAX_DAC_WORD: f32 = (1 << 20) as _; // maximum DAC dataword plus 2 bit due to interface alignment
         const VREF_OS: f32 = 0.0; // Device specific offset voltage for zero current at half dac scale
         const VREF_DAC: f32 = 3.0 + VREF_OS; // DAC reference voltage target plus offset

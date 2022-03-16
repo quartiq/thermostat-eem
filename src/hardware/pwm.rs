@@ -13,7 +13,7 @@ use super::{
         stm32::{TIM1, TIM3, TIM4},
         time::KiloHertz,
     },
-    Channel,
+    Channel, R_SENSE, VREF_TEC,
 };
 
 /// TEC limit types
@@ -168,13 +168,12 @@ impl Pwm {
     /// * `limit` - TEC limit type
     pub fn set(&mut self, ch: Channel, lim: Limit, val: f32) -> Result<(), Error> {
         // PWM constants
-        const R_SENSE: f32 = 0.05; // TEC current sense resistor
         const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
 
         /// Convert maximum current to relative pulsewidth for the (analog voltage)
         /// max output current inputs of the TEC driver.
         pub fn i_to_pwm(i: f32) -> f32 {
-            i * ((10.0 * R_SENSE) / V_PWM)
+            i * ((VREF_TEC * R_SENSE) / (V_PWM * 0.15))
         }
 
         /// Convert maximum voltage to relative pulsewidth for the (analog voltage)
