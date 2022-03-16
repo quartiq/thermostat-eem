@@ -10,8 +10,7 @@ pub mod net;
 
 use defmt::{info, Format};
 use defmt_rtt as _; // global logger
-#[allow(unused_imports)]
-use panic_probe; // necessary to explicitly import
+use panic_probe as _; // necessary to explicitly import
 
 use hardware::{
     dac::Dac,
