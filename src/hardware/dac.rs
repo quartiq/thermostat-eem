@@ -111,7 +111,7 @@ impl Dac {
             return Err(Bounds);
         };
 
-        let buf = &value.to_be_bytes()[1..];
+        let buf = &(value as u32).to_be_bytes()[1..];
 
         match ch {
             Channel::Ch0 => {
