@@ -73,7 +73,7 @@ pub struct Pwm {
 }
 
 impl Pwm {
-    /// Construct a new PWM driver for all Thermostat output channels.
+    /// Construct a new PWM driver for all Thermostat output channel limits.
     ///
     /// # Args
     /// * `clocks` - Reference to CoreClocks
@@ -127,54 +127,70 @@ impl Pwm {
 
         /// Convert maximum current to relative pulsewidth for the (analog voltage)
         /// max output current inputs of the TEC driver.
-        pub fn i_to_pwm(i: f32) -> f32 {
+        pub fn current_limit_to_duty_cycle(i: f32) -> f32 {
             i * ((VREF_TEC * R_SENSE) / (V_PWM * 0.15))
         }
 
         /// Convert maximum voltage to relative pulsewidth for the (analog voltage)
         /// max output voltage of the TEC driver.
-        pub fn v_to_pwm(v: f32) -> f32 {
+        pub fn voltage_limit_to_duty_cycle(v: f32) -> f32 {
             v * (1.0 / 4.0 / V_PWM)
         }
 
-        fn set_pwm<P: PwmPin<Duty = u16>>(pin: &mut P, duty: f32) -> Result<(), Error> {
-            let max = pin.get_max_duty();
+        fn set_pwm_channel<P: PwmPin<Duty = u16>>(channel: &mut P, duty: f32) -> Result<(), Error> {
+            let max = channel.get_max_duty();
             let value = (duty * max as f32) as i32;
             if !(0..max as _).contains(&value) {
                 return Err(Error::Bounds);
             }
-            pin.set_duty(value as u16);
+            channel.set_duty(value as u16);
             Ok(())
         }
         match lim {
-            Limit::Voltage(Channel::Ch0) => set_pwm(&mut self.voltage.0, v_to_pwm(val)),
-            Limit::Voltage(Channel::Ch1) => set_pwm(&mut self.voltage.1, v_to_pwm(val)),
-            Limit::Voltage(Channel::Ch2) => set_pwm(&mut self.voltage.2, v_to_pwm(val)),
-            Limit::Voltage(Channel::Ch3) => set_pwm(&mut self.voltage.3, v_to_pwm(val)),
-            Limit::NegativeCurrent(Channel::Ch0) => {
-                set_pwm(&mut self.negative_current.0, i_to_pwm(-val))
+            Limit::Voltage(Channel::Ch0) => {
+                set_pwm_channel(&mut self.voltage.0, voltage_limit_to_duty_cycle(val))
             }
-            Limit::NegativeCurrent(Channel::Ch1) => {
-                set_pwm(&mut self.negative_current.1, i_to_pwm(-val))
+            Limit::Voltage(Channel::Ch1) => {
+                set_pwm_channel(&mut self.voltage.1, voltage_limit_to_duty_cycle(val))
             }
-            Limit::NegativeCurrent(Channel::Ch2) => {
-                set_pwm(&mut self.negative_current.2, i_to_pwm(-val))
+            Limit::Voltage(Channel::Ch2) => {
+                set_pwm_channel(&mut self.voltage.2, voltage_limit_to_duty_cycle(val))
             }
-            Limit::NegativeCurrent(Channel::Ch3) => {
-                set_pwm(&mut self.negative_current.3, i_to_pwm(-val))
+            Limit::Voltage(Channel::Ch3) => {
+                set_pwm_channel(&mut self.voltage.3, voltage_limit_to_duty_cycle(val))
             }
-            Limit::PositiveCurrent(Channel::Ch0) => {
-                set_pwm(&mut self.positive_current.0, i_to_pwm(val))
-            }
-            Limit::PositiveCurrent(Channel::Ch1) => {
-                set_pwm(&mut self.positive_current.1, i_to_pwm(val))
-            }
-            Limit::PositiveCurrent(Channel::Ch2) => {
-                set_pwm(&mut self.positive_current.2, i_to_pwm(val))
-            }
-            Limit::PositiveCurrent(Channel::Ch3) => {
-                set_pwm(&mut self.positive_current.3, i_to_pwm(val))
-            }
+            Limit::NegativeCurrent(Channel::Ch0) => set_pwm_channel(
+                &mut self.negative_current.0,
+                current_limit_to_duty_cycle(-val),
+            ),
+            Limit::NegativeCurrent(Channel::Ch1) => set_pwm_channel(
+                &mut self.negative_current.1,
+                current_limit_to_duty_cycle(-val),
+            ),
+            Limit::NegativeCurrent(Channel::Ch2) => set_pwm_channel(
+                &mut self.negative_current.2,
+                current_limit_to_duty_cycle(-val),
+            ),
+            Limit::NegativeCurrent(Channel::Ch3) => set_pwm_channel(
+                &mut self.negative_current.3,
+                current_limit_to_duty_cycle(-val),
+            ),
+            Limit::PositiveCurrent(Channel::Ch0) => set_pwm_channel(
+                &mut self.positive_current.0,
+                current_limit_to_duty_cycle(val),
+            ),
+            Limit::PositiveCurrent(Channel::Ch1) => set_pwm_channel(
+                &mut self.positive_current.1,
+                current_limit_to_duty_cycle(val),
+            ),
+            Limit::PositiveCurrent(Channel::Ch2) => set_pwm_channel(
+                &mut self.positive_current.2,
+                current_limit_to_duty_cycle(val),
+            ),
+            Limit::PositiveCurrent(Channel::Ch3) => set_pwm_channel(
+                &mut self.positive_current.3,
+                current_limit_to_duty_cycle(val),
+            ),
         }
     }
 }
