@@ -16,25 +16,6 @@ use super::{
     Channel,
 };
 
-// PWM freqency. 20kHz is ~80dB down with the installed second order 160Hz lowpass.
-const F_PWM: KiloHertz = KiloHertz(20);
-
-// PWM constants
-const R_SENSE: f32 = 0.05; // TEC current sense resistor
-const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
-
-/// Convert maximum current to relative pulsewidth for the (analog voltage)
-/// max output current inputs of the TEC driver.
-pub fn i_to_pwm(i: f32) -> f32 {
-    i * ((10.0 * R_SENSE) / V_PWM)
-}
-
-/// Convert maximum voltage to relative pulsewidth for the (analog voltage)
-/// max output voltage of the TEC driver.
-pub fn v_to_pwm(v: f32) -> f32 {
-    v / (4.0 * V_PWM)
-}
-
 /// TEC limit types
 ///
 /// LimV - Upper and lower voltage limit
@@ -100,6 +81,9 @@ impl Pwm {
         tim: (TIM1, TIM3, TIM4),
         pins: PwmPins,
     ) -> Pwm {
+        // PWM freqency. 20kHz is ~80dB down with the installed second order 160Hz lowpass.
+        const F_PWM: KiloHertz = KiloHertz(20);
+
         fn init_pwm_pin<P: PwmPin<Duty = u16>>(pin: &mut P) {
             pin.set_duty(0);
             pin.enable();
@@ -116,11 +100,6 @@ impl Pwm {
             tim_rec.0,
             clocks,
         );
-        init_pwm_pin(&mut lim_v0);
-        init_pwm_pin(&mut lim_v1);
-        init_pwm_pin(&mut lim_v2);
-        init_pwm_pin(&mut lim_v3);
-
         let (mut lim_i_low0, mut lim_i_low1, mut lim_i_low2, mut lim_i_low3) = tim.1.pwm(
             (
                 pins.lim_i_low0_pin,
@@ -132,11 +111,6 @@ impl Pwm {
             tim_rec.1,
             clocks,
         );
-        init_pwm_pin(&mut lim_i_low0);
-        init_pwm_pin(&mut lim_i_low1);
-        init_pwm_pin(&mut lim_i_low2);
-        init_pwm_pin(&mut lim_i_low3);
-
         let (mut lim_i_up0, mut lim_i_up1, mut lim_i_up2, mut lim_i_up3) = tim.2.pwm(
             (
                 pins.lim_i_up0_pin,
@@ -148,6 +122,14 @@ impl Pwm {
             tim_rec.2,
             clocks,
         );
+        init_pwm_pin(&mut lim_v0);
+        init_pwm_pin(&mut lim_v1);
+        init_pwm_pin(&mut lim_v2);
+        init_pwm_pin(&mut lim_v3);
+        init_pwm_pin(&mut lim_i_low0);
+        init_pwm_pin(&mut lim_i_low1);
+        init_pwm_pin(&mut lim_i_low2);
+        init_pwm_pin(&mut lim_i_low3);
         init_pwm_pin(&mut lim_i_up0);
         init_pwm_pin(&mut lim_i_up1);
         init_pwm_pin(&mut lim_i_up2);
@@ -175,6 +157,22 @@ impl Pwm {
     /// * `ch` - Thermostat output channel
     /// * `limit` - TEC limit type
     pub fn set(&mut self, ch: Channel, lim: Limit, val: f32) {
+        // PWM constants
+        const R_SENSE: f32 = 0.05; // TEC current sense resistor
+        const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
+
+        /// Convert maximum current to relative pulsewidth for the (analog voltage)
+        /// max output current inputs of the TEC driver.
+        pub fn i_to_pwm(i: f32) -> f32 {
+            i * ((10.0 * R_SENSE) / V_PWM)
+        }
+
+        /// Convert maximum voltage to relative pulsewidth for the (analog voltage)
+        /// max output voltage of the TEC driver.
+        pub fn v_to_pwm(v: f32) -> f32 {
+            v * (1.0 / 4.0 / V_PWM)
+        }
+
         fn set_pwm<P: PwmPin<Duty = u16>>(pin: &mut P, duty: f32) {
             let max = pin.get_max_duty();
             let value = ((duty * (max as f32)) as u16).min(max);
