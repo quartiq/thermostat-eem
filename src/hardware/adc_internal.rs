@@ -6,21 +6,21 @@ use super::hal::{
     rcc::{rec, CoreClocks},
     stm32::{ADC1, ADC2, ADC3},
 };
+use super::Channel;
 
 const V_REF: f32 = 3.0; // ADC reference voltage
-
-pub enum OutChannel {
-    Zero,
-    One,
-    Two,
-    Three,
-}
 
 pub enum Supply {
     P5v,
     P12v,
     P3v3,
     I12v,
+}
+
+pub enum AdcChannel {
+    Supply(Supply),
+    OutputCurrent(Channel),
+    OutputVoltage(Channel),
 }
 
 pub struct AdcPins {
@@ -56,29 +56,37 @@ impl AdcInternal {
         AdcInternal { adc1, adc3, pins }
     }
 
-    pub fn read_outu(&mut self, outu: OutChannel) -> u32 {
+    pub fn read(&mut self, ch: AdcChannel) -> u32 {
+        match ch {
+            AdcChannel::OutputVoltage(ch) => self.read_output_voltage(ch),
+            AdcChannel::OutputCurrent(ch) => self.read_output_current(ch),
+            AdcChannel::Supply(ch) => self.read_supply(ch),
+        }
+    }
+
+    pub fn read_output_voltage(&mut self, ch: Channel) -> u32 {
         let p = &mut self.pins.output_voltage;
-        match outu {
-            OutChannel::Zero => self.adc1.read(&mut p.0).unwrap(),
-            OutChannel::One => self.adc1.read(&mut p.1).unwrap(),
-            OutChannel::Two => self.adc1.read(&mut p.2).unwrap(),
-            OutChannel::Three => self.adc1.read(&mut p.3).unwrap(),
+        match ch {
+            Channel::Ch0 => self.adc1.read(&mut p.0).unwrap(),
+            Channel::Ch1 => self.adc1.read(&mut p.1).unwrap(),
+            Channel::Ch2 => self.adc1.read(&mut p.2).unwrap(),
+            Channel::Ch3 => self.adc1.read(&mut p.3).unwrap(),
         }
     }
 
-    pub fn read_outi(&mut self, outi: OutChannel) -> u32 {
+    pub fn read_output_current(&mut self, ch: Channel) -> u32 {
         let p = &mut self.pins.output_current;
-        match outi {
-            OutChannel::Zero => self.adc1.read(&mut p.0).unwrap(),
-            OutChannel::One => self.adc1.read(&mut p.1).unwrap(),
-            OutChannel::Two => self.adc1.read(&mut p.2).unwrap(),
-            OutChannel::Three => self.adc1.read(&mut p.3).unwrap(),
+        match ch {
+            Channel::Ch0 => self.adc1.read(&mut p.0).unwrap(),
+            Channel::Ch1 => self.adc1.read(&mut p.1).unwrap(),
+            Channel::Ch2 => self.adc1.read(&mut p.2).unwrap(),
+            Channel::Ch3 => self.adc1.read(&mut p.3).unwrap(),
         }
     }
 
-    pub fn read_supply(&mut self, supply: Supply) -> u32 {
+    pub fn read_supply(&mut self, ch: Supply) -> u32 {
         let p = &mut self.pins.supply;
-        match supply {
+        match ch {
             Supply::P5v => self.adc1.read(&mut p.0).unwrap(),
             Supply::P12v => self.adc1.read(&mut p.1).unwrap(),
             Supply::P3v3 => self.adc3.read(&mut p.2).unwrap(),
@@ -88,29 +96,29 @@ impl AdcInternal {
 
     /// reads the 12V rail voltage in volt
     pub fn read_p12v(&mut self) -> f32 {
-        let div_p12v: f32 = 1.6 / (1.6 + 6.8); // Resistor divider 12V rail
-        let factor = (V_REF / self.adc1.max_sample() as f32) / div_p12v;
+        const DIV: f32 = 1.6 / (1.6 + 6.8); // Resistor divider 12V rail
+        let factor = (V_REF / DIV) / self.adc1.max_sample() as f32;
         self.read_supply(Supply::P12v) as f32 * factor
     }
 
     /// reads the 5V rail voltage in volt
     pub fn read_p5v(&mut self) -> f32 {
-        let div_p5v: f32 = 6.8 / (10.0 + 6.8); // Resistor divider 5V rail
-        let factor = (V_REF / self.adc1.max_sample() as f32) / div_p5v;
+        const DIV: f32 = 6.8 / (10.0 + 6.8); // Resistor divider 5V rail
+        let factor = (V_REF / DIV) / self.adc1.max_sample() as f32;
         self.read_supply(Supply::P5v) as f32 * factor
     }
 
     /// reads the 3.3V rail voltage in volt
     pub fn read_p3v3(&mut self) -> f32 {
-        let div_p3v3: f32 = 6.8 / (1.6 + 6.8); // Resistor divider 3V3 rail
-        let factor = (V_REF / self.adc1.max_sample() as f32) / div_p3v3;
+        const DIV: f32 = 6.8 / (1.6 + 6.8); // Resistor divider 3V3 rail
+        let factor = (V_REF / DIV) / self.adc1.max_sample() as f32;
         self.read_supply(Supply::P3v3) as f32 * factor
     }
 
     /// reads the 12V rail current in ampere
     pub fn read_i12v(&mut self) -> f32 {
-        let gain_i12v: f32 = 0.005 * (10000.0 / 100.0); // 12V current measurement resistor configuration for LT6106
-        let factor = (V_REF / self.adc1.max_sample() as f32) / gain_i12v;
+        const GAIN: f32 = 0.005 * (10000.0 / 100.0); // 12V current measurement resistor configuration for LT6106
+        let factor = (V_REF / GAIN) / self.adc1.max_sample() as f32;
         self.read_supply(Supply::I12v) as f32 * factor
     }
 }
