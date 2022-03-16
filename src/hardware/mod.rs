@@ -21,16 +21,6 @@ const TX_DESRING_CNT: usize = 4;
 // Number of RX descriptors in the ethernet descriptor ring.
 const RX_DESRING_CNT: usize = 4;
 
-// // ADC constants
-// const GAIN: u32 = 0x555555; // default ADC gain from datasheet
-// const R_INNER: f32 = 2.0 * 5100.0; // ratiometric resistor setup. 5.1k high and low side.
-
-// // Steinhart-Hart Parameters
-// const ZEROK: f32 = 273.15; // 0°C in °K
-// const B: f32 = 3988.0; // NTC beta value
-// const T_N_INV: f32 = 1.0 / (25.0 + ZEROK); // T_n = 25°C
-// const R_N: f32 = 10000.0; // TEC resistance at 25°C
-
 pub type NetworkStack = smoltcp_nal::NetworkStack<
     'static,
     hal::ethernet::EthernetDMA<'static, TX_DESRING_CNT, RX_DESRING_CNT>,

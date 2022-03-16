@@ -329,14 +329,14 @@ pub fn setup(
         voltage1: gpioe.pe11.into_alternate_af1(),
         voltage2: gpioe.pe13.into_alternate_af1(),
         voltage3: gpioe.pe14.into_alternate_af1(),
-        current_positive0: gpiod.pd12.into_alternate_af2(),
-        current_positive1: gpiod.pd13.into_alternate_af2(),
-        current_positive2: gpiod.pd14.into_alternate_af2(),
-        current_positive3: gpiod.pd15.into_alternate_af2(),
-        current_negative0: gpioc.pc6.into_alternate_af2(),
-        current_negative1: gpiob.pb5.into_alternate_af2(),
-        current_negative2: gpioc.pc8.into_alternate_af2(),
-        current_negative3: gpioc.pc9.into_alternate_af2(),
+        positive_current0: gpiod.pd12.into_alternate_af2(),
+        positive_current1: gpiod.pd13.into_alternate_af2(),
+        positive_current2: gpiod.pd14.into_alternate_af2(),
+        positive_current3: gpiod.pd15.into_alternate_af2(),
+        negative_current0: gpioc.pc6.into_alternate_af2(),
+        negative_current1: gpiob.pb5.into_alternate_af2(),
+        negative_current2: gpioc.pc8.into_alternate_af2(),
+        negative_current3: gpioc.pc9.into_alternate_af2(),
     };
 
     let pwm = Pwm::new(
