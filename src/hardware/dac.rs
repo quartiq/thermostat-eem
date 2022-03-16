@@ -109,7 +109,7 @@ impl Dac {
 
         // current to DAC word conversion
         let v = (current * 10.0 * R_SENSE) + VREF_TEC;
-        let value = ((v * MAX_DAC_WORD as f32) / VREF_DAC) as i32;
+        let value = (v * (MAX_DAC_WORD as f32 / VREF_DAC)) as i32;
 
         if !(0..MAX_DAC_WORD).contains(&value) {
             return Err(Error::Bounds);
