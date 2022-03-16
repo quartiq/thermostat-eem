@@ -18,13 +18,13 @@ use super::{
 
 /// TEC limit types
 ///
-/// LimV - Upper and lower voltage limit
-/// LimIUp - Upper current limit
-/// LimILow - Lower current limit
+/// Voltage - Upper and lower voltage limit
+/// PositiveCurrent - Upper current limit
+/// NegativeCurrent - Lower current limit
 pub enum Limit {
-    LimV,
-    LimIUp,
-    LimILow,
+    Voltage,
+    PositiveCurrent,
+    NegativeCurrent,
 }
 
 /// Pwm pins.
@@ -179,18 +179,18 @@ impl Pwm {
             pin.set_duty(value);
         }
         match (ch, lim) {
-            (Channel::Ch0, Limit::LimV) => set_pwm(&mut self.lim_v0, v_to_pwm(val)),
-            (Channel::Ch1, Limit::LimV) => set_pwm(&mut self.lim_v1, v_to_pwm(val)),
-            (Channel::Ch2, Limit::LimV) => set_pwm(&mut self.lim_v2, v_to_pwm(val)),
-            (Channel::Ch3, Limit::LimV) => set_pwm(&mut self.lim_v3, v_to_pwm(val)),
-            (Channel::Ch0, Limit::LimIUp) => set_pwm(&mut self.lim_i_up0, i_to_pwm(val)),
-            (Channel::Ch1, Limit::LimIUp) => set_pwm(&mut self.lim_i_up1, i_to_pwm(val)),
-            (Channel::Ch2, Limit::LimIUp) => set_pwm(&mut self.lim_i_up2, i_to_pwm(val)),
-            (Channel::Ch3, Limit::LimIUp) => set_pwm(&mut self.lim_i_up3, i_to_pwm(val)),
-            (Channel::Ch0, Limit::LimILow) => set_pwm(&mut self.lim_i_low0, i_to_pwm(val)),
-            (Channel::Ch1, Limit::LimILow) => set_pwm(&mut self.lim_i_low1, i_to_pwm(val)),
-            (Channel::Ch2, Limit::LimILow) => set_pwm(&mut self.lim_i_low2, i_to_pwm(val)),
-            (Channel::Ch3, Limit::LimILow) => set_pwm(&mut self.lim_i_low3, i_to_pwm(val)),
+            (Channel::Ch0, Limit::Voltage) => set_pwm(&mut self.lim_v0, v_to_pwm(val)),
+            (Channel::Ch1, Limit::Voltage) => set_pwm(&mut self.lim_v1, v_to_pwm(val)),
+            (Channel::Ch2, Limit::Voltage) => set_pwm(&mut self.lim_v2, v_to_pwm(val)),
+            (Channel::Ch3, Limit::Voltage) => set_pwm(&mut self.lim_v3, v_to_pwm(val)),
+            (Channel::Ch0, Limit::PositiveCurrent) => set_pwm(&mut self.lim_i_up0, i_to_pwm(val)),
+            (Channel::Ch1, Limit::PositiveCurrent) => set_pwm(&mut self.lim_i_up1, i_to_pwm(val)),
+            (Channel::Ch2, Limit::PositiveCurrent) => set_pwm(&mut self.lim_i_up2, i_to_pwm(val)),
+            (Channel::Ch3, Limit::PositiveCurrent) => set_pwm(&mut self.lim_i_up3, i_to_pwm(val)),
+            (Channel::Ch0, Limit::NegativeCurrent) => set_pwm(&mut self.lim_i_low0, i_to_pwm(val)),
+            (Channel::Ch1, Limit::NegativeCurrent) => set_pwm(&mut self.lim_i_low1, i_to_pwm(val)),
+            (Channel::Ch2, Limit::NegativeCurrent) => set_pwm(&mut self.lim_i_low2, i_to_pwm(val)),
+            (Channel::Ch3, Limit::NegativeCurrent) => set_pwm(&mut self.lim_i_low3, i_to_pwm(val)),
         }
     }
 }

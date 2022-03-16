@@ -200,9 +200,9 @@ mod app {
         let pwm = c.local.pwm;
         for (i, s) in settings.output_settings.iter().enumerate() {
             let ch = Channel::try_from(i).unwrap();
-            pwm.set(ch, Limit::LimV, s.max_v);
-            pwm.set(ch, Limit::LimIUp, s.current_limit_upper);
-            pwm.set(ch, Limit::LimILow, s.current_limit_lower);
+            pwm.set(ch, Limit::Voltage, s.max_v);
+            pwm.set(ch, Limit::PositiveCurrent, s.current_limit_upper);
+            pwm.set(ch, Limit::NegativeCurrent, s.current_limit_lower);
             dac.set(s.current, ch).unwrap(); // TODO: implement what happens if user chooses invalid value
             dac.set_shutdown(ch, s.enable);
             info!("DAC channel no {:?}: {:?}", i, s);
