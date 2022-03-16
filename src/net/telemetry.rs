@@ -31,7 +31,7 @@ pub struct TelemetryClient<T: Serialize> {
 /// These values can be converted to SI units immediately before reporting to save processing time.
 /// This allows for the DSP process to continually update the values without incurring significant
 /// run-time overhead during conversion to SI units.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub struct TelemetryBuffer {
     pub led: bool,
 }
@@ -44,12 +44,6 @@ pub struct TelemetryBuffer {
 #[derive(Serialize)]
 pub struct Telemetry {
     pub led: bool,
-}
-
-impl Default for TelemetryBuffer {
-    fn default() -> Self {
-        Self { led: false }
-    }
 }
 
 impl TelemetryBuffer {
