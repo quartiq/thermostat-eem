@@ -36,28 +36,28 @@ pub struct OutputSettings {
     /// true to enable, false to disable.
     pub enable: bool,
 
-    /// TEC current lower bound in ampere.
+    /// TEC positive current limit in ampere.
     ///
     /// # Value
     /// 0.0 to 3.0
-    pub current_limit_upper: f32,
+    pub current_limit_positive: f32,
 
-    /// TEC current lower bound in ampere.
+    /// TEC negative current limit in ampere.
     ///
     /// # Value
     /// -3.0 to 0.0
-    pub current_limit_lower: f32,
+    pub current_limit_negative: f32,
 
     /// Maximum absolute (positive and negative) TEC voltage in volt.
     ///
     /// # Value
     /// 0.0 to 5.0
-    pub max_v: f32,
+    pub voltage_limit: f32,
 
     /// TEC current in ampere.
     ///
     /// # Value
-    /// -3.0 to 3.0
+    /// -3.0 to a bit less than 3.0
     pub current: f32,
 }
 
@@ -98,9 +98,9 @@ impl Default for Settings {
             telemetry_period: 1.0,
             output_settings: [OutputSettings {
                 enable: false,
-                current_limit_lower: 0.5,
-                current_limit_upper: 0.5,
-                max_v: 0.5,
+                current_limit_negative: -0.5,
+                current_limit_positive: 0.5,
+                voltage_limit: 0.5,
                 current: 0.0,
             }; 4],
             led: false,
@@ -200,9 +200,9 @@ mod app {
         let pwm = c.local.pwm;
         for (i, s) in settings.output_settings.iter().enumerate() {
             let ch = Channel::try_from(i).unwrap();
-            pwm.set(ch, Limit::Voltage, s.max_v);
-            pwm.set(ch, Limit::PositiveCurrent, s.current_limit_upper);
-            pwm.set(ch, Limit::NegativeCurrent, s.current_limit_lower);
+            pwm.set(ch, Limit::Voltage, s.voltage_limit);
+            pwm.set(ch, Limit::PositiveCurrent, s.current_limit_positive);
+            pwm.set(ch, Limit::NegativeCurrent, s.current_limit_negative);
             dac.set(s.current, ch).unwrap(); // TODO: implement what happens if user chooses invalid value
             dac.set_shutdown(ch, s.enable);
             info!("DAC channel no {:?}: {:?}", i, s);
