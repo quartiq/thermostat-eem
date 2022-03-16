@@ -325,18 +325,18 @@ pub fn setup(
     info!("Setup PWM");
 
     let pwm_pins = PwmPins {
-        lim_v0_pin: gpioe.pe9.into_alternate_af1(),
-        lim_v1_pin: gpioe.pe11.into_alternate_af1(),
-        lim_v2_pin: gpioe.pe13.into_alternate_af1(),
-        lim_v3_pin: gpioe.pe14.into_alternate_af1(),
-        lim_i_up0_pin: gpiod.pd12.into_alternate_af2(),
-        lim_i_up1_pin: gpiod.pd13.into_alternate_af2(),
-        lim_i_up2_pin: gpiod.pd14.into_alternate_af2(),
-        lim_i_up3_pin: gpiod.pd15.into_alternate_af2(),
-        lim_i_low0_pin: gpioc.pc6.into_alternate_af2(),
-        lim_i_low1_pin: gpiob.pb5.into_alternate_af2(),
-        lim_i_low2_pin: gpioc.pc8.into_alternate_af2(),
-        lim_i_low3_pin: gpioc.pc9.into_alternate_af2(),
+        voltage0: gpioe.pe9.into_alternate_af1(),
+        voltage1: gpioe.pe11.into_alternate_af1(),
+        voltage2: gpioe.pe13.into_alternate_af1(),
+        voltage3: gpioe.pe14.into_alternate_af1(),
+        current_positive0: gpiod.pd12.into_alternate_af2(),
+        current_positive1: gpiod.pd13.into_alternate_af2(),
+        current_positive2: gpiod.pd14.into_alternate_af2(),
+        current_positive3: gpiod.pd15.into_alternate_af2(),
+        current_negative0: gpioc.pc6.into_alternate_af2(),
+        current_negative1: gpiob.pb5.into_alternate_af2(),
+        current_negative2: gpioc.pc8.into_alternate_af2(),
+        current_negative3: gpioc.pc9.into_alternate_af2(),
     };
 
     let pwm = Pwm::new(

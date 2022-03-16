@@ -29,23 +29,23 @@ pub enum Limit {
 
 /// Pwm pins.
 ///
-/// lim_v<n>_pin - voltage limit pin
-/// lim_i_up<n>_pin - upper current limit pin
-/// lim_i_low<n>_pin - lower current limit pin
+/// voltage<n> - voltage limit pin
+/// current_positive<n> - positive current limit pin
+/// current_negative<n> - negative current limit pin
 /// * <n> specifies Thermostat output channel
 pub struct PwmPins {
-    pub lim_v0_pin: PE9<Alternate<AF1>>,
-    pub lim_v1_pin: PE11<Alternate<AF1>>,
-    pub lim_v2_pin: PE13<Alternate<AF1>>,
-    pub lim_v3_pin: PE14<Alternate<AF1>>,
-    pub lim_i_up0_pin: PD12<Alternate<AF2>>,
-    pub lim_i_up1_pin: PD13<Alternate<AF2>>,
-    pub lim_i_up2_pin: PD14<Alternate<AF2>>,
-    pub lim_i_up3_pin: PD15<Alternate<AF2>>,
-    pub lim_i_low0_pin: PC6<Alternate<AF2>>,
-    pub lim_i_low1_pin: PB5<Alternate<AF2>>,
-    pub lim_i_low2_pin: PC8<Alternate<AF2>>,
-    pub lim_i_low3_pin: PC9<Alternate<AF2>>,
+    pub voltage0: PE9<Alternate<AF1>>,
+    pub voltage1: PE11<Alternate<AF1>>,
+    pub voltage2: PE13<Alternate<AF1>>,
+    pub voltage3: PE14<Alternate<AF1>>,
+    pub current_positive0: PD12<Alternate<AF2>>,
+    pub current_positive1: PD13<Alternate<AF2>>,
+    pub current_positive2: PD14<Alternate<AF2>>,
+    pub current_positive3: PD15<Alternate<AF2>>,
+    pub current_negative0: PC6<Alternate<AF2>>,
+    pub current_negative1: PB5<Alternate<AF2>>,
+    pub current_negative2: PC8<Alternate<AF2>>,
+    pub current_negative3: PC9<Alternate<AF2>>,
 }
 
 type Pt0<T, S> = super::hal::pwm::Pwm<T, S, ComplementaryDisabled, ActiveHigh, ActiveHigh>;
@@ -53,18 +53,18 @@ type Pt1<T, S> = super::hal::pwm::Pwm<T, S, ComplementaryImpossible, ActiveHigh,
 
 /// PWM driver struct containing the PWM output pins.
 pub struct Pwm {
-    lim_v0: Pt0<TIM1, C1>,
-    lim_v1: Pt0<TIM1, C2>,
-    lim_v2: Pt0<TIM1, C3>,
-    lim_v3: Pt1<TIM1, C4>,
-    lim_i_up0: Pt1<TIM4, C1>,
-    lim_i_up1: Pt1<TIM4, C2>,
-    lim_i_up2: Pt1<TIM4, C3>,
-    lim_i_up3: Pt1<TIM4, C4>,
-    lim_i_low0: Pt1<TIM3, C1>,
-    lim_i_low1: Pt1<TIM3, C2>,
-    lim_i_low2: Pt1<TIM3, C3>,
-    lim_i_low3: Pt1<TIM3, C4>,
+    voltage0: Pt0<TIM1, C1>,
+    voltage1: Pt0<TIM1, C2>,
+    voltage2: Pt0<TIM1, C3>,
+    voltage3: Pt1<TIM1, C4>,
+    current_positive0: Pt1<TIM4, C1>,
+    current_positive1: Pt1<TIM4, C2>,
+    current_positive2: Pt1<TIM4, C3>,
+    current_positive3: Pt1<TIM4, C4>,
+    current_negative0: Pt1<TIM3, C1>,
+    current_negative1: Pt1<TIM3, C2>,
+    current_negative2: Pt1<TIM3, C3>,
+    current_negative3: Pt1<TIM3, C4>,
 }
 
 impl Pwm {
@@ -89,65 +89,65 @@ impl Pwm {
             pin.enable();
         }
 
-        let (mut lim_v0, mut lim_v1, mut lim_v2, mut lim_v3) = tim.0.pwm(
+        let (mut voltage0, mut voltage1, mut voltage2, mut voltage3) = tim.0.pwm(
             (
-                pins.lim_v0_pin,
-                pins.lim_v1_pin,
-                pins.lim_v2_pin,
-                pins.lim_v3_pin,
+                pins.voltage0,
+                pins.voltage1,
+                pins.voltage2,
+                pins.voltage3,
             ),
             F_PWM,
             tim_rec.0,
             clocks,
         );
-        let (mut lim_i_low0, mut lim_i_low1, mut lim_i_low2, mut lim_i_low3) = tim.1.pwm(
+        let (mut current_negative0, mut current_negative1, mut current_negative2, mut current_negative3) = tim.1.pwm(
             (
-                pins.lim_i_low0_pin,
-                pins.lim_i_low1_pin,
-                pins.lim_i_low2_pin,
-                pins.lim_i_low3_pin,
+                pins.current_negative0,
+                pins.current_negative1,
+                pins.current_negative2,
+                pins.current_negative3,
             ),
             F_PWM,
             tim_rec.1,
             clocks,
         );
-        let (mut lim_i_up0, mut lim_i_up1, mut lim_i_up2, mut lim_i_up3) = tim.2.pwm(
+        let (mut current_positive0, mut current_positive1, mut current_positive2, mut current_positive3) = tim.2.pwm(
             (
-                pins.lim_i_up0_pin,
-                pins.lim_i_up1_pin,
-                pins.lim_i_up2_pin,
-                pins.lim_i_up3_pin,
+                pins.current_positive0,
+                pins.current_positive1,
+                pins.current_positive2,
+                pins.current_positive3,
             ),
             F_PWM,
             tim_rec.2,
             clocks,
         );
-        init_pwm_pin(&mut lim_v0);
-        init_pwm_pin(&mut lim_v1);
-        init_pwm_pin(&mut lim_v2);
-        init_pwm_pin(&mut lim_v3);
-        init_pwm_pin(&mut lim_i_low0);
-        init_pwm_pin(&mut lim_i_low1);
-        init_pwm_pin(&mut lim_i_low2);
-        init_pwm_pin(&mut lim_i_low3);
-        init_pwm_pin(&mut lim_i_up0);
-        init_pwm_pin(&mut lim_i_up1);
-        init_pwm_pin(&mut lim_i_up2);
-        init_pwm_pin(&mut lim_i_up3);
+        init_pwm_pin(&mut voltage0);
+        init_pwm_pin(&mut voltage1);
+        init_pwm_pin(&mut voltage2);
+        init_pwm_pin(&mut voltage3);
+        init_pwm_pin(&mut current_negative0);
+        init_pwm_pin(&mut current_negative1);
+        init_pwm_pin(&mut current_negative2);
+        init_pwm_pin(&mut current_negative3);
+        init_pwm_pin(&mut current_positive0);
+        init_pwm_pin(&mut current_positive1);
+        init_pwm_pin(&mut current_positive2);
+        init_pwm_pin(&mut current_positive3);
 
         Pwm {
-            lim_v0,
-            lim_v1,
-            lim_v2,
-            lim_v3,
-            lim_i_up0,
-            lim_i_up1,
-            lim_i_up2,
-            lim_i_up3,
-            lim_i_low0,
-            lim_i_low1,
-            lim_i_low2,
-            lim_i_low3,
+            voltage0,
+            voltage1,
+            voltage2,
+            voltage3,
+            current_positive0,
+            current_positive1,
+            current_positive2,
+            current_positive3,
+            current_negative0,
+            current_negative1,
+            current_negative2,
+            current_negative3,
         }
     }
 
@@ -179,18 +179,18 @@ impl Pwm {
             pin.set_duty(value);
         }
         match (ch, lim) {
-            (Channel::Ch0, Limit::Voltage) => set_pwm(&mut self.lim_v0, v_to_pwm(val)),
-            (Channel::Ch1, Limit::Voltage) => set_pwm(&mut self.lim_v1, v_to_pwm(val)),
-            (Channel::Ch2, Limit::Voltage) => set_pwm(&mut self.lim_v2, v_to_pwm(val)),
-            (Channel::Ch3, Limit::Voltage) => set_pwm(&mut self.lim_v3, v_to_pwm(val)),
-            (Channel::Ch0, Limit::PositiveCurrent) => set_pwm(&mut self.lim_i_up0, i_to_pwm(val)),
-            (Channel::Ch1, Limit::PositiveCurrent) => set_pwm(&mut self.lim_i_up1, i_to_pwm(val)),
-            (Channel::Ch2, Limit::PositiveCurrent) => set_pwm(&mut self.lim_i_up2, i_to_pwm(val)),
-            (Channel::Ch3, Limit::PositiveCurrent) => set_pwm(&mut self.lim_i_up3, i_to_pwm(val)),
-            (Channel::Ch0, Limit::NegativeCurrent) => set_pwm(&mut self.lim_i_low0, i_to_pwm(val)),
-            (Channel::Ch1, Limit::NegativeCurrent) => set_pwm(&mut self.lim_i_low1, i_to_pwm(val)),
-            (Channel::Ch2, Limit::NegativeCurrent) => set_pwm(&mut self.lim_i_low2, i_to_pwm(val)),
-            (Channel::Ch3, Limit::NegativeCurrent) => set_pwm(&mut self.lim_i_low3, i_to_pwm(val)),
+            (Channel::Ch0, Limit::Voltage) => set_pwm(&mut self.voltage0, v_to_pwm(val)),
+            (Channel::Ch1, Limit::Voltage) => set_pwm(&mut self.voltage1, v_to_pwm(val)),
+            (Channel::Ch2, Limit::Voltage) => set_pwm(&mut self.voltage2, v_to_pwm(val)),
+            (Channel::Ch3, Limit::Voltage) => set_pwm(&mut self.voltage3, v_to_pwm(val)),
+            (Channel::Ch0, Limit::PositiveCurrent) => set_pwm(&mut self.current_positive0, i_to_pwm(val)),
+            (Channel::Ch1, Limit::PositiveCurrent) => set_pwm(&mut self.current_positive1, i_to_pwm(val)),
+            (Channel::Ch2, Limit::PositiveCurrent) => set_pwm(&mut self.current_positive2, i_to_pwm(val)),
+            (Channel::Ch3, Limit::PositiveCurrent) => set_pwm(&mut self.current_positive3, i_to_pwm(val)),
+            (Channel::Ch0, Limit::NegativeCurrent) => set_pwm(&mut self.current_negative0, i_to_pwm(val)),
+            (Channel::Ch1, Limit::NegativeCurrent) => set_pwm(&mut self.current_negative1, i_to_pwm(val)),
+            (Channel::Ch2, Limit::NegativeCurrent) => set_pwm(&mut self.current_negative2, i_to_pwm(val)),
+            (Channel::Ch3, Limit::NegativeCurrent) => set_pwm(&mut self.current_negative3, i_to_pwm(val)),
         }
     }
 }
