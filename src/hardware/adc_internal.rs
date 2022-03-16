@@ -26,7 +26,7 @@ pub enum AdcChannel {
 pub struct AdcPins {
     pub output_voltage: (PC3<Analog>, PA0<Analog>, PA3<Analog>, PA4<Analog>),
     pub output_current: (PA5<Analog>, PA6<Analog>, PB0<Analog>, PB1<Analog>),
-    pub supply: (PC0<Analog>, PC2<Analog>, PF7<Analog>, PF8<Analog>),
+    pub supply: (PF7<Analog>, PC0<Analog>, PC2<Analog>, PF8<Analog>),
 }
 
 pub struct AdcInternal {
@@ -87,9 +87,9 @@ impl AdcInternal {
     pub fn read_supply(&mut self, ch: Supply) -> u32 {
         let p = &mut self.pins.supply;
         match ch {
-            Supply::P3v3 => self.adc3.read(&mut p.2).unwrap(),
-            Supply::P5v => self.adc1.read(&mut p.0).unwrap(),
-            Supply::P12v => self.adc1.read(&mut p.1).unwrap(),
+            Supply::P3v3 => self.adc3.read(&mut p.0).unwrap(),
+            Supply::P5v => self.adc1.read(&mut p.1).unwrap(),
+            Supply::P12v => self.adc1.read(&mut p.2).unwrap(),
             Supply::I12v => self.adc3.read(&mut p.3).unwrap(),
         }
     }
@@ -118,6 +118,7 @@ impl AdcInternal {
     /// reads the 12V rail current in ampere
     pub fn read_i12v(&mut self) -> f32 {
         const GAIN: f32 = 0.005 * (10000.0 / 100.0); // 12V current measurement resistor configuration for LT6106
+                                                     // FIXME: adc1 or adc3? Needs refactor.
         let factor = (V_REF / GAIN) / self.adc1.max_sample() as f32;
         self.read_supply(Supply::I12v) as f32 * factor
     }

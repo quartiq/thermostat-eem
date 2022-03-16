@@ -398,9 +398,9 @@ pub fn setup(
             gpiob.pb1.into_analog(),
         ),
         supply: (
+            gpiof.pf7.into_analog(),
             gpioc.pc0.into_analog(),
             gpioc.pc2.into_analog(),
-            gpiof.pf7.into_analog(),
             gpiof.pf8.into_analog(),
         ),
     };
