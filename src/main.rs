@@ -10,7 +10,7 @@ pub mod net;
 
 use defmt::{info, Format};
 use defmt_rtt as _; // global logger
-use panic_probe as _; // necessary to explicitly import
+use panic_probe as _; // gloibal panic handler
 
 use hardware::{
     dac::Dac,
@@ -96,7 +96,7 @@ impl Default for Settings {
         Self {
             telemetry_period: 1.0,
             output_settings: [OutputSettings {
-                shutdown: false,
+                shutdown: true,
                 current_limit_negative: -0.5,
                 current_limit_positive: 0.5,
                 voltage_limit: 0.5,
