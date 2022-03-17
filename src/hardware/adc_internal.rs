@@ -8,7 +8,7 @@ use super::hal::{
 };
 use super::{
     dac::{R_SENSE, VREF_TEC},
-    Channel,
+    OutputChannel,
 };
 
 const V_REF: f32 = 3.0; // ADC reference voltage
@@ -21,9 +21,9 @@ pub enum Supply {
 }
 
 pub enum AdcChannel {
-    OutputVoltage(Channel),
-    OutputCurrent(Channel),
-    OutputVref(Channel),
+    OutputVoltage(OutputChannel),
+    OutputCurrent(OutputChannel),
+    OutputVref(OutputChannel),
     Supply(Supply),
 }
 
@@ -73,13 +73,13 @@ impl AdcInternal {
         }
     }
 
-    pub fn read_output_voltage(&mut self, ch: Channel) -> f32 {
+    pub fn read_output_voltage(&mut self, ch: OutputChannel) -> f32 {
         let p = &mut self.pins.output_voltage;
         let code: u32 = match ch {
-            Channel::Ch0 => self.adc1.read(&mut p.0),
-            Channel::Ch1 => self.adc1.read(&mut p.1),
-            Channel::Ch2 => self.adc1.read(&mut p.2),
-            Channel::Ch3 => self.adc1.read(&mut p.3),
+            OutputChannel::Zero => self.adc1.read(&mut p.0),
+            OutputChannel::One => self.adc1.read(&mut p.1),
+            OutputChannel::Two => self.adc1.read(&mut p.2),
+            OutputChannel::Three => self.adc1.read(&mut p.3),
         }
         .unwrap();
         const SCALE: f32 = V_REF * 20.0 / 5.0; // Differential voltage sense gain
@@ -87,13 +87,13 @@ impl AdcInternal {
         code as f32 / self.adc1.max_sample() as f32 * SCALE + OFFSET
     }
 
-    pub fn read_output_current(&mut self, ch: Channel) -> f32 {
+    pub fn read_output_current(&mut self, ch: OutputChannel) -> f32 {
         let p = &mut self.pins.output_current;
         let code: u32 = match ch {
-            Channel::Ch0 => self.adc1.read(&mut p.0),
-            Channel::Ch1 => self.adc1.read(&mut p.1),
-            Channel::Ch2 => self.adc1.read(&mut p.2),
-            Channel::Ch3 => self.adc1.read(&mut p.3),
+            OutputChannel::Zero => self.adc1.read(&mut p.0),
+            OutputChannel::One => self.adc1.read(&mut p.1),
+            OutputChannel::Two => self.adc1.read(&mut p.2),
+            OutputChannel::Three => self.adc1.read(&mut p.3),
         }
         .unwrap();
         const SCALE: f32 = V_REF / R_SENSE * 8.0; // MAX1968 ITEC scale
@@ -101,13 +101,13 @@ impl AdcInternal {
         code as f32 / self.adc1.max_sample() as f32 * SCALE + OFFSET
     }
 
-    pub fn read_output_vref(&mut self, ch: Channel) -> f32 {
+    pub fn read_output_vref(&mut self, ch: OutputChannel) -> f32 {
         let p = &mut self.pins.output_vref;
         let code: u32 = match ch {
-            Channel::Ch0 => self.adc3.read(&mut p.0),
-            Channel::Ch1 => self.adc3.read(&mut p.1),
-            Channel::Ch2 => self.adc3.read(&mut p.2),
-            Channel::Ch3 => self.adc3.read(&mut p.3),
+            OutputChannel::Zero => self.adc3.read(&mut p.0),
+            OutputChannel::One => self.adc3.read(&mut p.1),
+            OutputChannel::Two => self.adc3.read(&mut p.2),
+            OutputChannel::Three => self.adc3.read(&mut p.3),
         }
         .unwrap();
         const SCALE: f32 = V_REF;

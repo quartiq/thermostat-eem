@@ -5,7 +5,7 @@ use super::hal::{
     hal::digital::v2::{InputPin, OutputPin, PinState},
 };
 
-use super::Channel;
+use super::OutputChannel;
 
 #[allow(clippy::type_complexity)]
 pub struct GpioPins {
@@ -117,7 +117,7 @@ impl Gpio {
     pub fn new(pins: GpioPins) -> Self {
         let mut gpio = Gpio { pins };
         for i in 0..4 {
-            let ch = Channel::try_from(i).unwrap();
+            let ch = OutputChannel::try_from(i).unwrap();
             gpio.set_shutdown(ch, State::Assert);
         }
         for i in 0..8 {
@@ -133,13 +133,13 @@ impl Gpio {
     /// # Args
     /// * `ch` - Thermostat output channel
     /// * `shutdown` - TEC driver shutdown. True to set shutdown mode, false to enable the driver.
-    pub fn set_shutdown(&mut self, ch: Channel, shutdown: State) {
+    pub fn set_shutdown(&mut self, ch: OutputChannel, shutdown: State) {
         let s = !PinState::from(shutdown);
         match ch {
-            Channel::Ch0 => self.pins.shdn.0.set_state(s),
-            Channel::Ch1 => self.pins.shdn.1.set_state(s),
-            Channel::Ch2 => self.pins.shdn.2.set_state(s),
-            Channel::Ch3 => self.pins.shdn.3.set_state(s),
+            OutputChannel::Zero => self.pins.shdn.0.set_state(s),
+            OutputChannel::One => self.pins.shdn.1.set_state(s),
+            OutputChannel::Two => self.pins.shdn.2.set_state(s),
+            OutputChannel::Three => self.pins.shdn.3.set_state(s),
         }
         .unwrap()
     }

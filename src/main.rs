@@ -18,7 +18,7 @@ use hardware::{
     hal,
     pwm::{Limit, Pwm},
     system_timer::SystemTimer,
-    Channel,
+    OutputChannel,
 };
 use net::{
     miniconf::Miniconf,
@@ -195,7 +195,7 @@ mod app {
         let pwm = c.local.pwm;
         let gpio = c.local.gpio;
         for (i, s) in settings.output_settings.iter().enumerate() {
-            let ch = Channel::try_from(i).unwrap();
+            let ch = OutputChannel::try_from(i).unwrap();
             // TODO: implement what happens if user chooses invalid value
             pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
             pwm.set_limit(Limit::PositiveCurrent(ch), s.current_limit_positive)

@@ -38,9 +38,9 @@ pub type EthernetPhy = hal::ethernet::phy::LAN8742A<hal::ethernet::EthernetMAC>;
 
 #[derive(Clone, Copy, TryFromPrimitive)]
 #[repr(usize)]
-pub enum Channel {
-    Ch0 = 0,
-    Ch1 = 1,
-    Ch2 = 2,
-    Ch3 = 3,
+pub enum OutputChannel {
+    Zero = 0,
+    One = 1,
+    Two = 2,
+    Three = 3,
 }
