@@ -4,6 +4,7 @@ use super::hal::{
     prelude::*,
     pwm::Pwm,
     pwm::{ActiveHigh, ComplementaryDisabled, C2},
+    // rcc::ResetEnable,
     rcc::{rec, CoreClocks},
     stm32::{TIM2, TIM8},
     time::KiloHertz,
@@ -33,10 +34,14 @@ impl Fan {
         pins: FanPins,
     ) -> Fan {
         const F_PWM: KiloHertz = KiloHertz(20);
-
         let mut pwm = tim.1.pwm(pins.pwm, F_PWM, tim_rec.1, clocks);
         pwm.set_duty(0);
         pwm.enable();
+
+        // const F_TACHO: Hertz = Hertz(2);
+        // let mut _tacho = tim.0.pwm(pins.tacho, F_TACHO, tim_rec.0, clocks);
+        // let tim2 = unsafe { &*TIM2::PTR };
+        // tim2.ccer.modify(|_, w| w.cc3e())
 
         Fan {
             pwm,
