@@ -33,6 +33,7 @@ pub struct GpioPins {
     pub poe_pwr: PF2<Input<Floating>>,
     pub at_event: PE7<Input<Floating>>,
     pub eem_pwr: PD0<Output<PushPull>>,
+    pub tec_freq: PD2<Output<PushPull>>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -61,9 +62,30 @@ impl From<State> for PinState {
 
 #[derive(Copy, Clone, Debug)]
 pub enum PoePower {
+    /// No Power over Ethernet detected
     Absent,
-    Low,  // 802.3af (13 W)
-    High, // 802.3at (25.5 W)
+    /// 802.3af (12.95 W) Power over Ethernet present
+    Low,
+    /// 802.3at (25.5 W) Power over Ethernet present
+    High,
+}
+
+/// TEC driver PWM frequency setting
+#[derive(Copy, Clone, Debug)]
+pub enum TecFrequency {
+    /// Low frequency (~500 kHz)
+    Low,
+    /// High frequency (~1 MHz)
+    High,
+}
+
+impl From<TecFrequency> for PinState {
+    fn from(other: TecFrequency) -> PinState {
+        match other {
+            TecFrequency::Low => PinState::Low,
+            TecFrequency::High => PinState::High,
+        }
+    }
 }
 /// GPIO pins.
 ///
@@ -87,6 +109,7 @@ impl Gpio {
             gpio.set_led(i, State::Deassert);
         }
         gpio.set_eem_pwr(false);
+        gpio.set_tec_frequency(TecFrequency::Low);
         gpio
     }
 
@@ -142,5 +165,9 @@ impl Gpio {
 
     pub fn set_eem_pwr(&mut self, enabled: bool) {
         self.pins.eem_pwr.set_state(enabled.into()).unwrap();
+    }
+
+    pub fn set_tec_frequency(&mut self, frequency: TecFrequency) {
+        self.pins.tec_freq.set_state(frequency.into()).unwrap();
     }
 }

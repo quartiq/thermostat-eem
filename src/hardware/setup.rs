@@ -364,6 +364,7 @@ pub fn setup(
         poe_pwr: gpiof.pf2.into_floating_input(),
         at_event: gpioe.pe7.into_floating_input(),
         eem_pwr: gpiod.pd0.into_push_pull_output(),
+        tec_freq: gpiod.pd2.into_push_pull_output(),
     });
 
     info!("HWREV: {}", gpio.hwrev());
