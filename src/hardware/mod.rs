@@ -7,6 +7,7 @@ pub use stm32h7xx_hal as hal;
 
 pub mod adc_internal;
 pub mod dac;
+pub mod fan;
 pub mod gpio;
 pub mod pwm;
 pub mod setup;

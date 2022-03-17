@@ -14,6 +14,7 @@ use super::hal::{
 use super::{
     adc_internal::{AdcInternal, AdcPins},
     dac::{Dac, DacPins},
+    fan::{Fan, FanPins},
     gpio::{Gpio, GpioPins},
     pwm::{Pwm, PwmPins},
     EthernetPhy, NetworkStack,
@@ -98,6 +99,7 @@ pub struct ThermostatDevices {
     pub dac: Dac,
     pub pwm: Pwm,
     pub gpio: Gpio,
+    pub fan: Fan,
 }
 
 #[link_section = ".sram3.eth"]
@@ -178,6 +180,17 @@ pub fn setup(
     info!("PoE Power: {}", gpio.poe());
     info!("Overtemp: {}", gpio.overtemp());
 
+    info!("Setup fan");
+    let fan = Fan::new(
+        &ccdr.clocks,
+        (ccdr.peripheral.TIM2, ccdr.peripheral.TIM8),
+        (device.TIM2, device.TIM8),
+        FanPins {
+            tacho: gpiob.pb10.into_alternate_af1(),
+            pwm: gpioc.pc7.into_alternate_af3(),
+        },
+    );
+
     info!("Setup TEC limit PWM");
     let pwm_pins = PwmPins {
         voltage: (
@@ -219,12 +232,12 @@ pub fn setup(
         gpioc.pc10.into_alternate_af6(),
         gpioc.pc12.into_alternate_af6(),
         DacPins {
-        sync: (
-            gpiog.pg3.into_push_pull_output(),
-            gpiog.pg2.into_push_pull_output(),
-            gpiog.pg1.into_push_pull_output(),
-            gpiog.pg0.into_push_pull_output(),
-        ),
+            sync: (
+                gpiog.pg3.into_push_pull_output(),
+                gpiog.pg2.into_push_pull_output(),
+                gpiog.pg1.into_push_pull_output(),
+                gpiog.pg0.into_push_pull_output(),
+            ),
         },
     );
 
@@ -432,5 +445,6 @@ pub fn setup(
         dac,
         pwm,
         gpio,
+        fan,
     }
 }
