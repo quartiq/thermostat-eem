@@ -36,6 +36,7 @@ pub struct GpioPins {
     pub at_event: PE7<Input<Floating>>,
     pub eem_pwr: PD0<Output<PushPull>>,
     pub tec_freq: PD2<Output<PushPull>>,
+    pub overtemp: PG12<Input<Floating>>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -183,5 +184,9 @@ impl Gpio {
 
     pub fn set_tec_frequency(&mut self, frequency: TecFrequency) {
         self.pins.tec_freq.set_state(frequency.into()).unwrap();
+    }
+
+    pub fn overtemp(&self) -> bool {
+        self.pins.overtemp.is_low().unwrap()
     }
 }

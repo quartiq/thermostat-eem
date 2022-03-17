@@ -171,10 +171,12 @@ pub fn setup(
         at_event: gpioe.pe7.into_floating_input(),
         eem_pwr: gpiod.pd0.into_push_pull_output(),
         tec_freq: gpiod.pd2.into_push_pull_output(),
+        overtemp: gpiog.pg12.into_floating_input(),
     };
     let gpio = Gpio::new(gpio_pins);
     info!("HWREV: {}", gpio.hwrev());
     info!("PoE Power: {}", gpio.poe());
+    info!("Overtemp: {}", gpio.overtemp());
 
     info!("Setup TEC limit PWM");
     let pwm_pins = PwmPins {
