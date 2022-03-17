@@ -339,6 +339,12 @@ pub fn setup(
     info!("Setup GPIO");
 
     let gpio = Gpio::new(GpioPins {
+        hwrev: (
+            gpiod.pd8.into_floating_input(),
+            gpiod.pd9.into_floating_input(),
+            gpiod.pd10.into_floating_input(),
+            gpiod.pd11.into_floating_input(),
+        ),
         led: (
             gpiog.pg9.into_push_pull_output(),
             gpiog.pg10.into_push_pull_output(),
@@ -355,7 +361,13 @@ pub fn setup(
             gpiog.pg6.into_push_pull_output(),
             gpiog.pg7.into_push_pull_output(),
         ),
+        poe_pwr: gpiof.pf2.into_floating_input(),
+        at_event: gpioe.pe7.into_floating_input(),
+        eem_pwr: gpiod.pd0.into_push_pull_output(),
     });
+
+    info!("HWREV: {}", gpio.hwrev());
+    info!("PoE Power: {}", gpio.poe());
 
     info!("Setup DAC");
 
@@ -412,10 +424,10 @@ pub fn setup(
         adc_pins,
     );
 
-    info!("P3V3: {:?} V", adc_int.read_p3v3_voltage());
-    info!("P5V: {:?} V", adc_int.read_p5v_voltage());
+    info!("P3V3: {} V", adc_int.read_p3v3_voltage());
+    info!("P5V: {} V", adc_int.read_p5v_voltage());
     info!(
-        "P12V: {:?} V, {:?} A",
+        "P12V: {} V, {} A",
         adc_int.read_p12v_voltage(),
         adc_int.read_p12v_current()
     );

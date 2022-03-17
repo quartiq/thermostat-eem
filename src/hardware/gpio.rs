@@ -1,12 +1,18 @@
 use super::hal::{
-    gpio::{gpioe::*, gpiog::*, Output, PushPull},
-    hal::digital::v2::{OutputPin, PinState},
+    gpio::{gpiod::*, gpioe::*, gpiof::*, gpiog::*, Floating, Input, Output, PushPull},
+    hal::digital::v2::{InputPin, OutputPin, PinState},
 };
 
 use super::Channel;
 
 #[allow(clippy::type_complexity)]
 pub struct GpioPins {
+    pub hwrev: (
+        PD8<Input<Floating>>,
+        PD9<Input<Floating>>,
+        PD10<Input<Floating>>,
+        PD11<Input<Floating>>,
+    ),
     // Front panel LEDs
     pub led: (
         PG9<Output<PushPull>>,
@@ -24,8 +30,12 @@ pub struct GpioPins {
         PG6<Output<PushPull>>,
         PG7<Output<PushPull>>,
     ),
+    pub poe_pwr: PF2<Input<Floating>>,
+    pub at_event: PE7<Input<Floating>>,
+    pub eem_pwr: PD0<Output<PushPull>>,
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum State {
     Assert,
     Deassert,
@@ -49,6 +59,12 @@ impl From<State> for PinState {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum PoePower {
+    Absent,
+    Low,  // 802.3af (13 W)
+    High, // 802.3at (25.5 W)
+}
 /// GPIO pins.
 ///
 /// shutdown - TEC driver shutdown signals
@@ -70,6 +86,7 @@ impl Gpio {
         for i in 0..8 {
             gpio.set_led(i, State::Deassert);
         }
+        gpio.set_eem_pwr(false);
         gpio
     }
 
@@ -103,5 +120,27 @@ impl Gpio {
             _ => panic!(),
         }
         .unwrap()
+    }
+
+    pub fn hwrev(&self) -> u8 {
+        self.pins.hwrev.0.is_high().unwrap() as u8
+            | (self.pins.hwrev.1.is_high().unwrap() as u8) << 1
+            | (self.pins.hwrev.2.is_high().unwrap() as u8) << 2
+            | (self.pins.hwrev.3.is_high().unwrap() as u8) << 3
+    }
+
+    pub fn poe(&self) -> PoePower {
+        match (
+            self.pins.poe_pwr.is_high().unwrap(),
+            self.pins.at_event.is_high().unwrap(),
+        ) {
+            (false, _) => PoePower::Absent,
+            (true, false) => PoePower::Low,
+            (true, true) => PoePower::High,
+        }
+    }
+
+    pub fn set_eem_pwr(&mut self, enabled: bool) {
+        self.pins.eem_pwr.set_state(enabled.into()).unwrap();
     }
 }
