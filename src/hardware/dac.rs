@@ -57,7 +57,7 @@ pub struct DacPins {
 /// DAC driver struct containing the SPI bus and the gpio pins.
 pub struct Dac {
     spi: Spi<SPI3, Enabled, u8>,
-    gpio: DacPins,
+    pins: DacPins,
 }
 
 impl Dac {
@@ -76,16 +76,16 @@ impl Dac {
         spi3: SPI3,
         sck: PC10<Alternate<AF6>>,
         mosi: PC12<Alternate<AF6>>,
-        gpio: DacPins,
+        pins: DacPins,
     ) -> Self {
         let spi = spi3.spi((sck, NoMiso, mosi), MODE_1, SPI_CLOCK, spi3_rec, clocks);
 
-        let mut dac = Dac { spi, gpio };
+        let mut dac = Dac { spi, pins };
 
-        dac.gpio.sync.0.set_high().unwrap();
-        dac.gpio.sync.1.set_high().unwrap();
-        dac.gpio.sync.2.set_high().unwrap();
-        dac.gpio.sync.3.set_high().unwrap();
+        dac.pins.sync.0.set_high().unwrap();
+        dac.pins.sync.1.set_high().unwrap();
+        dac.pins.sync.2.set_high().unwrap();
+        dac.pins.sync.3.set_high().unwrap();
 
         // default to zero current
         for i in 0..4 {
@@ -117,25 +117,25 @@ impl Dac {
 
         match ch {
             OutputChannel::Zero => {
-                self.gpio.sync.0.set_low().unwrap();
+                self.pins.sync.0.set_low().unwrap();
                 // 24 bit write. 4 MSB are zero and 2 LSB are ignored for a 18 bit DAC output.
                 self.spi.write(buf).unwrap();
-                self.gpio.sync.0.set_high().unwrap();
+                self.pins.sync.0.set_high().unwrap();
             }
             OutputChannel::One => {
-                self.gpio.sync.1.set_low().unwrap();
+                self.pins.sync.1.set_low().unwrap();
                 self.spi.write(buf).unwrap();
-                self.gpio.sync.1.set_high().unwrap();
+                self.pins.sync.1.set_high().unwrap();
             }
             OutputChannel::Two => {
-                self.gpio.sync.2.set_low().unwrap();
+                self.pins.sync.2.set_low().unwrap();
                 self.spi.write(buf).unwrap();
-                self.gpio.sync.2.set_high().unwrap();
+                self.pins.sync.2.set_high().unwrap();
             }
             OutputChannel::Three => {
-                self.gpio.sync.3.set_low().unwrap();
+                self.pins.sync.3.set_low().unwrap();
                 self.spi.write(buf).unwrap();
-                self.gpio.sync.3.set_high().unwrap();
+                self.pins.sync.3.set_high().unwrap();
             }
         }
         Ok(())

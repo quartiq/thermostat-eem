@@ -210,21 +210,20 @@ pub fn setup(
     );
 
     info!("Setup TEC driver DACs");
-    let dac_pins = DacPins {
-        sync: (
-            gpiog.pg3.into_push_pull_output(),
-            gpiog.pg2.into_push_pull_output(),
-            gpiog.pg1.into_push_pull_output(),
-            gpiog.pg0.into_push_pull_output(),
-        ),
-    };
     let dac = Dac::new(
         &ccdr.clocks,
         ccdr.peripheral.SPI3,
         device.SPI3,
         gpioc.pc10.into_alternate_af6(),
         gpioc.pc12.into_alternate_af6(),
-        dac_pins,
+        DacPins {
+        sync: (
+            gpiog.pg3.into_push_pull_output(),
+            gpiog.pg2.into_push_pull_output(),
+            gpiog.pg1.into_push_pull_output(),
+            gpiog.pg0.into_push_pull_output(),
+        ),
+        },
     );
 
     info!("Setup CPU ADCs");
