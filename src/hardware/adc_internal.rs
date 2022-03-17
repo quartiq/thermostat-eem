@@ -83,8 +83,8 @@ impl AdcInternal {
         }
         .unwrap();
         const SCALE: f32 = V_REF * 20.0 / 5.0; // Differential voltage sense gain
-        const OFFSET: f32 = -VREF_TEC * SCALE / V_REF; // Differential voltage sense offset
-        code as f32 / self.adc1.max_sample() as f32 * SCALE + OFFSET
+        const OFFSET: f32 = -VREF_TEC / V_REF; // Differential voltage sense offset
+        (code as f32 / self.adc1.max_sample() as f32 + OFFSET) * SCALE
     }
 
     pub fn read_output_current(&mut self, ch: OutputChannel) -> f32 {
@@ -96,9 +96,9 @@ impl AdcInternal {
             OutputChannel::Three => self.adc1.read(&mut p.3),
         }
         .unwrap();
-        const SCALE: f32 = V_REF / R_SENSE * 8.0; // MAX1968 ITEC scale
-        const OFFSET: f32 = -VREF_TEC * SCALE / (V_REF / R_SENSE); // MAX1968 ITEC offset
-        code as f32 / self.adc1.max_sample() as f32 * SCALE + OFFSET
+        const SCALE: f32 = V_REF / R_SENSE / 8.0; // MAX1968 ITEC scale
+        const OFFSET: f32 = -VREF_TEC / V_REF; // MAX1968 ITEC offset
+        (code as f32 / self.adc1.max_sample() as f32 + OFFSET) * SCALE
     }
 
     pub fn read_output_vref(&mut self, ch: OutputChannel) -> f32 {
