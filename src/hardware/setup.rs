@@ -100,6 +100,7 @@ pub struct ThermostatDevices {
     pub pwm: Pwm,
     pub gpio: Gpio,
     pub fan: Fan,
+    pub adc_internal: AdcInternal,
 }
 
 #[link_section = ".sram3.eth"]
@@ -267,7 +268,7 @@ pub fn setup(
         p12v_current: gpiof.pf8.into_analog(),
     };
 
-    let mut adc_int = AdcInternal::new(
+    let mut adc_internal = AdcInternal::new(
         &mut delay,
         &ccdr.clocks,
         (ccdr.peripheral.ADC12, ccdr.peripheral.ADC3),
@@ -275,12 +276,12 @@ pub fn setup(
         adc_pins,
     );
 
-    info!("P3V3: {} V", adc_int.read_p3v3_voltage());
-    info!("P5V: {} V", adc_int.read_p5v_voltage());
+    info!("P3V3: {} V", adc_internal.read_p3v3_voltage());
+    info!("P5V: {} V", adc_internal.read_p5v_voltage());
     info!(
         "P12V: {} V, {} A",
-        adc_int.read_p12v_voltage(),
-        adc_int.read_p12v_current()
+        adc_internal.read_p12v_voltage(),
+        adc_internal.read_p12v_current()
     );
 
     info!("Setup Ethernet");
@@ -446,5 +447,6 @@ pub fn setup(
         pwm,
         gpio,
         fan,
+        adc_internal,
     }
 }
