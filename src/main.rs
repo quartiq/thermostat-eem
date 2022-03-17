@@ -14,7 +14,7 @@ use panic_probe as _; // gloibal panic handler
 
 use hardware::{
     dac::Dac,
-    gpio::Gpio,
+    gpio::{Gpio, Led},
     hal,
     pwm::{Limit, Pwm},
     system_timer::SystemTimer,
@@ -188,7 +188,7 @@ mod app {
         c.shared.settings.lock(|current| *current = settings);
 
         // led is proxy for real settings and telemetry later
-        c.local.gpio.set_led(0, settings.led.into());
+        c.local.gpio.set_led(Led::Led0, settings.led.into());
 
         // update DAC state
         let dac = c.local.dac;

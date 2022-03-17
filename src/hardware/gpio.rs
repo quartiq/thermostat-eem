@@ -1,3 +1,5 @@
+use num_enum::TryFromPrimitive;
+
 use super::hal::{
     gpio::{gpiod::*, gpioe::*, gpiof::*, gpiog::*, Floating, Input, Output, PushPull},
     hal::digital::v2::{InputPin, OutputPin, PinState},
@@ -87,6 +89,19 @@ impl From<TecFrequency> for PinState {
         }
     }
 }
+
+#[derive(Copy, Clone, Debug, TryFromPrimitive)]
+#[repr(usize)]
+pub enum Led {
+    Led0 = 0,
+    Led1 = 1,
+    Led2 = 2,
+    Led3 = 3,
+    Led4 = 4,
+    Led5 = 5,
+    Led6 = 6,
+    Led7 = 7,
+}
 /// GPIO pins.
 ///
 /// shutdown - TEC driver shutdown signals
@@ -106,7 +121,7 @@ impl Gpio {
             gpio.set_shutdown(ch, State::Assert);
         }
         for i in 0..8 {
-            gpio.set_led(i, State::Deassert);
+            gpio.set_led(Led::try_from(i).unwrap(), State::Deassert);
         }
         gpio.set_eem_pwr(false);
         gpio.set_tec_frequency(TecFrequency::Low);
@@ -129,18 +144,17 @@ impl Gpio {
         .unwrap()
     }
 
-    pub fn set_led(&mut self, index: i32, state: State) {
+    pub fn set_led(&mut self, led: Led, state: State) {
         let s = PinState::from(state);
-        match index {
-            0 => self.pins.led.0.set_state(s),
-            1 => self.pins.led.1.set_state(s),
-            2 => self.pins.led.2.set_state(s),
-            3 => self.pins.led.3.set_state(s),
-            4 => self.pins.led.4.set_state(s),
-            5 => self.pins.led.5.set_state(s),
-            6 => self.pins.led.6.set_state(s),
-            7 => self.pins.led.7.set_state(s),
-            _ => panic!(),
+        match led {
+            Led::Led0 => self.pins.led.0.set_state(s),
+            Led::Led1 => self.pins.led.1.set_state(s),
+            Led::Led2 => self.pins.led.2.set_state(s),
+            Led::Led3 => self.pins.led.3.set_state(s),
+            Led::Led4 => self.pins.led.4.set_state(s),
+            Led::Led5 => self.pins.led.5.set_state(s),
+            Led::Led6 => self.pins.led.6.set_state(s),
+            Led::Led7 => self.pins.led.7.set_state(s),
         }
         .unwrap()
     }
