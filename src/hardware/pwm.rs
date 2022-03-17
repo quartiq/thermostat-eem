@@ -4,6 +4,7 @@
 ///! This voltage is controlled by the MCU using low-pass filtered PWM outputs.
 ///!
 use super::{
+    dac::{R_SENSE, VREF_TEC},
     hal::{
         gpio::{gpiob::*, gpioc::*, gpiod::*, gpioe::*, Alternate, AF1, AF2},
         hal::PwmPin,
@@ -13,7 +14,7 @@ use super::{
         stm32::{TIM1, TIM3, TIM4},
         time::KiloHertz,
     },
-    Channel, R_SENSE, VREF_TEC,
+    Channel,
 };
 
 /// TEC limit types
@@ -121,7 +122,7 @@ impl Pwm {
     /// # Args
     /// * `ch` - Thermostat output channel
     /// * `limit` - TEC limit type
-    pub fn set(&mut self, lim: Limit, val: f32) -> Result<(), Error> {
+    pub fn set_limit(&mut self, lim: Limit, val: f32) -> Result<(), Error> {
         // PWM constants
         const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
 

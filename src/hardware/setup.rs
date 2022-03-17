@@ -14,6 +14,7 @@ use super::hal::{
 use super::{
     adc_internal::{AdcInternal, AdcPins},
     dac::{Dac, DacPins},
+    gpio::{Gpio, GpioPins},
     pwm::{Pwm, PwmPins},
     EthernetPhy, LEDs, NetworkStack,
 };
@@ -97,6 +98,7 @@ pub struct ThermostatDevices {
     pub dac: Dac,
     pub pwm: Pwm,
     pub leds: LEDs,
+    pub gpio: Gpio,
 }
 
 #[link_section = ".sram3.eth"]
@@ -356,6 +358,17 @@ pub fn setup(
         pwm_pins,
     );
 
+    info!("Setup GPIO");
+
+    let gpio = Gpio::new(GpioPins {
+        shdn: (
+            gpiog.pg4.into_push_pull_output(),
+            gpiog.pg5.into_push_pull_output(),
+            gpiog.pg6.into_push_pull_output(),
+            gpiog.pg7.into_push_pull_output(),
+        ),
+    });
+
     info!("Setup DAC");
 
     let dac_pins = DacPins {
@@ -364,12 +377,6 @@ pub fn setup(
             gpiog.pg2.into_push_pull_output(),
             gpiog.pg1.into_push_pull_output(),
             gpiog.pg0.into_push_pull_output(),
-        ),
-        shdn: (
-            gpiog.pg4.into_push_pull_output(),
-            gpiog.pg5.into_push_pull_output(),
-            gpiog.pg6.into_push_pull_output(),
-            gpiog.pg7.into_push_pull_output(),
         ),
     };
 
@@ -426,5 +433,6 @@ pub fn setup(
         dac,
         pwm,
         leds,
+        gpio,
     }
 }

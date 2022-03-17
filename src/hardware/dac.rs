@@ -24,10 +24,14 @@ use super::hal::{
     time::MegaHertz,
 };
 
-use super::{Channel, R_SENSE, VREF_TEC};
+use super::Channel;
 
 // Note: 30MHz clock valid according to DAC datasheet. This lead to spurious RxFIFO overruns on the STM side when probing the spi clock with a scope probe.
 const SPI_CLOCK: MegaHertz = MegaHertz(8);
+
+// DAC and PWM shared constants
+pub const R_SENSE: f32 = 0.05; // TEC current sense resistor
+pub const VREF_TEC: f32 = 1.5; // TEC driver reference voltage
 
 /// DAC value out of bounds error.
 #[derive(Debug)]
@@ -47,12 +51,6 @@ pub struct DacPins {
         PG2<Output<PushPull>>,
         PG1<Output<PushPull>>,
         PG0<Output<PushPull>>,
-    ),
-    pub shdn: (
-        PG4<Output<PushPull>>,
-        PG5<Output<PushPull>>,
-        PG6<Output<PushPull>>,
-        PG7<Output<PushPull>>,
     ),
 }
 
@@ -89,9 +87,10 @@ impl Dac {
         dac.gpio.sync.2.set_high().unwrap();
         dac.gpio.sync.3.set_high().unwrap();
 
-        // default to zero amps
+        // default to zero current
         for i in 0..4 {
-            dac.set(Channel::try_from(i).unwrap(), 0.0).unwrap();
+            let ch = Channel::try_from(i).unwrap();
+            dac.set_current(ch, 0.0).unwrap();
         }
         dac
     }
@@ -101,7 +100,7 @@ impl Dac {
     /// # Args
     /// * `ch` - Thermostat output channel
     /// * `current` - Set current in Ampere
-    pub fn set(&mut self, ch: Channel, current: f32) -> Result<(), Error> {
+    pub fn set_current(&mut self, ch: Channel, current: f32) -> Result<(), Error> {
         // DAC constants
         const MAX_DAC_WORD: i32 = 1 << 20; // maximum DAC dataword (exclusive) plus 2 bit due to interface alignment
         const VREF_DAC: f32 = 3.0; // DAC reference voltage
@@ -140,23 +139,5 @@ impl Dac {
             }
         }
         Ok(())
-    }
-
-    /// Set or reset the shutdown pin of an output channel.
-    ///
-    /// # Args
-    /// * `ch` - Thermostat output channel
-    /// * `shutdown` - TEC driver shutdown. True to set shutdown mode, false to enable the driver.
-    pub fn set_shutdown(&mut self, ch: Channel, shutdown: bool) {
-        match (ch, shutdown) {
-            (Channel::Ch0, false) => self.gpio.shdn.0.set_high().unwrap(),
-            (Channel::Ch1, false) => self.gpio.shdn.1.set_high().unwrap(),
-            (Channel::Ch2, false) => self.gpio.shdn.2.set_high().unwrap(),
-            (Channel::Ch3, false) => self.gpio.shdn.3.set_high().unwrap(),
-            (Channel::Ch0, true) => self.gpio.shdn.0.set_low().unwrap(),
-            (Channel::Ch1, true) => self.gpio.shdn.1.set_low().unwrap(),
-            (Channel::Ch2, true) => self.gpio.shdn.2.set_low().unwrap(),
-            (Channel::Ch3, true) => self.gpio.shdn.3.set_low().unwrap(),
-        }
     }
 }

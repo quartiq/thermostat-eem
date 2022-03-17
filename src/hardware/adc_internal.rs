@@ -6,7 +6,10 @@ use super::hal::{
     rcc::{rec, CoreClocks},
     stm32::{ADC1, ADC2, ADC3},
 };
-use super::{Channel, R_SENSE, VREF_TEC};
+use super::{
+    dac::{R_SENSE, VREF_TEC},
+    Channel,
+};
 
 const V_REF: f32 = 3.0; // ADC reference voltage
 
@@ -76,8 +79,8 @@ impl AdcInternal {
             Channel::Ch3 => self.adc1.read(&mut p.3),
         }
         .unwrap();
-        const SCALE: f32 = V_REF / R_SENSE * 8.0; // MAX1968 ITEC scale
-        const OFFSET: f32 = -VREF_TEC * SCALE / (V_REF / R_SENSE); // MAX1968 ITEC offset
+        const SCALE: f32 = V_REF * 20.0 / 5.0; // Differential voltage sense gain
+        const OFFSET: f32 = -VREF_TEC * SCALE / V_REF; // Differential voltage sense offset
         code as f32 / self.adc1.max_sample() as f32 * SCALE + OFFSET
     }
 
@@ -90,8 +93,8 @@ impl AdcInternal {
             Channel::Ch3 => self.adc1.read(&mut p.3),
         }
         .unwrap();
-        const SCALE: f32 = V_REF * 20.0 / 5.0; // Differential voltage sense gain
-        const OFFSET: f32 = -VREF_TEC * SCALE / V_REF; // Differential voltage sense offset
+        const SCALE: f32 = V_REF / R_SENSE * 8.0; // MAX1968 ITEC scale
+        const OFFSET: f32 = -VREF_TEC * SCALE / (V_REF / R_SENSE); // MAX1968 ITEC offset
         code as f32 / self.adc1.max_sample() as f32 * SCALE + OFFSET
     }
 

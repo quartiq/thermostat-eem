@@ -14,6 +14,7 @@ use panic_probe as _; // gloibal panic handler
 
 use hardware::{
     dac::Dac,
+    gpio::Gpio,
     hal,
     pwm::{Limit, Pwm},
     system_timer::SystemTimer,
@@ -125,6 +126,7 @@ mod app {
         leds: LEDs,
         dac: Dac,
         pwm: Pwm,
+        gpio: Gpio,
     }
 
     #[init]
@@ -157,6 +159,7 @@ mod app {
             leds: thermostat.leds,
             dac: thermostat.dac,
             pwm: thermostat.pwm,
+            gpio: thermostat.gpio,
         };
 
         let shared = Shared {
@@ -179,7 +182,7 @@ mod app {
         }
     }
 
-    #[task(priority = 1, local=[leds, dac, pwm], shared=[settings, network, telemetry])]
+    #[task(priority = 1, local=[leds, dac, pwm, gpio], shared=[settings, network, telemetry])]
     fn settings_update(mut c: settings_update::Context) {
         let settings = c
             .shared
@@ -197,16 +200,17 @@ mod app {
         // update DAC state
         let dac = c.local.dac;
         let pwm = c.local.pwm;
+        let gpio = c.local.gpio;
         for (i, s) in settings.output_settings.iter().enumerate() {
             let ch = Channel::try_from(i).unwrap();
             // TODO: implement what happens if user chooses invalid value
-            pwm.set(Limit::Voltage(ch), s.voltage_limit).unwrap();
-            pwm.set(Limit::PositiveCurrent(ch), s.current_limit_positive)
+            pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
+            pwm.set_limit(Limit::PositiveCurrent(ch), s.current_limit_positive)
                 .unwrap();
-            pwm.set(Limit::NegativeCurrent(ch), s.current_limit_negative)
+            pwm.set_limit(Limit::NegativeCurrent(ch), s.current_limit_negative)
                 .unwrap();
-            dac.set(ch, s.current).unwrap();
-            dac.set_shutdown(ch, s.shutdown);
+            dac.set_current(ch, s.current).unwrap();
+            gpio.set_shutdown(ch, s.shutdown);
             info!("DAC channel no {:?}: {:?}", i, s);
         }
 

@@ -7,6 +7,7 @@ pub use stm32h7xx_hal as hal;
 
 pub mod adc_internal;
 pub mod dac;
+pub mod gpio;
 pub mod pwm;
 pub mod setup;
 pub mod system_timer;
@@ -55,7 +56,3 @@ pub enum Channel {
     Ch2 = 2,
     Ch3 = 3,
 }
-
-// DAC and PWM shared constants
-const R_SENSE: f32 = 0.05; // TEC current sense resistor
-const VREF_TEC: f32 = 1.5; // TEC driver reference voltage
