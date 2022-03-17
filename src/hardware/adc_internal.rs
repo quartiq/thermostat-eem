@@ -23,12 +23,14 @@ pub enum Supply {
 pub enum AdcChannel {
     OutputVoltage(Channel),
     OutputCurrent(Channel),
+    OutputVref(Channel),
     Supply(Supply),
 }
 
 pub struct AdcPins {
     pub output_voltage: (PC3<Analog>, PA0<Analog>, PA3<Analog>, PA4<Analog>),
     pub output_current: (PA5<Analog>, PA6<Analog>, PB0<Analog>, PB1<Analog>),
+    pub output_vref: (PF3<Analog>, PF4<Analog>, PF5<Analog>, PF6<Analog>),
     pub p3v3_voltage: PF7<Analog>,
     pub p5v_voltage: PC0<Analog>,
     pub p12v_voltage: PC2<Analog>,
@@ -66,6 +68,7 @@ impl AdcInternal {
         match ch {
             AdcChannel::OutputVoltage(ch) => self.read_output_voltage(ch),
             AdcChannel::OutputCurrent(ch) => self.read_output_current(ch),
+            AdcChannel::OutputVref(ch) => self.read_output_vref(ch),
             AdcChannel::Supply(ch) => self.read_supply(ch),
         }
     }
@@ -96,6 +99,19 @@ impl AdcInternal {
         const SCALE: f32 = V_REF / R_SENSE * 8.0; // MAX1968 ITEC scale
         const OFFSET: f32 = -VREF_TEC * SCALE / (V_REF / R_SENSE); // MAX1968 ITEC offset
         code as f32 / self.adc1.max_sample() as f32 * SCALE + OFFSET
+    }
+
+    pub fn read_output_vref(&mut self, ch: Channel) -> f32 {
+        let p = &mut self.pins.output_vref;
+        let code: u32 = match ch {
+            Channel::Ch0 => self.adc3.read(&mut p.0),
+            Channel::Ch1 => self.adc3.read(&mut p.1),
+            Channel::Ch2 => self.adc3.read(&mut p.2),
+            Channel::Ch3 => self.adc3.read(&mut p.3),
+        }
+        .unwrap();
+        const SCALE: f32 = V_REF;
+        code as f32 / self.adc3.max_sample() as f32 * SCALE
     }
 
     pub fn read_supply(&mut self, ch: Supply) -> f32 {

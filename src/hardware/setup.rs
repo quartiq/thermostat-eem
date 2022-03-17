@@ -392,6 +392,12 @@ pub fn setup(
             gpiob.pb0.into_analog(),
             gpiob.pb1.into_analog(),
         ),
+        output_vref: (
+            gpiof.pf3.into_analog(),
+            gpiof.pf4.into_analog(),
+            gpiof.pf5.into_analog(),
+            gpiof.pf6.into_analog(),
+        ),
         p3v3_voltage: gpiof.pf7.into_analog(),
         p5v_voltage: gpioc.pc0.into_analog(),
         p12v_voltage: gpioc.pc2.into_analog(),
