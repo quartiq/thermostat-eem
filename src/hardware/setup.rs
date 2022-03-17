@@ -16,7 +16,7 @@ use super::{
     dac::{Dac, DacPins},
     gpio::{Gpio, GpioPins},
     pwm::{Pwm, PwmPins},
-    EthernetPhy, LEDs, NetworkStack,
+    EthernetPhy, NetworkStack,
 };
 
 use defmt::info;
@@ -97,7 +97,6 @@ pub struct ThermostatDevices {
     pub net: NetworkDevices,
     pub dac: Dac,
     pub pwm: Pwm,
-    pub leds: LEDs,
     pub gpio: Gpio,
 }
 
@@ -143,27 +142,6 @@ pub fn setup(
     let gpioe = device.GPIOE.split(ccdr.peripheral.GPIOE);
     let gpiof = device.GPIOF.split(ccdr.peripheral.GPIOF);
     let gpiog = device.GPIOG.split(ccdr.peripheral.GPIOG);
-
-    // Setup LEDs
-    let mut leds = LEDs {
-        led0: gpiog.pg9.into_push_pull_output(),
-        led1: gpiog.pg10.into_push_pull_output(),
-        led2: gpioe.pe8.into_push_pull_output(),
-        led3: gpioe.pe10.into_push_pull_output(),
-        led4: gpioe.pe12.into_push_pull_output(),
-        led5: gpiog.pg15.into_push_pull_output(),
-        led6: gpioe.pe15.into_push_pull_output(),
-        led7: gpiog.pg8.into_push_pull_output(),
-    };
-
-    leds.led0.set_low().unwrap();
-    leds.led1.set_low().unwrap();
-    leds.led2.set_low().unwrap();
-    leds.led3.set_low().unwrap();
-    leds.led4.set_low().unwrap();
-    leds.led5.set_low().unwrap();
-    leds.led6.set_low().unwrap();
-    leds.led7.set_low().unwrap();
 
     info!("-- Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
@@ -361,6 +339,16 @@ pub fn setup(
     info!("Setup GPIO");
 
     let gpio = Gpio::new(GpioPins {
+        led: (
+            gpiog.pg9.into_push_pull_output(),
+            gpiog.pg10.into_push_pull_output(),
+            gpioe.pe8.into_push_pull_output(),
+            gpioe.pe10.into_push_pull_output(),
+            gpioe.pe12.into_push_pull_output(),
+            gpiog.pg15.into_push_pull_output(),
+            gpioe.pe15.into_push_pull_output(),
+            gpiog.pg8.into_push_pull_output(),
+        ),
         shdn: (
             gpiog.pg4.into_push_pull_output(),
             gpiog.pg5.into_push_pull_output(),
@@ -432,7 +420,6 @@ pub fn setup(
         net,
         dac,
         pwm,
-        leds,
         gpio,
     }
 }

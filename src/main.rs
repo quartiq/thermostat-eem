@@ -18,14 +18,13 @@ use hardware::{
     hal,
     pwm::{Limit, Pwm},
     system_timer::SystemTimer,
-    Channel, LEDs,
+    Channel,
 };
 use net::{
     miniconf::Miniconf,
     telemetry::{Telemetry, TelemetryBuffer},
     NetworkState, NetworkUsers,
 };
-use stm32h7xx_hal::hal::digital::v2::OutputPin;
 use systick_monotonic::*;
 
 #[derive(Copy, Clone, Debug, Miniconf, Format)]
@@ -123,7 +122,6 @@ mod app {
 
     #[local]
     struct Local {
-        leds: LEDs,
         dac: Dac,
         pwm: Pwm,
         gpio: Gpio,
@@ -156,7 +154,6 @@ mod app {
         telemetry_task::spawn().unwrap();
 
         let local = Local {
-            leds: thermostat.leds,
             dac: thermostat.dac,
             pwm: thermostat.pwm,
             gpio: thermostat.gpio,
@@ -182,7 +179,7 @@ mod app {
         }
     }
 
-    #[task(priority = 1, local=[leds, dac, pwm, gpio], shared=[settings, network, telemetry])]
+    #[task(priority = 1, local=[dac, pwm, gpio], shared=[settings, network, telemetry])]
     fn settings_update(mut c: settings_update::Context) {
         let settings = c
             .shared
@@ -191,11 +188,7 @@ mod app {
         c.shared.settings.lock(|current| *current = settings);
 
         // led is proxy for real settings and telemetry later
-        if settings.led {
-            c.local.leds.led0.set_high().unwrap();
-        } else {
-            c.local.leds.led0.set_low().unwrap();
-        }
+        c.local.gpio.set_led(0, settings.led.into());
 
         // update DAC state
         let dac = c.local.dac;
@@ -210,7 +203,7 @@ mod app {
             pwm.set_limit(Limit::NegativeCurrent(ch), s.current_limit_negative)
                 .unwrap();
             dac.set_current(ch, s.current).unwrap();
-            gpio.set_shutdown(ch, s.shutdown);
+            gpio.set_shutdown(ch, s.shutdown.into());
             info!("DAC channel no {:?}: {:?}", i, s);
         }
 
