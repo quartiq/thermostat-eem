@@ -14,17 +14,13 @@ use panic_probe as _; // gloibal panic handler
 
 use hardware::{
     dac::Dac,
-    gpio::{Gpio, Led},
+    gpio::{Gpio, Led, PoePower},
     hal,
     pwm::{Limit, Pwm},
     system_timer::SystemTimer,
     OutputChannel,
 };
-use net::{
-    miniconf::Miniconf,
-    telemetry::{Telemetry, TelemetryBuffer},
-    NetworkState, NetworkUsers,
-};
+use net::{miniconf::Miniconf, serde::Serialize, NetworkState, NetworkUsers};
 use systick_monotonic::*;
 
 #[derive(Copy, Clone, Debug, Miniconf, Format)]
@@ -107,8 +103,23 @@ impl Default for Settings {
     }
 }
 
+#[derive(Serialize, Copy, Clone, Default, Debug)]
+pub struct Telemetry {
+    p3v3_voltage: f32,
+    p5v_voltage: f32,
+    p12v_voltage: f32,
+    p12v_current: f32,
+    output_vref: [f32; 4],
+    output_current: [f32; 4],
+    output_voltage: [f32; 4],
+    poe: PoePower,
+    overtemp: bool,
+}
+
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
 mod app {
+    use hardware::adc_internal::AdcInternal;
+
     use super::*;
 
     #[monotonic(binds = SysTick, default = true)]
@@ -117,14 +128,15 @@ mod app {
     struct Shared {
         network: NetworkUsers<Settings, Telemetry>,
         settings: Settings,
-        telemetry: TelemetryBuffer,
+        telemetry: Telemetry,
+        gpio: Gpio,
     }
 
     #[local]
     struct Local {
         dac: Dac,
         pwm: Pwm,
-        gpio: Gpio,
+        adc_internal: AdcInternal,
     }
 
     #[init]
@@ -156,13 +168,14 @@ mod app {
         let local = Local {
             dac: thermostat.dac,
             pwm: thermostat.pwm,
-            gpio: thermostat.gpio,
+            adc_internal: thermostat.adc_internal,
         };
 
         let shared = Shared {
             network,
             settings: Settings::default(),
-            telemetry: TelemetryBuffer::default(),
+            telemetry: Telemetry::default(),
+            gpio: thermostat.gpio,
         };
 
         (shared, local, init::Monotonics(mono))
@@ -179,7 +192,7 @@ mod app {
         }
     }
 
-    #[task(priority = 1, local=[dac, pwm, gpio], shared=[settings, network, telemetry])]
+    #[task(priority = 1, local=[dac, pwm], shared=[settings, network, gpio])]
     fn settings_update(mut c: settings_update::Context) {
         let settings = c
             .shared
@@ -188,12 +201,13 @@ mod app {
         c.shared.settings.lock(|current| *current = settings);
 
         // led is proxy for real settings and telemetry later
-        c.local.gpio.set_led(Led::Led0, settings.led.into());
+        c.shared
+            .gpio
+            .lock(|gpio| gpio.set_led(Led::Led0, settings.led.into()));
 
         // update DAC state
         let dac = c.local.dac;
         let pwm = c.local.pwm;
-        let gpio = c.local.gpio;
         for (i, s) in settings.output_settings.iter().enumerate() {
             let ch = OutputChannel::try_from(i).unwrap();
             // TODO: implement what happens if user chooses invalid value
@@ -203,25 +217,39 @@ mod app {
             pwm.set_limit(Limit::NegativeCurrent(ch), s.current_limit_negative)
                 .unwrap();
             dac.set_current(ch, s.current).unwrap();
-            gpio.set_shutdown(ch, s.shutdown.into());
+            c.shared
+                .gpio
+                .lock(|gpio| gpio.set_shutdown(ch, s.shutdown.into()));
             info!("DAC channel no {:?}: {:?}", i, s);
         }
-
-        c.shared.telemetry.lock(|tele| tele.led = settings.led);
     }
 
-    #[task(priority = 1, shared=[network, settings, telemetry])]
+    #[task(priority = 1, local=[adc_internal], shared=[network, settings, telemetry, gpio])]
     fn telemetry_task(mut c: telemetry_task::Context) {
-        let telemetry: TelemetryBuffer = c.shared.telemetry.lock(|telemetry| *telemetry);
+        let mut telemetry: Telemetry = c.shared.telemetry.lock(|telemetry| *telemetry);
 
-        let telemetry_period = c.shared.settings.lock(|settings| settings.telemetry_period);
+        let adc_int = c.local.adc_internal;
+        telemetry.p3v3_voltage = adc_int.read_p3v3_voltage();
+        telemetry.p5v_voltage = adc_int.read_p5v_voltage();
+        telemetry.p12v_voltage = adc_int.read_p12v_voltage();
+        telemetry.p12v_current = adc_int.read_p12v_current();
+        for i in 0..4 {
+            let ch = OutputChannel::try_from(i).unwrap();
+            telemetry.output_vref[i] = adc_int.read_output_vref(ch);
+            telemetry.output_voltage[i] = adc_int.read_output_voltage(ch);
+            telemetry.output_current[i] = adc_int.read_output_current(ch);
+        }
+        c.shared.gpio.lock(|gpio| {
+            telemetry.overtemp = gpio.overtemp();
+            telemetry.poe = gpio.poe();
+        });
 
         c.shared
             .network
-            .lock(|network| network.telemetry.publish(&telemetry.finalize()));
+            .lock(|network| network.telemetry.publish(&telemetry));
 
-        // Schedule the telemetry task in the future.
-        // ToDo: Figure out how to give feedback for impossible (neg. etc) telemetry periods.
+        // TODO: validate telemetry period.
+        let telemetry_period = c.shared.settings.lock(|settings| settings.telemetry_period);
         telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
     }
 

@@ -4,6 +4,8 @@ use super::hal::{
     gpio::{gpiod::*, gpioe::*, gpiof::*, gpiog::*, Floating, Input, Output, PushPull},
     hal::digital::v2::{InputPin, OutputPin, PinState},
 };
+use crate::net::serde::Serialize;
+use defmt::Format;
 
 use super::OutputChannel;
 
@@ -63,7 +65,7 @@ impl From<State> for PinState {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Format)]
 pub enum PoePower {
     /// No Power over Ethernet detected
     Absent,
@@ -71,6 +73,12 @@ pub enum PoePower {
     Low,
     /// 802.3at (25.5 W) Power over Ethernet present
     High,
+}
+
+impl Default for PoePower {
+    fn default() -> Self {
+        Self::Absent
+    }
 }
 
 /// TEC driver PWM frequency setting
