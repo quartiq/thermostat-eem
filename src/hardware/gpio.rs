@@ -111,18 +111,22 @@ pub enum Led {
     Led6 = 6,
     Led7 = 7,
 }
-/// GPIO pins.
+/// GPIO struct.
 ///
-/// shutdown - TEC driver shutdown signals
+/// pins - All Thermostat GPIO pins.
 pub struct Gpio {
     pins: GpioPins,
 }
 
 impl Gpio {
-    /// Construct a new GPIO driver for all Thermostat output channels.
+    /// Construct a new GPIO driver for all Thermostat QPIOs.
+    /// - Sets all output channels into shutdown mode.
+    /// - Sets all LEDs to off.
+    /// - Sets EEM power to off.
+    /// - Sets TEC frequency to TecFrequency::Low.
     ///
     /// # Args
-    /// * `shdn_pins` - SHDN pin tuple.
+    /// * `pins` - Thermostat GPIO pins.
     pub fn new(pins: GpioPins) -> Self {
         let mut gpio = Gpio { pins };
         for i in 0..4 {
