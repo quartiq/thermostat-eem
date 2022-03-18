@@ -6,33 +6,41 @@ use super::hal::{
     rcc::{rec, CoreClocks},
     stm32::{ADC1, ADC2, ADC3},
 };
+use super::{
+    dac::{R_SENSE, VREF_TEC},
+    OutputChannel,
+};
 
 const V_REF: f32 = 3.0; // ADC reference voltage
 
-pub enum OutChannel {
-    Zero,
-    One,
-    Two,
-    Three,
-}
-
 pub enum Supply {
-    P5v,
-    P12v,
-    P3v3,
-    I12v,
+    P3v3Voltage,
+    P5vVoltage,
+    P12vVoltage,
+    P12vCurrent,
 }
 
-pub type OutUPins = (PC3<Analog>, PA0<Analog>, PA3<Analog>, PA4<Analog>);
-pub type OutIPins = (PA5<Analog>, PA6<Analog>, PB0<Analog>, PB1<Analog>);
-pub type SupplyPins = (PC0<Analog>, PC2<Analog>, PF7<Analog>, PF8<Analog>);
+pub enum AdcChannel {
+    OutputVoltage(OutputChannel),
+    OutputCurrent(OutputChannel),
+    OutputVref(OutputChannel),
+    Supply(Supply),
+}
+
+pub struct AdcPins {
+    pub output_voltage: (PC3<Analog>, PA0<Analog>, PA3<Analog>, PA4<Analog>),
+    pub output_current: (PA5<Analog>, PA6<Analog>, PB0<Analog>, PB1<Analog>),
+    pub output_vref: (PF3<Analog>, PF4<Analog>, PF5<Analog>, PF6<Analog>),
+    pub p3v3_voltage: PF7<Analog>,
+    pub p5v_voltage: PC0<Analog>,
+    pub p12v_voltage: PC2<Analog>,
+    pub p12v_current: PF8<Analog>,
+}
 
 pub struct AdcInternal {
     adc1: adc::Adc<ADC1, adc::Enabled>,
     adc3: adc::Adc<ADC3, adc::Enabled>,
-    supply: SupplyPins,
-    outu: OutUPins,
-    outi: OutIPins,
+    pins: AdcPins,
 }
 
 impl AdcInternal {
@@ -41,12 +49,10 @@ impl AdcInternal {
         clocks: &CoreClocks,
         adc_rcc: (rec::Adc12, rec::Adc3),
         adc: (ADC1, ADC2, ADC3),
-        supply: SupplyPins,
-        outu: OutUPins,
-        outi: OutIPins,
+        pins: AdcPins,
     ) -> Self {
-        // Setup ADC1 and ADC2
-        let (adc1, _) = adc::adc12(adc.0, adc.1, delay, adc_rcc.0, clocks);
+        // Setup ADCs
+        let (adc1, _adc2) = adc::adc12(adc.0, adc.1, delay, adc_rcc.0, clocks);
         let adc3 = adc::Adc::adc3(adc.2, delay, adc_rcc.1, clocks);
 
         let mut adc1 = adc1.enable();
@@ -55,67 +61,93 @@ impl AdcInternal {
         let mut adc3 = adc3.enable();
         adc3.set_resolution(adc::Resolution::SIXTEENBIT);
 
-        AdcInternal {
-            adc1,
-            adc3,
-            supply,
-            outu,
-            outi,
+        AdcInternal { adc1, adc3, pins }
+    }
+
+    pub fn read(&mut self, ch: AdcChannel) -> f32 {
+        match ch {
+            AdcChannel::OutputVoltage(ch) => self.read_output_voltage(ch),
+            AdcChannel::OutputCurrent(ch) => self.read_output_current(ch),
+            AdcChannel::OutputVref(ch) => self.read_output_vref(ch),
+            AdcChannel::Supply(ch) => self.read_supply(ch),
         }
     }
 
-    pub fn read_outu(&mut self, outu: OutChannel) -> u32 {
-        match outu {
-            OutChannel::Zero => self.adc1.read(&mut self.outu.0).unwrap(),
-            OutChannel::One => self.adc1.read(&mut self.outu.1).unwrap(),
-            OutChannel::Two => self.adc1.read(&mut self.outu.2).unwrap(),
-            OutChannel::Three => self.adc1.read(&mut self.outu.3).unwrap(),
+    pub fn read_output_voltage(&mut self, ch: OutputChannel) -> f32 {
+        let p = &mut self.pins.output_voltage;
+        let code: u32 = match ch {
+            OutputChannel::Zero => self.adc1.read(&mut p.0),
+            OutputChannel::One => self.adc1.read(&mut p.1),
+            OutputChannel::Two => self.adc1.read(&mut p.2),
+            OutputChannel::Three => self.adc1.read(&mut p.3),
         }
+        .unwrap();
+        const SCALE: f32 = -V_REF * 20.0 / 5.0; // Differential voltage sense gain
+        const OFFSET: f32 = -VREF_TEC / V_REF; // Differential voltage sense offset
+        (code as f32 / self.adc1.max_sample() as f32 + OFFSET) * SCALE
     }
 
-    pub fn read_outi(&mut self, outi: OutChannel) -> u32 {
-        match outi {
-            OutChannel::Zero => self.adc1.read(&mut self.outi.0).unwrap(),
-            OutChannel::One => self.adc1.read(&mut self.outi.1).unwrap(),
-            OutChannel::Two => self.adc1.read(&mut self.outi.2).unwrap(),
-            OutChannel::Three => self.adc1.read(&mut self.outi.3).unwrap(),
+    pub fn read_output_current(&mut self, ch: OutputChannel) -> f32 {
+        let p = &mut self.pins.output_current;
+        let code: u32 = match ch {
+            OutputChannel::Zero => self.adc1.read(&mut p.0),
+            OutputChannel::One => self.adc1.read(&mut p.1),
+            OutputChannel::Two => self.adc1.read(&mut p.2),
+            OutputChannel::Three => self.adc1.read(&mut p.3),
         }
+        .unwrap();
+        const SCALE: f32 = V_REF / R_SENSE / 8.0; // MAX1968 ITEC scale
+        const OFFSET: f32 = -VREF_TEC / V_REF; // MAX1968 ITEC offset
+        (code as f32 / self.adc1.max_sample() as f32 + OFFSET) * SCALE
     }
 
-    pub fn read_supply(&mut self, supply: Supply) -> u32 {
-        match supply {
-            Supply::P5v => self.adc1.read(&mut self.supply.0).unwrap(),
-            Supply::P12v => self.adc1.read(&mut self.supply.1).unwrap(),
-            Supply::P3v3 => self.adc3.read(&mut self.supply.2).unwrap(),
-            Supply::I12v => self.adc3.read(&mut self.supply.3).unwrap(),
+    pub fn read_output_vref(&mut self, ch: OutputChannel) -> f32 {
+        let p = &mut self.pins.output_vref;
+        let code: u32 = match ch {
+            OutputChannel::Zero => self.adc3.read(&mut p.0),
+            OutputChannel::One => self.adc3.read(&mut p.1),
+            OutputChannel::Two => self.adc3.read(&mut p.2),
+            OutputChannel::Three => self.adc3.read(&mut p.3),
         }
+        .unwrap();
+        const SCALE: f32 = V_REF;
+        code as f32 / self.adc3.max_sample() as f32 * SCALE
     }
 
-    /// reads the 12V rail voltage in volt
-    pub fn read_p12v(&mut self) -> f32 {
-        let div_p12v: f32 = 1.6 / (1.6 + 6.8); // Resistor divider 12V rail
-        let factor = (V_REF / self.adc1.max_sample() as f32) / div_p12v;
-        self.read_supply(Supply::P12v) as f32 * factor
-    }
-
-    /// reads the 5V rail voltage in volt
-    pub fn read_p5v(&mut self) -> f32 {
-        let div_p5v: f32 = 6.8 / (10.0 + 6.8); // Resistor divider 5V rail
-        let factor = (V_REF / self.adc1.max_sample() as f32) / div_p5v;
-        self.read_supply(Supply::P5v) as f32 * factor
+    pub fn read_supply(&mut self, ch: Supply) -> f32 {
+        match ch {
+            Supply::P3v3Voltage => self.read_p3v3_voltage(),
+            Supply::P5vVoltage => self.read_p5v_voltage(),
+            Supply::P12vVoltage => self.read_p12v_voltage(),
+            Supply::P12vCurrent => self.read_p12v_current(),
+        }
     }
 
     /// reads the 3.3V rail voltage in volt
-    pub fn read_p3v3(&mut self) -> f32 {
-        let div_p3v3: f32 = 6.8 / (1.6 + 6.8); // Resistor divider 3V3 rail
-        let factor = (V_REF / self.adc1.max_sample() as f32) / div_p3v3;
-        self.read_supply(Supply::P3v3) as f32 * factor
+    pub fn read_p3v3_voltage(&mut self) -> f32 {
+        const DIV: f32 = 6.8 / (1.6 + 6.8); // Resistor divider 3V3 rail
+        let code: u32 = self.adc3.read(&mut self.pins.p3v3_voltage).unwrap();
+        code as f32 / self.adc3.max_sample() as f32 * (V_REF / DIV)
+    }
+
+    /// reads the 5V rail voltage in volt
+    pub fn read_p5v_voltage(&mut self) -> f32 {
+        const DIV: f32 = 6.8 / (10.0 + 6.8); // Resistor divider 5V rail
+        let code: u32 = self.adc1.read(&mut self.pins.p5v_voltage).unwrap();
+        code as f32 / self.adc1.max_sample() as f32 * (V_REF / DIV)
+    }
+
+    /// reads the 12V rail voltage in volt
+    pub fn read_p12v_voltage(&mut self) -> f32 {
+        const DIV: f32 = 1.6 / (1.6 + 6.8); // Resistor divider 12V rail
+        let code: u32 = self.adc1.read(&mut self.pins.p12v_voltage).unwrap();
+        code as f32 / self.adc1.max_sample() as f32 * (V_REF / DIV)
     }
 
     /// reads the 12V rail current in ampere
-    pub fn read_i12v(&mut self) -> f32 {
-        let gain_i12v: f32 = 0.005 * (10000.0 / 100.0); // 12V current measurement resistor configuration for LT6106
-        let factor = (V_REF / self.adc1.max_sample() as f32) / gain_i12v;
-        self.read_supply(Supply::I12v) as f32 * factor
+    pub fn read_p12v_current(&mut self) -> f32 {
+        const GAIN: f32 = 0.005 * (10000.0 / 100.0); // 12V current measurement resistor configuration for LT6106
+        let code: u32 = self.adc3.read(&mut self.pins.p12v_current).unwrap();
+        code as f32 / self.adc3.max_sample() as f32 * (V_REF / GAIN)
     }
 }

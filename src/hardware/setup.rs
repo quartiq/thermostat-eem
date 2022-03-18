@@ -12,10 +12,12 @@ use super::hal::{
 };
 
 use super::{
-    adc_internal::{AdcInternal, OutIPins, OutUPins, SupplyPins},
-    dac::{Dac, DacGpio},
+    adc_internal::{AdcInternal, AdcPins},
+    dac::{Dac, DacPins},
+    fan::{Fan, FanPins},
+    gpio::{Gpio, GpioPins},
     pwm::{Pwm, PwmPins},
-    EthernetPhy, LEDs, NetworkStack,
+    EthernetPhy, NetworkStack,
 };
 
 use defmt::info;
@@ -96,7 +98,9 @@ pub struct ThermostatDevices {
     pub net: NetworkDevices,
     pub dac: Dac,
     pub pwm: Pwm,
-    pub leds: LEDs,
+    pub gpio: Gpio,
+    pub fan: Fan,
+    pub adc_internal: AdcInternal,
 }
 
 #[link_section = ".sram3.eth"]
@@ -142,28 +146,145 @@ pub fn setup(
     let gpiof = device.GPIOF.split(ccdr.peripheral.GPIOF);
     let gpiog = device.GPIOG.split(ccdr.peripheral.GPIOG);
 
-    // Setup LEDs
-    let mut leds = LEDs {
-        led0: gpiog.pg9.into_push_pull_output(),
-        led1: gpiog.pg10.into_push_pull_output(),
-        led2: gpioe.pe8.into_push_pull_output(),
-        led3: gpioe.pe10.into_push_pull_output(),
-        led4: gpioe.pe12.into_push_pull_output(),
-        led5: gpiog.pg15.into_push_pull_output(),
-        led6: gpioe.pe15.into_push_pull_output(),
-        led7: gpiog.pg8.into_push_pull_output(),
+    info!("Setup GPIO");
+    let gpio_pins = GpioPins {
+        hwrev: (
+            gpiod.pd8.into_floating_input(),
+            gpiod.pd9.into_floating_input(),
+            gpiod.pd10.into_floating_input(),
+            gpiod.pd11.into_floating_input(),
+        ),
+        led: (
+            gpiog.pg9.into_push_pull_output(),
+            gpiog.pg10.into_push_pull_output(),
+            gpioe.pe8.into_push_pull_output(),
+            gpioe.pe10.into_push_pull_output(),
+            gpioe.pe12.into_push_pull_output(),
+            gpiog.pg15.into_push_pull_output(),
+            gpioe.pe15.into_push_pull_output(),
+            gpiog.pg8.into_push_pull_output(),
+        ),
+        shdn: (
+            gpiog.pg4.into_push_pull_output(),
+            gpiog.pg5.into_push_pull_output(),
+            gpiog.pg6.into_push_pull_output(),
+            gpiog.pg7.into_push_pull_output(),
+        ),
+        poe_pwr: gpiof.pf2.into_floating_input(),
+        at_event: gpioe.pe7.into_floating_input(),
+        eem_pwr: gpiod.pd0.into_push_pull_output(),
+        tec_freq: gpiod.pd2.into_push_pull_output(),
+        overtemp: gpiog.pg12.into_floating_input(),
+    };
+    let gpio = Gpio::new(gpio_pins);
+    info!("HWREV: {}", gpio.hwrev());
+    info!("PoE Power: {}", gpio.poe());
+    info!("Overtemp: {}", gpio.overtemp());
+
+    info!("Setup fan");
+    let fan = Fan::new(
+        &ccdr.clocks,
+        (ccdr.peripheral.TIM2, ccdr.peripheral.TIM8),
+        (device.TIM2, device.TIM8),
+        FanPins {
+            tacho: gpiob.pb10.into_alternate_af1(),
+            pwm: gpioc.pc7.into_alternate_af3(),
+        },
+    );
+
+    info!("Setup TEC limit PWM");
+    let pwm_pins = PwmPins {
+        voltage: (
+            gpioe.pe9.into_alternate_af1(),
+            gpioe.pe11.into_alternate_af1(),
+            gpioe.pe13.into_alternate_af1(),
+            gpioe.pe14.into_alternate_af1(),
+        ),
+        negative_current: (
+            gpioc.pc6.into_alternate_af2(),
+            gpiob.pb5.into_alternate_af2(),
+            gpioc.pc8.into_alternate_af2(),
+            gpioc.pc9.into_alternate_af2(),
+        ),
+        positive_current: (
+            gpiod.pd12.into_alternate_af2(),
+            gpiod.pd13.into_alternate_af2(),
+            gpiod.pd14.into_alternate_af2(),
+            gpiod.pd15.into_alternate_af2(),
+        ),
     };
 
-    leds.led0.set_low().unwrap();
-    leds.led1.set_low().unwrap();
-    leds.led2.set_low().unwrap();
-    leds.led3.set_low().unwrap();
-    leds.led4.set_low().unwrap();
-    leds.led5.set_low().unwrap();
-    leds.led6.set_low().unwrap();
-    leds.led7.set_low().unwrap();
+    let pwm = Pwm::new(
+        &ccdr.clocks,
+        (
+            ccdr.peripheral.TIM1,
+            ccdr.peripheral.TIM3,
+            ccdr.peripheral.TIM4,
+        ),
+        (device.TIM1, device.TIM3, device.TIM4),
+        pwm_pins,
+    );
 
-    info!("-- Setup Ethernet");
+    info!("Setup TEC driver DACs");
+    let dac = Dac::new(
+        &ccdr.clocks,
+        ccdr.peripheral.SPI3,
+        device.SPI3,
+        gpioc.pc10.into_alternate_af6(),
+        gpioc.pc12.into_alternate_af6(),
+        DacPins {
+            sync: (
+                gpiog.pg3.into_push_pull_output(),
+                gpiog.pg2.into_push_pull_output(),
+                gpiog.pg1.into_push_pull_output(),
+                gpiog.pg0.into_push_pull_output(),
+            ),
+        },
+    );
+
+    info!("Setup CPU ADCs");
+    let adc_pins = AdcPins {
+        output_voltage: (
+            gpioc.pc3.into_analog(),
+            gpioa.pa0.into_analog(),
+            gpioa.pa3.into_analog(),
+            gpioa.pa4.into_analog(),
+        ),
+        output_current: (
+            gpioa.pa5.into_analog(),
+            gpioa.pa6.into_analog(),
+            gpiob.pb0.into_analog(),
+            gpiob.pb1.into_analog(),
+        ),
+        output_vref: (
+            gpiof.pf3.into_analog(),
+            gpiof.pf4.into_analog(),
+            gpiof.pf5.into_analog(),
+            gpiof.pf6.into_analog(),
+        ),
+        p3v3_voltage: gpiof.pf7.into_analog(),
+        p5v_voltage: gpioc.pc0.into_analog(),
+        p12v_voltage: gpioc.pc2.into_analog(),
+        p12v_current: gpiof.pf8.into_analog(),
+    };
+
+    let mut adc_internal = AdcInternal::new(
+        &mut delay,
+        &ccdr.clocks,
+        (ccdr.peripheral.ADC12, ccdr.peripheral.ADC3),
+        (device.ADC1, device.ADC2, device.ADC3),
+        adc_pins,
+    );
+
+    info!("P3V3: {} V", adc_internal.read_p3v3_voltage());
+    info!("P5V: {} V", adc_internal.read_p5v_voltage());
+    info!(
+        "P12V: {} V, {} A",
+        adc_internal.read_p12v_voltage(),
+        adc_internal.read_p12v_current()
+    );
+
+    info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
     log::info!("EUI48: {}", mac_addr);
 
@@ -226,7 +347,6 @@ pub fn setup(
             )
         };
 
-        info!("Ethernet PHY pins bound");
         // Configure the ethernet controller
         let (eth_dma, eth_mac) = ethernet::new(
             device.ETHERNET_MAC,
@@ -248,7 +368,6 @@ pub fn setup(
 
         unsafe { ethernet::enable_interrupt() };
 
-        info!("Configure TCP/UDP buffers and neighbour/routing caches");
         // Note(unwrap): The hardware configuration function is only allowed to be called once.
         // Unwrapping is intended to panic if called again to prevent re-use of global memory.
         let store = cortex_m::singleton!(: NetStorage = NetStorage::default()).unwrap();
@@ -313,8 +432,6 @@ pub fn setup(
 
         stack.seed_random_port(&random_seed);
 
-        info!("-- Setup Ethernet done.");
-
         NetworkDevices {
             stack,
             phy: lan8742a,
@@ -322,98 +439,14 @@ pub fn setup(
         }
     };
 
-    info!("Setup PWM");
-
-    let pwm_pins = PwmPins {
-        voltage0: gpioe.pe9.into_alternate_af1(),
-        voltage1: gpioe.pe11.into_alternate_af1(),
-        voltage2: gpioe.pe13.into_alternate_af1(),
-        voltage3: gpioe.pe14.into_alternate_af1(),
-        positive_current0: gpiod.pd12.into_alternate_af2(),
-        positive_current1: gpiod.pd13.into_alternate_af2(),
-        positive_current2: gpiod.pd14.into_alternate_af2(),
-        positive_current3: gpiod.pd15.into_alternate_af2(),
-        negative_current0: gpioc.pc6.into_alternate_af2(),
-        negative_current1: gpiob.pb5.into_alternate_af2(),
-        negative_current2: gpioc.pc8.into_alternate_af2(),
-        negative_current3: gpioc.pc9.into_alternate_af2(),
-    };
-
-    let pwm = Pwm::new(
-        &ccdr.clocks,
-        (
-            ccdr.peripheral.TIM1,
-            ccdr.peripheral.TIM3,
-            ccdr.peripheral.TIM4,
-        ),
-        (device.TIM1, device.TIM3, device.TIM4),
-        pwm_pins,
-    );
-
-    info!("Setup DAC");
-
-    let dac_pins = DacGpio {
-        sync0: gpiog.pg3.into_push_pull_output(),
-        sync1: gpiog.pg2.into_push_pull_output(),
-        sync2: gpiog.pg1.into_push_pull_output(),
-        sync3: gpiog.pg0.into_push_pull_output(),
-        shdn0: gpiog.pg4.into_push_pull_output(),
-        shdn1: gpiog.pg5.into_push_pull_output(),
-        shdn2: gpiog.pg6.into_push_pull_output(),
-        shdn3: gpiog.pg7.into_push_pull_output(),
-    };
-
-    let dac = Dac::new(
-        &ccdr.clocks,
-        ccdr.peripheral.SPI3,
-        device.SPI3,
-        gpioc.pc10.into_alternate_af6(),
-        gpioc.pc12.into_alternate_af6(),
-        dac_pins,
-    );
-
-    info!("setup internal ADCs");
-
-    let out_u_pins: OutUPins = (
-        gpioc.pc3.into_analog(),
-        gpioa.pa0.into_analog(),
-        gpioa.pa3.into_analog(),
-        gpioa.pa4.into_analog(),
-    );
-    let out_i_pins: OutIPins = (
-        gpioa.pa5.into_analog(),
-        gpioa.pa6.into_analog(),
-        gpiob.pb0.into_analog(),
-        gpiob.pb1.into_analog(),
-    );
-    let supply_pins: SupplyPins = (
-        gpioc.pc0.into_analog(),
-        gpioc.pc2.into_analog(),
-        gpiof.pf7.into_analog(),
-        gpiof.pf8.into_analog(),
-    );
-
-    let mut adc_int = AdcInternal::new(
-        &mut delay,
-        &ccdr.clocks,
-        (ccdr.peripheral.ADC12, ccdr.peripheral.ADC3),
-        (device.ADC1, device.ADC2, device.ADC3),
-        supply_pins,
-        out_u_pins,
-        out_i_pins,
-    );
-
-    info!("P12v: {:?} V", adc_int.read_p12v());
-    info!("P5v: {:?} V", adc_int.read_p5v());
-    info!("P3v3: {:?} V", adc_int.read_p3v3());
-    info!("I12v: {:?} A", adc_int.read_i12v());
-
-    info!("--- Hardware setup done.");
+    info!("--- Hardware setup done");
 
     ThermostatDevices {
         net,
         dac,
         pwm,
-        leds,
+        gpio,
+        fan,
+        adc_internal,
     }
 }

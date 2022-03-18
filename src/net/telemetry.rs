@@ -25,42 +25,6 @@ pub struct TelemetryClient<T: Serialize> {
     _telemetry: core::marker::PhantomData<T>,
 }
 
-/// The telemetry buffer is used for storing sample values during execution.
-///
-/// # Note
-/// These values can be converted to SI units immediately before reporting to save processing time.
-/// This allows for the DSP process to continually update the values without incurring significant
-/// run-time overhead during conversion to SI units.
-#[derive(Copy, Clone)]
-pub struct TelemetryBuffer {
-    pub led: bool,
-}
-
-/// The telemetry structure is data that is ultimately reported as telemetry over MQTT.
-///
-/// # Note
-/// This structure should be generated on-demand by the buffer when required to minimize conversion
-/// overhead.
-#[derive(Serialize)]
-pub struct Telemetry {
-    pub led: bool,
-}
-
-impl Default for TelemetryBuffer {
-    fn default() -> Self {
-        Self { led: false }
-    }
-}
-
-impl TelemetryBuffer {
-    /// Convert the telemetry buffer to finalized, SI-unit telemetry for reporting.
-    /// # Returns
-    /// The finalized telemetry structure that can be serialized and reported.
-    pub fn finalize(self) -> Telemetry {
-        Telemetry { led: self.led }
-    }
-}
-
 impl<T: Serialize> TelemetryClient<T> {
     /// Construct a new telemetry client.
     ///

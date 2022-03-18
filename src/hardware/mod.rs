@@ -7,6 +7,8 @@ pub use stm32h7xx_hal as hal;
 
 pub mod adc_internal;
 pub mod dac;
+pub mod fan;
+pub mod gpio;
 pub mod pwm;
 pub mod setup;
 pub mod system_timer;
@@ -35,27 +37,11 @@ pub type NetworkManager = smoltcp_nal::shared::NetworkManager<
 
 pub type EthernetPhy = hal::ethernet::phy::LAN8742A<hal::ethernet::EthernetMAC>;
 
-// Front LEDs.
-pub struct LEDs {
-    pub led0: hal::gpio::gpiog::PG9<hal::gpio::Output<hal::gpio::PushPull>>,
-    pub led1: hal::gpio::gpiog::PG10<hal::gpio::Output<hal::gpio::PushPull>>,
-    pub led2: hal::gpio::gpioe::PE8<hal::gpio::Output<hal::gpio::PushPull>>,
-    pub led3: hal::gpio::gpioe::PE10<hal::gpio::Output<hal::gpio::PushPull>>,
-    pub led4: hal::gpio::gpioe::PE12<hal::gpio::Output<hal::gpio::PushPull>>,
-    pub led5: hal::gpio::gpiog::PG15<hal::gpio::Output<hal::gpio::PushPull>>,
-    pub led6: hal::gpio::gpioe::PE15<hal::gpio::Output<hal::gpio::PushPull>>,
-    pub led7: hal::gpio::gpiog::PG8<hal::gpio::Output<hal::gpio::PushPull>>,
-}
-
 #[derive(Clone, Copy, TryFromPrimitive)]
 #[repr(usize)]
-pub enum Channel {
-    Ch0 = 0,
-    Ch1 = 1,
-    Ch2 = 2,
-    Ch3 = 3,
+pub enum OutputChannel {
+    Zero = 0,
+    One = 1,
+    Two = 2,
+    Three = 3,
 }
-
-// DAC and PWM shared constants
-const R_SENSE: f32 = 0.05; // TEC current sense resistor
-const VREF_TEC: f32 = 1.5; // TEC driver reference voltage
