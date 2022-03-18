@@ -42,7 +42,6 @@ pub enum Error {
 /// DAC gpio pins.
 ///
 /// sync<n> - DAC IC adressing signals
-/// shdn<n> - TEC driver shutdown signals
 /// * <n> specifies Thermostat output channel
 #[allow(clippy::type_complexity)]
 pub struct DacPins {
@@ -69,7 +68,7 @@ impl Dac {
     /// * `spi3` - SPI3 peripheral
     /// * `sck` - SPI3 sck pin
     /// * `mosi` - SPI3 mosi pin
-    /// * `gpio` - DAC gpios including DAC sync pins and TEC shutdown pins.
+    /// * `pins` - DAC sync pins.
     pub fn new(
         clocks: &CoreClocks,
         spi3_rec: rec::Spi3,
