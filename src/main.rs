@@ -13,6 +13,7 @@ use defmt_rtt as _; // global logger
 use panic_probe as _; // gloibal panic handler
 
 use hardware::{
+    adc_internal::AdcInternal,
     dac::Dac,
     gpio::{Gpio, Led, PoePower},
     hal,
@@ -118,8 +119,6 @@ pub struct Telemetry {
 
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
 mod app {
-    use hardware::adc_internal::AdcInternal;
-
     use super::*;
 
     #[monotonic(binds = SysTick, default = true)]
