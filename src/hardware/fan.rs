@@ -10,7 +10,6 @@ use super::hal::{
     time::KiloHertz,
 };
 
-#[allow(clippy::type_complexity)]
 pub struct FanPins {
     pub tacho: PB10<Alternate<AF1>>,
     pub pwm: PC7<Alternate<AF3>>,
@@ -20,7 +19,6 @@ pub enum Error {
     Bounds,
 }
 
-#[allow(clippy::type_complexity)]
 pub struct Fan {
     pwm: Pwm<TIM8, C2, ComplementaryDisabled, ActiveHigh, ActiveHigh>,
     // tacho:
