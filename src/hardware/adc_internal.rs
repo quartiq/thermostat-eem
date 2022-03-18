@@ -51,7 +51,7 @@ impl AdcInternal {
         adc: (ADC1, ADC2, ADC3),
         pins: AdcPins,
     ) -> Self {
-        // Setup ADC1 and ADC2
+        // Setup ADCs
         let (adc1, _adc2) = adc::adc12(adc.0, adc.1, delay, adc_rcc.0, clocks);
         let adc3 = adc::Adc::adc3(adc.2, delay, adc_rcc.1, clocks);
 
@@ -82,7 +82,7 @@ impl AdcInternal {
             OutputChannel::Three => self.adc1.read(&mut p.3),
         }
         .unwrap();
-        const SCALE: f32 = V_REF * 20.0 / 5.0; // Differential voltage sense gain
+        const SCALE: f32 = -V_REF * 20.0 / 5.0; // Differential voltage sense gain
         const OFFSET: f32 = -VREF_TEC / V_REF; // Differential voltage sense offset
         (code as f32 / self.adc1.max_sample() as f32 + OFFSET) * SCALE
     }
