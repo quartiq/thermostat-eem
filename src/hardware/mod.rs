@@ -5,6 +5,7 @@
 use num_enum::TryFromPrimitive;
 pub use stm32h7xx_hal as hal;
 
+pub mod ad7172;
 pub mod adc;
 pub mod adc_internal;
 pub mod dac;
