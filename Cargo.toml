@@ -25,8 +25,7 @@ num_enum = { version = "0.5.6", default-features = false }
 defmt = "0.3.0"
 defmt-rtt = "0.3.0"
 num-traits = { version = "0.2", default-features = false, features = ["libm"] }
-byteorder = { version = "1", default-features = false }
-
+shared-bus = { version = "0.2", features = ["cortex-m"] }
 
 [profile.dev]
 opt-level = 3

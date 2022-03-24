@@ -4,7 +4,10 @@ use defmt::info;
 
 use super::hal::{
     gpio::{gpioe::*, Output, PushPull},
-    hal::{blocking::spi::Transfer, digital::v2::OutputPin},
+    hal::{
+        blocking::spi::{Transfer, Write},
+        digital::v2::OutputPin,
+    },
     spi::Enabled,
     spi::Spi,
     stm32::SPI4,
@@ -51,12 +54,18 @@ enum Setupcon {
     DIAREF = 11 << 4,     // diagnostic reference
 }
 
-pub struct Ad7172 {
+pub struct Ad7172<SPI>
+where
+    SPI: Transfer<u8> + Write<u8>,
+{
     spi: Spi<SPI4, Enabled, u8>,
     cs: PE0<Output<PushPull>>,
 }
 
-impl Ad7172 {
+impl<SPI> Ad7172<SPI>
+where
+    SPI: Transfer<u8> + Write<u8>,
+{
     pub fn new(spi: Spi<SPI4, Enabled, u8>, mut cs: PE0<Output<PushPull>>) -> Self {
         // set all CS high first
         cs.set_high().unwrap();

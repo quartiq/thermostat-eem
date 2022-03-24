@@ -1,7 +1,8 @@
-// Thermostat ADC driver
-// (AD7172 https://www.analog.com/media/en/technical-documentation/data-sheets/AD7172-2.pdf)
+// Thermostat ADC struct.
 
 use num_enum::TryFromPrimitive;
+use shared_bus::{SpiProxy, BusMutex};
+use stm32h7xx_hal::adc::Enabled;
 
 use super::ad7172::Ad7172;
 
@@ -47,7 +48,8 @@ pub struct AdcPins {
 
 pub struct Adc {
     // spi: Spi<SPI4, Enabled, u8>,
-    pub adcs: Ad7172,
+    pub adcs: Ad7172<SpiProxy<'static, shared_bus::NullMutex<Spi<SPI4, Enabled>>>>,
+    // pub adcs: Ad7172<SpiProxy<'static>>,
 }
 
 impl Adc {
@@ -77,7 +79,9 @@ impl Adc {
         let spi: Spi<_, _, u8> =
             spi4.spi((sck, miso, mosi), spi::MODE_0, 1.mhz(), spi4_rec, clocks);
 
-        let ad7172 = Ad7172::new(spi, pins.cs.0);
+        let bus_manager = shared_bus::BusManagerSimple::new(spi);
+
+        let ad7172 = Ad7172::new(bus_manager.acquire_spi(), pins.cs.0);
 
         let adc = Adc { adcs: ad7172 };
         adc

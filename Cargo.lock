@@ -890,7 +890,6 @@ name = "thermostat-eem"
 version = "0.1.0"
 dependencies = [
  "asm-delay",
- "byteorder",
  "cortex-m 0.7.4",
  "cortex-m-rt",
  "cortex-m-rtic",
@@ -906,6 +905,7 @@ dependencies = [
  "panic-probe",
  "serde",
  "serde-json-core",
+ "shared-bus",
  "smoltcp-nal",
  "stm32h7xx-hal",
  "systick-monotonic",
