@@ -97,9 +97,9 @@ impl Adc {
     /// * `clocks` - Reference to CoreClocks
     /// * `pins` - DAC chip select pins.
     pub fn new(
+        clocks: &CoreClocks,
         spi4_rec: rec::Spi4,
         spi4: SPI4,
-        clocks: &CoreClocks,
         sck: PE2<Alternate<AF5>>,
         miso: PE5<Alternate<AF5>>,
         mosi: PE6<Alternate<AF5>>,

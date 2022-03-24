@@ -285,6 +285,25 @@ pub fn setup(
         adc_internal.read_p12v_current()
     );
 
+    info!("Setup ADC");
+
+    let mut adc = Adc::new(
+        &ccdr.clocks,
+        ccdr.peripheral.SPI4,
+        device.SPI4,
+        gpioe.pe2.into_alternate_af5(),
+        gpioe.pe5.into_alternate_af5(),
+        gpioe.pe6.into_alternate_af5(),
+        AdcPins {
+            cs: (
+                gpioe.pe0.into_push_pull_output(),
+                gpioe.pe1.into_push_pull_output(),
+                gpioe.pe3.into_push_pull_output(),
+                gpioe.pe4.into_push_pull_output(),
+            ),
+        },
+    );
+
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
     log::info!("EUI48: {}", mac_addr);
