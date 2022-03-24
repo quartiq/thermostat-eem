@@ -1,8 +1,9 @@
 // Thermostat ADC struct.
 
+use cortex_m;
 use num_enum::TryFromPrimitive;
-use shared_bus::{SpiProxy, BusMutex};
-use stm32h7xx_hal::adc::Enabled;
+use shared_bus::{BusMutex, SpiProxy};
+use stm32h7xx_hal::spi::Enabled;
 
 use super::ad7172::Ad7172;
 
@@ -79,7 +80,9 @@ impl Adc {
         let spi: Spi<_, _, u8> =
             spi4.spi((sck, miso, mosi), spi::MODE_0, 1.mhz(), spi4_rec, clocks);
 
-        let bus_manager = shared_bus::BusManagerSimple::new(spi);
+        let bus_manager = cortex_m::singleton!(:
+            shared_bus::BusManager<shared_bus::NullMutex<stm32h7xx_hal::spi::Spi<stm32h7xx_hal::stm32::SPI4, stm32h7xx_hal::spi::Enabled>>> =
+            shared_bus::BusManagerSimple::new(spi)).unwrap();
 
         let ad7172 = Ad7172::new(bus_manager.acquire_spi(), pins.cs.0);
 
