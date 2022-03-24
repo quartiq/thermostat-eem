@@ -27,7 +27,7 @@ pub enum AdcChannel {
     Supply(Supply),
 }
 
-pub struct AdcPins {
+pub struct AdcInternalPins {
     pub output_voltage: (PC3<Analog>, PA0<Analog>, PA3<Analog>, PA4<Analog>),
     pub output_current: (PA5<Analog>, PA6<Analog>, PB0<Analog>, PB1<Analog>),
     pub output_vref: (PF3<Analog>, PF4<Analog>, PF5<Analog>, PF6<Analog>),
@@ -40,7 +40,7 @@ pub struct AdcPins {
 pub struct AdcInternal {
     adc1: adc::Adc<ADC1, adc::Enabled>,
     adc3: adc::Adc<ADC3, adc::Enabled>,
-    pins: AdcPins,
+    pins: AdcInternalPins,
 }
 
 impl AdcInternal {
@@ -49,7 +49,7 @@ impl AdcInternal {
         clocks: &CoreClocks,
         adc_rcc: (rec::Adc12, rec::Adc3),
         adc: (ADC1, ADC2, ADC3),
-        pins: AdcPins,
+        pins: AdcInternalPins,
     ) -> Self {
         // Setup ADCs
         let (adc1, _adc2) = adc::adc12(adc.0, adc.1, delay, adc_rcc.0, clocks);

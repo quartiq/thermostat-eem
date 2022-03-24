@@ -12,7 +12,8 @@ use super::hal::{
 };
 
 use super::{
-    adc_internal::{AdcInternal, AdcPins},
+    // adc::{Adc, AdcPins},
+    adc_internal::{AdcInternal, AdcInternalPins},
     dac::{Dac, DacPins},
     fan::{Fan, FanPins},
     gpio::{Gpio, GpioPins},
@@ -243,7 +244,7 @@ pub fn setup(
     );
 
     info!("Setup CPU ADCs");
-    let adc_pins = AdcPins {
+    let adc_internal_pins = AdcInternalPins {
         output_voltage: (
             gpioc.pc3.into_analog(),
             gpioa.pa0.into_analog(),
@@ -273,7 +274,7 @@ pub fn setup(
         &ccdr.clocks,
         (ccdr.peripheral.ADC12, ccdr.peripheral.ADC3),
         (device.ADC1, device.ADC2, device.ADC3),
-        adc_pins,
+        adc_internal_pins,
     );
 
     info!("P3V3: {} V", adc_internal.read_p3v3_voltage());
