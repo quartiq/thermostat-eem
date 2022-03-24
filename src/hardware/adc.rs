@@ -3,6 +3,7 @@
 
 use byteorder::{BigEndian, ByteOrder};
 use log::{info, warn};
+use num_enum::TryFromPrimitive;
 
 use super::hal::{
     gpio::{gpioe::*, Alternate, Output, PushPull, AF5},
@@ -13,16 +14,28 @@ use super::hal::{
     spi::Enabled,
     spi::Spi,
     stm32::SPI4,
-    time::MegaHertz,
 };
 
-/// SPI Mode 3
-pub const SPI_MODE: spi::Mode = spi::Mode {
-    polarity: spi::Polarity::IdleHigh,
-    phase: spi::Phase::CaptureOnSecondTransition,
-};
+#[derive(Clone, Copy, TryFromPrimitive)]
+#[repr(usize)]
+pub enum InputChannel {
+    Zero = 0,
+    One = 1,
+    Two = 2,
+    Three = 3,
+    Four = 4,
+    Five = 5,
+    Six = 6,
+    Seven = 7,
+}
 
-pub const SPI_CLOCK: MegaHertz = MegaHertz(2);
+// Physical ADC devices on Thermostat
+pub enum AdcPhy {
+    Zero = 0,
+    One = 1,
+    Two = 2,
+    Three = 3,
+}
 
 // ADC Register Adresses
 #[allow(unused)]
@@ -65,15 +78,6 @@ enum Setupcon {
     DIAREF = 11 << 4,     // diagnostic reference
 }
 
-pub type AdcSpi = Spi<
-    SPI4,
-    (
-        PE2<Alternate<AF5>>,
-        PE5<Alternate<AF5>>,
-        PE6<Alternate<AF5>>,
-    ),
->;
-
 pub struct AdcPins {
     pub cs: (
         PE0<Output<PushPull>>,
@@ -111,6 +115,7 @@ impl Adc {
         pins.cs.2.set_high().unwrap();
         pins.cs.3.set_high().unwrap();
 
+        // SPI at 1 MHz. SPI MODE_0: idle low, capture on first transition
         let spi: Spi<_, _, u8> =
             spi4.spi((sck, miso, mosi), spi::MODE_0, 1.mhz(), spi4_rec, clocks);
         let mut adc = Adc { spi, pins };
@@ -145,37 +150,23 @@ impl Adc {
         };
     }
 
-    /// Read a ADC register of size in bytes.
-    fn read_reg(&mut self, addr: AdcReg, size: u8) -> u32 {
-        let mut buf = [addr as u8 | 0x40, 0, 0, 0, 0];
+    /// Read a ADC register of size in bytes. Max. size 3 bytes.
+    fn read_reg(&mut self, addr: AdcReg, size: usize) -> u32 {
         self.pins.cs.0.set_low().unwrap();
-
-        self.spi.transfer(&mut buf[..(size + 1) as usize]).unwrap();
-        let data = match size {
-            1 => buf[1].clone() as u32,
-            2 => BigEndian::read_u16(&buf[1..3]) as u32,
-            3 => BigEndian::read_u24(&buf[1..4]) as u32,
-            4 => BigEndian::read_u32(&buf[1..5]) as u32,
-            _ => 0,
-        };
+        let mut buf = [0u8; 4];
+        buf[3 - size] = addr as u8 | 0x40; // addr with read flag
+        self.spi.transfer(&mut buf[3 - size..]).unwrap();
+        let data = u32::from_be_bytes(buf) & ((1 << size * 8) - 1);
         self.pins.cs.0.set_high().unwrap();
         return data;
     }
 
-    /// Write a ADC register of size in bytes.
-    fn write_reg(&mut self, addr: AdcReg, size: u8, data: u32) {
-        let mut addr_buf = [addr as u8];
+    /// Write a ADC register of size in bytes. Max. size 3 bytes.
+    fn write_reg(&mut self, addr: AdcReg, size: usize, data: u32) {
         self.pins.cs.0.set_low().unwrap();
-        self.spi.write(&mut addr_buf).unwrap();
-        let mut buf = [0, 0, 0, 0];
-        BigEndian::write_u32(&mut buf, data);
-        match size {
-            1 => self.spi.transfer(&mut buf[3..4]).unwrap(),
-            2 => self.spi.transfer(&mut buf[2..4]).unwrap(),
-            3 => self.spi.transfer(&mut buf[1..4]).unwrap(),
-            4 => self.spi.transfer(&mut buf[0..4]).unwrap(),
-            _ => &[0],
-        };
+        let mut buf = data.to_be_bytes();
+        buf[4 - size] = addr as _;
+        self.spi.write(&buf[4 - size..]).unwrap();
         self.pins.cs.0.set_high().unwrap();
     }
 
