@@ -12,7 +12,7 @@ use super::hal::{
 };
 
 use super::{
-    // adc::{Adc, AdcPins},
+    adc::{Adc, AdcPins},
     adc_internal::{AdcInternal, AdcInternalPins},
     dac::{Dac, DacPins},
     fan::{Fan, FanPins},
