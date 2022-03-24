@@ -12,7 +12,7 @@ use super::hal::{
 };
 
 use super::{
-    adc::{Adc, AdcPins},
+    adc::{Adc, AdcPins, AdcReg},
     adc_internal::{AdcInternal, AdcInternalPins},
     dac::{Dac, DacPins},
     fan::{Fan, FanPins},
@@ -303,6 +303,10 @@ pub fn setup(
             ),
         },
     );
+
+    adc.write_reg(AdcReg::FILTCON0, 2, 0b10101111111);
+
+    info!("FILTCON0 reg: {:b}", adc.read_reg(AdcReg::FILTCON0, 2));
 
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);

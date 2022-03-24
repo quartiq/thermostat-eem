@@ -2,7 +2,7 @@
 // (AD7172 https://www.analog.com/media/en/technical-documentation/data-sheets/AD7172-2.pdf)
 
 use byteorder::{BigEndian, ByteOrder};
-use log::{info, warn};
+use defmt::{info, warn};
 use num_enum::TryFromPrimitive;
 
 use super::hal::{
@@ -39,7 +39,7 @@ pub enum AdcPhy {
 
 // ADC Register Adresses
 #[allow(unused)]
-enum AdcReg {
+pub enum AdcReg {
     ID = 0x7,
     ADCMODE = 0x1,
     IFMODE = 0x2,
@@ -136,22 +136,23 @@ impl Adc {
 
     /// Reset ADC.  TODO: forward error up.
     pub fn reset(&mut self) {
+        // 64 cycles high for ADC reset
         let mut buf = [0xFFu8; 8];
         self.pins.cs.0.set_low().unwrap();
         let result = self.spi.transfer(&mut buf);
         self.pins.cs.0.set_high().unwrap();
-        match result {
-            Err(e) => {
-                warn!("ADC reset failed! {:?}", e)
-            }
-            Ok(_) => {
-                info!("ADC reset succeeded")
-            }
-        };
+        // match result {
+        //     Err(e) => {
+        //         warn!("ADC reset failed! {:?}", e)
+        //     }
+        //     Ok(_) => {
+        //         info!("ADC reset succeeded")
+        //     }
+        // };
     }
 
     /// Read a ADC register of size in bytes. Max. size 3 bytes.
-    fn read_reg(&mut self, addr: AdcReg, size: usize) -> u32 {
+    pub fn read_reg(&mut self, addr: AdcReg, size: usize) -> u32 {
         self.pins.cs.0.set_low().unwrap();
         let mut buf = [0u8; 4];
         buf[3 - size] = addr as u8 | 0x40; // addr with read flag
@@ -162,11 +163,11 @@ impl Adc {
     }
 
     /// Write a ADC register of size in bytes. Max. size 3 bytes.
-    fn write_reg(&mut self, addr: AdcReg, size: usize, data: u32) {
+    pub fn write_reg(&mut self, addr: AdcReg, size: usize, data: u32) {
         self.pins.cs.0.set_low().unwrap();
         let mut buf = data.to_be_bytes();
-        buf[4 - size] = addr as _;
-        self.spi.write(&buf[4 - size..]).unwrap();
+        buf[3 - size] = addr as _;
+        self.spi.transfer(&mut buf[3 - size..]).unwrap();
         self.pins.cs.0.set_high().unwrap();
     }
 
