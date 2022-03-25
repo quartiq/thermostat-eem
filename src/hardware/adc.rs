@@ -46,7 +46,12 @@ pub struct AdcPins {
 }
 
 pub struct Adc {
-    pub adcs: Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE0<Output<PushPull>>>,
+    pub adcs: (
+        Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE0<Output<PushPull>>>,
+        Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE1<Output<PushPull>>>,
+        Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE3<Output<PushPull>>>,
+        Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE4<Output<PushPull>>>,
+    ),
 }
 
 impl Adc {
@@ -81,9 +86,13 @@ impl Adc {
 
         let bus_manager = shared_bus_rtic::new!(spi, Spi<SPI4, Enabled>);
 
-        let ad7172 = Ad7172::new(bus_manager.acquire(), pins.cs.0);
-
-        let adc = Adc { adcs: ad7172 };
-        adc
+        Adc {
+            adcs: (
+                Ad7172::new(bus_manager.acquire(), pins.cs.0),
+                Ad7172::new(bus_manager.acquire(), pins.cs.1),
+                Ad7172::new(bus_manager.acquire(), pins.cs.2),
+                Ad7172::new(bus_manager.acquire(), pins.cs.3),
+            ),
+        }
     }
 }

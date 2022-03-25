@@ -305,9 +305,12 @@ pub fn setup(
         },
     );
 
-    adc.adcs.write_reg(AdcReg::FILTCON0, 2, 0b10101111111);
+    adc.adcs.0.write_reg(AdcReg::FILTCON0, 2, 0b10101111111);
 
-    info!("FILTCON0 reg: {:b}", adc.adcs.read_reg(AdcReg::FILTCON0, 2));
+    info!(
+        "FILTCON0 reg: {:b}",
+        adc.adcs.0.read_reg(AdcReg::FILTCON0, 2)
+    );
 
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
