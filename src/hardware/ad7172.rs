@@ -8,9 +8,6 @@ use super::hal::{
         blocking::spi::{Transfer, Write},
         digital::v2::OutputPin,
     },
-    spi::Enabled,
-    spi::Spi,
-    stm32::SPI4,
 };
 
 // ADC Register Adresses
@@ -58,15 +55,17 @@ pub struct Ad7172<SPI>
 where
     SPI: Transfer<u8> + Write<u8>,
 {
-    spi: Spi<SPI4, Enabled, u8>,
+    spi: SPI,
     cs: PE0<Output<PushPull>>,
 }
 
 impl<SPI> Ad7172<SPI>
 where
     SPI: Transfer<u8> + Write<u8>,
+    <SPI as Write<u8>>::Error: core::fmt::Debug,
+    <SPI as Transfer<u8>>::Error: core::fmt::Debug,
 {
-    pub fn new(spi: Spi<SPI4, Enabled, u8>, mut cs: PE0<Output<PushPull>>) -> Self {
+    pub fn new(spi: SPI, mut cs: PE0<Output<PushPull>>) -> Self {
         // set all CS high first
         cs.set_high().unwrap();
         let mut adc = Ad7172 { spi, cs };
@@ -118,7 +117,7 @@ where
         self.cs.set_low().unwrap();
         let mut buf = data.to_be_bytes();
         buf[3 - size] = addr as _;
-        self.spi.transfer(&mut buf[3 - size..]).unwrap();
+        self.spi.write(&mut buf[3 - size..]).unwrap();
         self.cs.set_high().unwrap();
     }
 

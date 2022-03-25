@@ -1,8 +1,7 @@
 // Thermostat ADC struct.
 
 use num_enum::TryFromPrimitive;
-use shared_bus::{SpiProxy, BusMutex};
-use stm32h7xx_hal::adc::Enabled;
+use shared_bus_rtic::SharedBus;
 
 use super::ad7172::Ad7172;
 
@@ -12,7 +11,7 @@ use super::hal::{
     prelude::*,
     rcc::{rec, CoreClocks},
     spi,
-    spi::Spi,
+    spi::{Enabled, Spi},
     stm32::SPI4,
 };
 
@@ -48,8 +47,8 @@ pub struct AdcPins {
 
 pub struct Adc {
     // spi: Spi<SPI4, Enabled, u8>,
-    pub adcs: Ad7172<SpiProxy<'static, shared_bus::NullMutex<Spi<SPI4, Enabled>>>>,
-    // pub adcs: Ad7172<SpiProxy<'static>>,
+    pub adcs: Ad7172<SharedBus<Spi<SPI4, Enabled>>>,
+    // bus_manager: &'static _
 }
 
 impl Adc {
@@ -79,11 +78,15 @@ impl Adc {
         let spi: Spi<_, _, u8> =
             spi4.spi((sck, miso, mosi), spi::MODE_0, 1.mhz(), spi4_rec, clocks);
 
-        let bus_manager = shared_bus::BusManagerSimple::new(spi);
+        let bus_manager = shared_bus_rtic::new!(spi, Spi<SPI4, Enabled>);
+        // shared_bus::BusManagerSimple::new(spi);
 
-        let ad7172 = Ad7172::new(bus_manager.acquire_spi(), pins.cs.0);
+        let ad7172 = Ad7172::new(bus_manager.acquire(), pins.cs.0);
 
-        let adc = Adc { adcs: ad7172 };
+        let adc = Adc {
+            adcs: ad7172,
+            // bus_manager: bus_manager,
+        };
         adc
     }
 }

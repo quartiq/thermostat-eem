@@ -372,18 +372,18 @@ pub fn setup(
         };
 
         // Configure the ethernet controller
-        // let (eth_dma, eth_mac) = ethernet::new(
-        //     device.ETHERNET_MAC,
-        //     device.ETHERNET_MTL,
-        //     device.ETHERNET_DMA,
-        //     ethernet_pins,
-        //     // Note(unsafe): We only call this function once to take ownership of the
-        //     // descriptor ring.
-        //     unsafe { &mut DES_RING },
-        //     mac_addr,
-        //     ccdr.peripheral.ETH1MAC,
-        //     &ccdr.clocks,
-        // );
+        let (eth_dma, eth_mac) = ethernet::new(
+            device.ETHERNET_MAC,
+            device.ETHERNET_MTL,
+            device.ETHERNET_DMA,
+            ethernet_pins,
+            // Note(unsafe): We only call this function once to take ownership of the
+            // descriptor ring.
+            unsafe { &mut DES_RING },
+            mac_addr,
+            ccdr.peripheral.ETH1MAC,
+            &ccdr.clocks,
+        );
 
         // Reset and initialize the ethernet phy.
         let mut lan8742a = ethernet::phy::LAN8742A::new(eth_mac.set_phy_addr(0));
