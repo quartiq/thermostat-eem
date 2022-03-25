@@ -46,9 +46,7 @@ pub struct AdcPins {
 }
 
 pub struct Adc {
-    // spi: Spi<SPI4, Enabled, u8>,
     pub adcs: Ad7172<SharedBus<Spi<SPI4, Enabled>>>,
-    // bus_manager: &'static _
 }
 
 impl Adc {
@@ -79,14 +77,10 @@ impl Adc {
             spi4.spi((sck, miso, mosi), spi::MODE_0, 1.mhz(), spi4_rec, clocks);
 
         let bus_manager = shared_bus_rtic::new!(spi, Spi<SPI4, Enabled>);
-        // shared_bus::BusManagerSimple::new(spi);
 
         let ad7172 = Ad7172::new(bus_manager.acquire(), pins.cs.0);
 
-        let adc = Adc {
-            adcs: ad7172,
-            // bus_manager: bus_manager,
-        };
+        let adc = Adc { adcs: ad7172 };
         adc
     }
 }
