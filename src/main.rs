@@ -13,6 +13,7 @@ use defmt_rtt as _; // global logger
 use panic_probe as _; // gloibal panic handler
 
 use hardware::{
+    adc::Adc,
     adc_internal::AdcInternal,
     dac::Dac,
     gpio::{Gpio, Led, PoePower},
@@ -133,6 +134,7 @@ mod app {
 
     #[local]
     struct Local {
+        adc: Adc,
         dac: Dac,
         pwm: Pwm,
         adc_internal: AdcInternal,
@@ -165,6 +167,7 @@ mod app {
         telemetry_task::spawn().unwrap();
 
         let local = Local {
+            adc: thermostat.adc,
             dac: thermostat.dac,
             pwm: thermostat.pwm,
             adc_internal: thermostat.adc_internal,

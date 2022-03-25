@@ -51,10 +51,7 @@ enum Setupcon {
     DIAREF = 11 << 4,     // diagnostic reference
 }
 
-pub struct Ad7172<SPI>
-where
-    SPI: Transfer<u8> + Write<u8>,
-{
+pub struct Ad7172<SPI> {
     spi: SPI,
     cs: PE0<Output<PushPull>>,
 }

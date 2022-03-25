@@ -102,6 +102,7 @@ pub struct ThermostatDevices {
     pub gpio: Gpio,
     pub fan: Fan,
     pub adc_internal: AdcInternal,
+    pub adc: Adc,
 }
 
 #[link_section = ".sram3.eth"]
@@ -472,5 +473,6 @@ pub fn setup(
         gpio,
         fan,
         adc_internal,
+        adc,
     }
 }
