@@ -2,12 +2,9 @@
 
 use defmt::info;
 
-use super::hal::{
-    // gpio::{gpioe::*, Output, PushPull},
-    hal::{
-        blocking::spi::{Transfer, Write},
-        digital::v2::OutputPin,
-    },
+use super::hal::hal::{
+    blocking::spi::{Transfer, Write},
+    digital::v2::OutputPin,
 };
 
 // ADC Register Adresses
@@ -132,7 +129,7 @@ where
     /// Reads the data register and returns data and channel information.
     /// The DATA_STAT bit has to be set in the IFMODE register.
     pub fn read_data(&mut self) -> (u32, u8) {
-        let datach = self.read_reg(AdcReg::DATA, 4);
+        let datach = self.read_reg(AdcReg::DATA, 3);
         let ch = (datach & 0x3) as u8;
         let data = datach >> 8;
         (data, ch)
