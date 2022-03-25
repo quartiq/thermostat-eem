@@ -3,7 +3,7 @@
 use defmt::info;
 
 use super::hal::{
-    gpio::{gpioe::*, Output, PushPull},
+    // gpio::{gpioe::*, Output, PushPull},
     hal::{
         blocking::spi::{Transfer, Write},
         digital::v2::OutputPin,
@@ -51,19 +51,21 @@ enum Setupcon {
     DIAREF = 11 << 4,     // diagnostic reference
 }
 
-pub struct Ad7172<SPI> {
+pub struct Ad7172<SPI, CS> {
     spi: SPI,
-    cs: PE0<Output<PushPull>>,
+    cs: CS,
 }
 
-impl<SPI> Ad7172<SPI>
+impl<SPI, CS> Ad7172<SPI, CS>
 where
     SPI: Transfer<u8> + Write<u8>,
     <SPI as Write<u8>>::Error: core::fmt::Debug,
     <SPI as Transfer<u8>>::Error: core::fmt::Debug,
+    CS: OutputPin,
+    <CS>::Error: core::fmt::Debug,
 {
-    pub fn new(spi: SPI, mut cs: PE0<Output<PushPull>>) -> Self {
-        // set all CS high first
+    pub fn new(spi: SPI, mut cs: CS) -> Self {
+        // set CS high first
         cs.set_high().unwrap();
         let mut adc = Ad7172 { spi, cs };
         adc.reset();

@@ -46,7 +46,7 @@ pub struct AdcPins {
 }
 
 pub struct Adc {
-    pub adcs: Ad7172<SharedBus<Spi<SPI4, Enabled>>>,
+    pub adcs: Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE0<Output<PushPull>>>,
 }
 
 impl Adc {
