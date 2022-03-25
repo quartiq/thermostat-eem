@@ -53,9 +53,12 @@ impl Adc {
     /// Construct a new ADC driver for all Thermostat input channels.
     ///
     /// # Args
+    /// * `clocks` - Reference to CoreClocks
     /// * `spi4_rec` - Peripheral Reset and Enable Control for SPI4
     /// * `spi4` - SPI4 peripheral
-    /// * `clocks` - Reference to CoreClocks
+    /// * `sck` - Spi sck pin
+    /// * `miso` - Spi miso pin
+    /// * `mosi` - Spi mosi pin
     /// * `pins` - ADC chip select pins.
     pub fn new(
         clocks: &CoreClocks,
