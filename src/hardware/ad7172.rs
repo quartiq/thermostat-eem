@@ -1,5 +1,9 @@
 // (AD7172 https://www.analog.com/media/en/technical-documentation/data-sheets/AD7172-2.pdf)
 
+// use core::fmt::Error;
+
+use core::fmt::Debug;
+
 use defmt::info;
 
 use super::hal::hal::{
@@ -48,6 +52,12 @@ enum Setupcon {
     DIAREF = 11 << 4,     // diagnostic reference
 }
 
+/// DAC value out of bounds error.
+#[derive(Debug)]
+pub enum Error {
+    AdcId,
+}
+
 pub struct Ad7172<SPI, CS> {
     spi: SPI,
     cs: CS,
@@ -61,13 +71,17 @@ where
     CS: OutputPin,
     <CS>::Error: core::fmt::Debug,
 {
-    pub fn new(spi: SPI, mut cs: CS) -> Self {
+    pub fn new(spi: SPI, mut cs: CS) -> Result<Self, Error> {
         // set CS high first
         cs.set_high().unwrap();
         let mut adc = Ad7172 { spi, cs };
         adc.reset();
 
-        info!("ADC ID: {:#X}", adc.read_reg(AdcReg::ID, 2));
+        let id = adc.read_reg(AdcReg::ID, 2);
+        if id & 0xf0 != 0xd0 {
+            // check that ID is 0x00DX, as per datasheet
+            return Err(Error::AdcId);
+        }
 
         // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
         adc.write_reg(AdcReg::ADCMODE, 2, 0x8000);
@@ -77,24 +91,15 @@ where
 
         adc.setup_channels();
 
-        adc
+        Ok(adc)
     }
 
-    /// Reset ADC.  TODO: forward error up.
     pub fn reset(&mut self) {
         // 64 cycles high for ADC reset
         let mut buf = [0xFFu8; 8];
         self.cs.set_low().unwrap();
-        let _result = self.spi.transfer(&mut buf);
+        let _result = self.spi.transfer(&mut buf).unwrap();
         self.cs.set_high().unwrap();
-        // match result {
-        //     Err(e) => {
-        //         warn!("ADC reset failed! {:?}", e)
-        //     }
-        //     Ok(_) => {
-        //         info!("ADC reset succeeded")
-        //     }
-        // };
     }
 
     /// Read a ADC register of size in bytes. Max. size 3 bytes.

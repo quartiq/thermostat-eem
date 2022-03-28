@@ -88,10 +88,10 @@ impl Adc {
 
         Adc {
             adcs: (
-                Ad7172::new(bus_manager.acquire(), pins.cs.0),
-                Ad7172::new(bus_manager.acquire(), pins.cs.1),
-                Ad7172::new(bus_manager.acquire(), pins.cs.2),
-                Ad7172::new(bus_manager.acquire(), pins.cs.3),
+                Ad7172::new(bus_manager.acquire(), pins.cs.0).unwrap(),
+                Ad7172::new(bus_manager.acquire(), pins.cs.1).unwrap(),
+                Ad7172::new(bus_manager.acquire(), pins.cs.2).unwrap(),
+                Ad7172::new(bus_manager.acquire(), pins.cs.3).unwrap(),
             ),
         }
     }

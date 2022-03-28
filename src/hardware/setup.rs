@@ -311,7 +311,7 @@ pub fn setup(
         info!("data reg: {:?}", adc.adcs.1.read_data());
         info!("data reg: {:?}", adc.adcs.2.read_data());
         info!("data reg: {:?}", adc.adcs.3.read_data());
-        cortex_m::asm::delay(100000);
+        cortex_m::asm::delay(1000000);
     }
 
     info!("Setup Ethernet");
