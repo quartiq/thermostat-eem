@@ -133,6 +133,7 @@ pub fn setup(
         .per_ck(100.mhz())
         .pll2_p_ck(100.mhz())
         .pll2_q_ck(100.mhz())
+        .mco1_from_hse(2.mhz())
         .freeze(vos, &device.SYSCFG);
 
     info!("--- Starting hardware setup");
@@ -304,6 +305,14 @@ pub fn setup(
             ),
         },
     );
+
+    // enable MCO 2MHz clock output to ADCs
+    gpioa.pa8.into_alternate_af0();
+
+    loop {
+        info!("adc.adcs.0.read_data(): {:?}", adc.adcs.0.read_data());
+        cortex_m::asm::delay(1000000);
+    }
 
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
