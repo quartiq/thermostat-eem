@@ -100,12 +100,12 @@ where
     /// Read a ADC register of size in bytes. Max. size 3 bytes.
     pub fn read_reg(&mut self, addr: AdcReg, size: usize) -> u32 {
         self.cs.set_low().unwrap();
-        let mut buf = [0u8; 4];
-        buf[3 - size] = addr as u8 | 0x40; // addr with read flag
-        self.spi.transfer(&mut buf[3 - size..]).unwrap();
-        let data = u32::from_be_bytes(buf) & ((1 << size * 8) - 1);
+        let mut buf = [0u8; 8];
+        buf[7 - size] = addr as u8 | 0x40; // addr with read flag
+        self.spi.transfer(&mut buf[7 - size..]).unwrap();
+        let data = u64::from_be_bytes(buf) & ((1 << size * 8) - 1);
         self.cs.set_high().unwrap();
-        return data;
+        return data as u32;
     }
 
     /// Write a ADC register of size in bytes. Max. size 3 bytes.
@@ -129,9 +129,9 @@ where
     /// Reads the data register and returns data and channel information.
     /// The DATA_STAT bit has to be set in the IFMODE register.
     pub fn read_data(&mut self) -> (u32, u8) {
-        let datach = self.read_reg(AdcReg::DATA, 3);
-        let ch = (datach & 0x3) as u8;
-        let data = datach >> 8;
+        let data_ch = self.read_reg(AdcReg::DATA, 4);
+        let ch = (data_ch & 0x3) as u8;
+        let data = data_ch >> 8;
         (data, ch)
     }
 
