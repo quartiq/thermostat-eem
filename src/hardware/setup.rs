@@ -305,15 +305,6 @@ pub fn setup(
         },
     );
 
-    loop {
-        info!("data reg: {:?}", adc.adcs.0.read_data());
-        // info!("adcmode: {:?}", adc.adcs.0.read_reg(AdcReg::ADCMODE, 2));
-        info!("data reg: {:?}", adc.adcs.1.read_data());
-        info!("data reg: {:?}", adc.adcs.2.read_data());
-        info!("data reg: {:?}", adc.adcs.3.read_data());
-        cortex_m::asm::delay(1000000);
-    }
-
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
     log::info!("EUI48: {}", mac_addr);

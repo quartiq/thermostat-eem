@@ -78,10 +78,12 @@ where
         adc.reset();
 
         let id = adc.read_reg(AdcReg::ID, 2);
-        if id & 0xf0 != 0xd0 {
-            // check that ID is 0x00DX, as per datasheet
-            return Err(Error::AdcId);
-        }
+        // check that ID is 0x00DX, as per datasheet
+        // currently this seems to sometimes read 0x40CE sometimes. To be investigated.
+        // if id & 0xf0 == 0xd0 {
+        //     return Err(Error::AdcId);
+        // }
+        info!("adc id: {:x}", id);
 
         // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
         adc.write_reg(AdcReg::ADCMODE, 2, 0x8000);
@@ -102,7 +104,7 @@ where
         self.cs.set_high().unwrap();
     }
 
-    /// Read a ADC register of size in bytes. Max. size 3 bytes.
+    /// Read a ADC register of size in bytes. Max. size 4 bytes.
     pub fn read_reg(&mut self, addr: AdcReg, size: usize) -> u32 {
         self.cs.set_low().unwrap();
         let mut buf = [0u8; 8];
