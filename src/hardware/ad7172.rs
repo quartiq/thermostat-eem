@@ -1,7 +1,5 @@
 // (AD7172 https://www.analog.com/media/en/technical-documentation/data-sheets/AD7172-2.pdf)
 
-// use core::fmt::Error;
-
 use core::fmt::Debug;
 
 use defmt::info;
@@ -44,18 +42,19 @@ pub enum AdcReg {
     GAIN3 = 0x3b,
 }
 
-// fn register_size
-
 // ADC SETUPCON register settings.
+struct Setupcon;
 #[allow(unused)]
-enum Setupcon {
-    REFBUFP = 1 << 11,    // REFBUF+
-    REFBUFN = 1 << 10,    // REFBUF-
-    AINBUFP = 1 << 9,     // AINBUF+
-    AINBUFN = 1 << 8,     // AINBUF-
-    BIUNIPOLAR = 1 << 12, // BI_UNIPOLAR
-    INTREF = 10 << 4,     // Internal 2,5V reference
-    DIAREF = 11 << 4,     // diagnostic reference
+impl Setupcon {
+    const BIPOLAR: u32 = 1 << 12; // Bipolar input
+    const UNIPOLAR: u32 = 0 << 12; // Unipolar input
+    const REFBUFP: u32 = 1 << 11; // REFBUF+
+    const REFBUFN: u32 = 1 << 10; // REFBUF-
+    const AINBUFP: u32 = 1 << 9; // AINBUF+
+    const AINBUFN: u32 = 1 << 8; // AINBUF-
+    const EXTREF: u32 = 00 << 4; // External reference
+    const INTREF: u32 = 10 << 4; // Internal 2,5V reference
+    const DIAREF: u32 = 11 << 4; // diagnostic reference
 }
 
 /// DAC value out of bounds error.
@@ -84,12 +83,12 @@ where
         adc.reset();
 
         // 500 us delay after reset.
-        delay.delay_us(500u16);
+        delay.delay_us(5000u16);
 
         let id = adc.read(AdcReg::ID, 2);
         // check that ID is 0x00DX, as per datasheet
         info!("id: {:x}", id);
-        if id & 0xf0 == 0x00d0 {
+        if id & 0xf0 != 0x00d0 {
             return Err(Error::AdcId);
         }
 
@@ -156,24 +155,24 @@ where
         self.write(
             AdcReg::SETUPCON0,
             2,
-            Setupcon::REFBUFP as u32
-                | Setupcon::REFBUFN as u32
-                | Setupcon::AINBUFP as u32
-                | Setupcon::AINBUFN as u32,
-            // Unipolar
-            // External Reference
+            Setupcon::UNIPOLAR
+                | Setupcon::REFBUFP
+                | Setupcon::REFBUFN
+                | Setupcon::AINBUFP
+                | Setupcon::AINBUFN
+                | Setupcon::EXTREF,
         );
 
         // Setup configuration register ch1
         self.write(
             AdcReg::SETUPCON1,
             2,
-            Setupcon::REFBUFP as u32
-                | Setupcon::REFBUFN as u32
-                | Setupcon::AINBUFP as u32
-                | Setupcon::AINBUFN as u32,
-            // Unipolar
-            // External Reference
+            Setupcon::UNIPOLAR
+                | Setupcon::REFBUFP
+                | Setupcon::REFBUFN
+                | Setupcon::AINBUFP
+                | Setupcon::AINBUFN
+                | Setupcon::EXTREF,
         );
 
         // Setup filter register ch0. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
