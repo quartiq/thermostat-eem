@@ -7,17 +7,21 @@ use core::fmt::Debug;
 use defmt::info;
 
 use super::hal::hal::{
-    blocking::spi::{Transfer, Write},
+    blocking::{
+        delay::DelayUs,
+        spi::{Transfer, Write},
+    },
     digital::v2::OutputPin,
 };
 
 // ADC Register Adresses
 #[allow(unused)]
 pub enum AdcReg {
-    ID = 0x7,
+    STATUS = 0x00,
     ADCMODE = 0x1,
     IFMODE = 0x2,
     DATA = 0x04,
+    ID = 0x7,
     FILTCON0 = 0x28,
     FILTCON1 = 0x29,
     FILTCON2 = 0x2a,
@@ -39,6 +43,8 @@ pub enum AdcReg {
     GAIN2 = 0x3a,
     GAIN3 = 0x3b,
 }
+
+// fn register_size
 
 // ADC SETUPCON register settings.
 #[allow(unused)]
@@ -71,19 +77,20 @@ where
     CS: OutputPin,
     <CS>::Error: core::fmt::Debug,
 {
-    pub fn new(spi: SPI, mut cs: CS) -> Result<Self, Error> {
+    pub fn new(delay: &mut impl DelayUs<u16>, spi: SPI, mut cs: CS) -> Result<Self, Error> {
         // set CS high first
         cs.set_high().unwrap();
         let mut adc = Ad7172 { spi, cs };
         adc.reset();
 
+        // 500 us delay after reset.
+        delay.delay_us(500u16);
+
         let id = adc.read_reg(AdcReg::ID, 2);
         // check that ID is 0x00DX, as per datasheet
-        // currently this seems to sometimes read 0x40CE sometimes. To be investigated.
-        // if id & 0xf0 == 0xd0 {
-        //     return Err(Error::AdcId);
-        // }
-        info!("adc id: {:x}", id);
+        if id & 0xf0 == 0xd0 {
+            return Err(Error::AdcId);
+        }
 
         // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
         adc.write_reg(AdcReg::ADCMODE, 2, 0x8008);
@@ -106,21 +113,22 @@ where
 
     /// Read a ADC register of size in bytes. Max. size 4 bytes.
     pub fn read_reg(&mut self, addr: AdcReg, size: usize) -> u32 {
-        self.cs.set_low().unwrap();
         let mut buf = [0u8; 8];
         buf[7 - size] = addr as u8 | 0x40; // addr with read flag
+        self.cs.set_low().unwrap();
         self.spi.transfer(&mut buf[7 - size..]).unwrap();
-        let data = u64::from_be_bytes(buf) & ((1 << size * 8) - 1);
         self.cs.set_high().unwrap();
+        let data = u64::from_be_bytes(buf) & ((1 << size * 8) - 1);
         return data as u32;
+        // return (buf[7-size], data);
     }
 
     /// Write a ADC register of size in bytes. Max. size 3 bytes.
     pub fn write_reg(&mut self, addr: AdcReg, size: usize, data: u32) {
-        self.cs.set_low().unwrap();
         let mut buf = data.to_be_bytes();
         buf[3 - size] = addr as _;
-        self.spi.write(&mut buf[3 - size..]).unwrap();
+        self.cs.set_low().unwrap();
+        self.spi.write(&mut buf[3 - size..]).unwrap(); // transfer and give status back
         self.cs.set_high().unwrap();
     }
 
@@ -134,7 +142,7 @@ where
     }
 
     /// Reads the data register and returns data and channel information.
-    /// The DATA_STAT bit has to be set in the IFMODE register.
+    /// The DATA_STAT bit has to be set in the IFMODE register
     pub fn read_data(&mut self) -> (u32, u8) {
         let data_ch = self.read_reg(AdcReg::DATA, 4);
         let ch = (data_ch & 0x3) as u8;

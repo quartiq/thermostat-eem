@@ -7,6 +7,7 @@ use super::ad7172::Ad7172;
 
 use super::hal::{
     gpio::{gpioe::*, Alternate, Output, PushPull, AF5},
+    hal::blocking::delay::DelayUs,
     hal::digital::v2::OutputPin,
     prelude::*,
     rcc::{rec, CoreClocks},
@@ -66,6 +67,7 @@ impl Adc {
     /// * `mosi` - Spi mosi pin
     /// * `pins` - ADC chip select pins.
     pub fn new(
+        delay: &mut impl DelayUs<u16>,
         clocks: &CoreClocks,
         spi4_rec: rec::Spi4,
         spi4: SPI4,
@@ -88,10 +90,10 @@ impl Adc {
 
         Adc {
             adcs: (
-                Ad7172::new(bus_manager.acquire(), pins.cs.0).unwrap(),
-                Ad7172::new(bus_manager.acquire(), pins.cs.1).unwrap(),
-                Ad7172::new(bus_manager.acquire(), pins.cs.2).unwrap(),
-                Ad7172::new(bus_manager.acquire(), pins.cs.3).unwrap(),
+                Ad7172::new(delay, bus_manager.acquire(), pins.cs.0).unwrap(),
+                Ad7172::new(delay, bus_manager.acquire(), pins.cs.1).unwrap(),
+                Ad7172::new(delay, bus_manager.acquire(), pins.cs.2).unwrap(),
+                Ad7172::new(delay, bus_manager.acquire(), pins.cs.3).unwrap(),
             ),
         }
     }

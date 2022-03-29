@@ -290,6 +290,7 @@ pub fn setup(
     info!("Setup ADC");
 
     let mut adc = Adc::new(
+        &mut delay,
         &ccdr.clocks,
         ccdr.peripheral.SPI4,
         device.SPI4,
