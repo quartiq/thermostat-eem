@@ -118,8 +118,8 @@ where
         self.cs.set_low().unwrap();
         self.spi.transfer(&mut buf[7 - size..]).unwrap();
         self.cs.set_high().unwrap();
-        let data = u64::from_be_bytes(buf) & ((1 << size * 8) - 1);
-        return data as u32;
+        let data = (u64::from_be_bytes(buf) & ((1 << size * 8) - 1)) as u32;
+        return data;
     }
 
     /// Write a ADC register of size in bytes. Max. size 3 bytes.
