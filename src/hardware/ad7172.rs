@@ -86,17 +86,18 @@ where
         // 500 us delay after reset.
         delay.delay_us(500u16);
 
-        let id = adc.read_reg(AdcReg::ID, 2);
+        let id = adc.read(AdcReg::ID, 2);
         // check that ID is 0x00DX, as per datasheet
-        if id & 0xf0 == 0xd0 {
+        info!("id: {:x}", id);
+        if id & 0xf0 == 0x00d0 {
             return Err(Error::AdcId);
         }
 
         // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
-        adc.write_reg(AdcReg::ADCMODE, 2, 0x8008);
+        adc.write(AdcReg::ADCMODE, 2, 0x8008);
 
         // Setup IFMODE register. Only enable data stat to get channel info on conversions.
-        adc.write_reg(AdcReg::IFMODE, 2, 0b100_0000);
+        adc.write(AdcReg::IFMODE, 2, 0b100_0000);
 
         adc.setup_channels();
 
@@ -112,7 +113,7 @@ where
     }
 
     /// Read a ADC register of size in bytes. Max. size 4 bytes.
-    pub fn read_reg(&mut self, addr: AdcReg, size: usize) -> u32 {
+    pub fn read(&mut self, addr: AdcReg, size: usize) -> u32 {
         let mut buf = [0u8; 8];
         buf[7 - size] = addr as u8 | 0x40; // addr with read flag
         self.cs.set_low().unwrap();
@@ -120,11 +121,10 @@ where
         self.cs.set_high().unwrap();
         let data = u64::from_be_bytes(buf) & ((1 << size * 8) - 1);
         return data as u32;
-        // return (buf[7-size], data);
     }
 
     /// Write a ADC register of size in bytes. Max. size 3 bytes.
-    pub fn write_reg(&mut self, addr: AdcReg, size: usize, data: u32) {
+    pub fn write(&mut self, addr: AdcReg, size: usize, data: u32) {
         let mut buf = data.to_be_bytes();
         buf[3 - size] = addr as _;
         self.cs.set_low().unwrap();
@@ -132,20 +132,12 @@ where
         self.cs.set_high().unwrap();
     }
 
-    /// Reads the status register and returns the value. This is different from reading a normal register.
-    pub fn get_status_reg(&mut self) -> u8 {
-        let mut addr_buf = [0];
-        self.cs.set_low().unwrap();
-        self.spi.transfer(&mut addr_buf).unwrap();
-        self.cs.set_high().unwrap();
-        addr_buf[0]
-    }
-
-    /// Reads the data register and returns data and channel information.
-    /// The DATA_STAT bit has to be set in the IFMODE register
+    /// Reads the data register and returns data and status information.
+    /// The DATA_STAT bit has to be set in the IFMODE register.
+    /// If DATA_STAT bit is not set, the content of status is undefined but data is still valid.
     pub fn read_data(&mut self) -> (u32, u8) {
-        let data_ch = self.read_reg(AdcReg::DATA, 4);
-        let ch = (data_ch & 0x3) as u8;
+        let data_ch = self.read(AdcReg::DATA, 4);
+        let ch = (data_ch & 0xff) as u8;
         let data = data_ch >> 8;
         (data, ch)
     }
@@ -154,14 +146,14 @@ where
     fn setup_channels(&mut self) {
         // enable first channel and configure Ain0, Ain1,
         // set config 0 for second channel,
-        self.write_reg(AdcReg::CH0, 2, 0x8001);
+        self.write(AdcReg::CH0, 2, 0x8001);
 
         // enable second channel and configure Ain2, Ain3,
         // set config 1 for second channel,
-        self.write_reg(AdcReg::CH1, 2, 0x9043);
+        self.write(AdcReg::CH1, 2, 0x9043);
 
         // Setup configuration register ch0
-        self.write_reg(
+        self.write(
             AdcReg::SETUPCON0,
             2,
             Setupcon::REFBUFP as u32
@@ -173,7 +165,7 @@ where
         );
 
         // Setup configuration register ch1
-        self.write_reg(
+        self.write(
             AdcReg::SETUPCON1,
             2,
             Setupcon::REFBUFP as u32
@@ -185,9 +177,9 @@ where
         );
 
         // Setup filter register ch0. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
-        self.write_reg(AdcReg::FILTCON0, 2, 0b110 << 8 | 1 << 11 | 0b10011);
+        self.write(AdcReg::FILTCON0, 2, 0b110 << 8 | 1 << 11 | 0b10011);
 
         // Setup filter register ch1. 10Hz data rate. Sinc5Sinc1 Filter. F16SPS 50/60Hz Filter.
-        self.write_reg(AdcReg::FILTCON1, 2, 0b110 << 8 | 1 << 11 | 0b10011);
+        self.write(AdcReg::FILTCON1, 2, 0b110 << 8 | 1 << 11 | 0b10011);
     }
 }
