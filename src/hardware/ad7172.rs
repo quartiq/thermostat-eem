@@ -52,9 +52,9 @@ impl Setupcon {
     const REFBUFN: u32 = 1 << 10; // REFBUF-
     const AINBUFP: u32 = 1 << 9; // AINBUF+
     const AINBUFN: u32 = 1 << 8; // AINBUF-
-    const EXTREF: u32 = 00 << 4; // External reference
-    const INTREF: u32 = 10 << 4; // Internal 2,5V reference
-    const DIAREF: u32 = 11 << 4; // diagnostic reference
+    const EXTREF: u32 = 0b00 << 4; // External reference
+    const INTREF: u32 = 0b10 << 4; // Internal 2,5V reference
+    const DIAREF: u32 = 0b11 << 4; // diagnostic reference
 }
 
 /// DAC value out of bounds error.
