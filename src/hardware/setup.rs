@@ -11,7 +11,6 @@ use super::hal::{
 use crate::hardware::SRC_MAC;
 
 use super::{
-    ad7172::AdcReg,
     adc::{Adc, AdcPins},
     adc_internal::{AdcInternal, AdcInternalPins},
     dac::{Dac, DacPins},
@@ -289,14 +288,16 @@ pub fn setup(
 
     info!("Setup ADC");
 
-    let mut adc = Adc::new(
+    let adc = Adc::new(
         &mut delay,
         &ccdr.clocks,
         ccdr.peripheral.SPI4,
         device.SPI4,
-        gpioe.pe2.into_alternate_af5(),
-        gpioe.pe5.into_alternate_af5(),
-        gpioe.pe6.into_alternate_af5(),
+        (
+            gpioe.pe2.into_alternate_af5(),
+            gpioe.pe5.into_alternate_af5(),
+            gpioe.pe6.into_alternate_af5(),
+        ),
         AdcPins {
             cs: (
                 gpioe.pe0.into_push_pull_output(),
@@ -309,11 +310,6 @@ pub fn setup(
 
     // enable MCO 2MHz clock output to ADCs
     gpioa.pa8.into_alternate_af0();
-
-    loop {
-        info!("adc.adcs.0.read_data(): {:?}", adc.adcs.0.read_data());
-        cortex_m::asm::delay(1000000);
-    }
 
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);

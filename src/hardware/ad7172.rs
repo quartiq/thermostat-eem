@@ -170,8 +170,7 @@ where
         self.cs.set_low().unwrap();
         self.spi.transfer(&mut buf[7 - size..]).unwrap();
         self.cs.set_high().unwrap();
-        let data = (u64::from_be_bytes(buf) & ((1 << size * 8) - 1)) as u32;
-        return data;
+        (u64::from_be_bytes(buf) & ((1 << (size * 8)) - 1)) as u32
     }
 
     /// Write a ADC register of size in bytes. Max. size 3 bytes.
@@ -180,7 +179,7 @@ where
         let mut buf = data.to_be_bytes();
         buf[3 - size] = addr as _;
         self.cs.set_low().unwrap();
-        self.spi.write(&mut buf[3 - size..]).unwrap();
+        self.spi.write(&buf[3 - size..]).unwrap();
         self.cs.set_high().unwrap();
     }
 

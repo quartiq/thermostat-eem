@@ -37,22 +37,26 @@ pub enum AdcPhy {
     Three = 3,
 }
 
+type SB = SharedBus<Spi<SPI4, Enabled>>;
+type O = Output<PushPull>;
+type Adcs = (
+    Ad7172<SB, PE0<O>>,
+    Ad7172<SB, PE1<O>>,
+    Ad7172<SB, PE3<O>>,
+    Ad7172<SB, PE4<O>>,
+);
+type SpiPins = (
+    PE2<Alternate<AF5>>,
+    PE5<Alternate<AF5>>,
+    PE6<Alternate<AF5>>,
+);
+
 pub struct AdcPins {
-    pub cs: (
-        PE0<Output<PushPull>>,
-        PE1<Output<PushPull>>,
-        PE3<Output<PushPull>>,
-        PE4<Output<PushPull>>,
-    ),
+    pub cs: (PE0<O>, PE1<O>, PE3<O>, PE4<O>),
 }
 
 pub struct Adc {
-    pub adcs: (
-        Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE0<Output<PushPull>>>,
-        Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE1<Output<PushPull>>>,
-        Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE3<Output<PushPull>>>,
-        Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE4<Output<PushPull>>>,
-    ),
+    pub adcs: Adcs,
 }
 
 impl Adc {
@@ -71,9 +75,7 @@ impl Adc {
         clocks: &CoreClocks,
         spi4_rec: rec::Spi4,
         spi4: SPI4,
-        sck: PE2<Alternate<AF5>>,
-        miso: PE5<Alternate<AF5>>,
-        mosi: PE6<Alternate<AF5>>,
+        spi_pins: SpiPins,
         mut pins: AdcPins,
     ) -> Self {
         // set all CS high first
@@ -83,8 +85,13 @@ impl Adc {
         pins.cs.3.set_high().unwrap();
 
         // SPI at 1 MHz. SPI MODE_0: idle low, capture on first transition
-        let spi: Spi<_, _, u8> =
-            spi4.spi((sck, miso, mosi), spi::MODE_0, 1.mhz(), spi4_rec, clocks);
+        let spi: Spi<_, _, u8> = spi4.spi(
+            (spi_pins.0, spi_pins.1, spi_pins.2),
+            spi::MODE_0,
+            1.mhz(),
+            spi4_rec,
+            clocks,
+        );
 
         let bus_manager = shared_bus_rtic::new!(spi, Spi<SPI4, Enabled>);
 
@@ -106,7 +113,7 @@ impl Adc {
     }
 
     /// Setup an adc on Thermostat-EEM.
-    fn setup_adc<CS>(adc: &mut Ad7172<SharedBus<Spi<SPI4, Enabled>>, CS>)
+    fn setup_adc<CS>(adc: &mut Ad7172<SB, CS>)
     where
         CS: OutputPin,
         <CS>::Error: core::fmt::Debug,
