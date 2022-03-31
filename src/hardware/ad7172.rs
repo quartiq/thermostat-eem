@@ -44,7 +44,7 @@ pub enum AdcReg {
 
 // *Note*: Register bitfields are not exhaustive.
 
-// ADC MODE register settings.
+// ADCMODE register settings.
 pub struct Adcmode;
 #[allow(unused)]
 impl Adcmode {
@@ -144,7 +144,7 @@ where
         // 500 us delay after reset.
         delay.delay_us(5000u16);
 
-        let id = adc.read(AdcReg::ID, 2);
+        let id = adc.read(AdcReg::ID);
         // check that ID is 0x00DX, as per datasheet
         info!("id: {:x}", id);
         if id & 0xf0 != 0x00d0 {
@@ -155,13 +155,12 @@ where
         // adc.write(AdcReg::ADCMODE, 2, 0x8008);
         adc.write(
             AdcReg::ADCMODE,
-            2,
             Adcmode::REF_EN | Adcmode::MODE_CONTINOUS_CONVERSION | Adcmode::CLOCKSEL_EXTERNAL_CLOCK,
         );
 
         // Setup IFMODE register. Only enable data stat to get channel info on conversions.
         // adc.write(AdcReg::IFMODE, 2, 0b100_0000);
-        adc.write(AdcReg::IFMODE, 2, Ifmode::DATA_STAT);
+        adc.write(AdcReg::IFMODE, Ifmode::DATA_STAT);
 
         adc.setup_channels();
 
@@ -177,7 +176,8 @@ where
     }
 
     /// Read a ADC register of size in bytes. Max. size 4 bytes.
-    pub fn read(&mut self, addr: AdcReg, size: usize) -> u32 {
+    pub fn read(&mut self, addr: AdcReg) -> u32 {
+        let size = Ad7172::<SPI, CS>::get_reg_width(&addr);
         let mut buf = [0u8; 8];
         buf[7 - size] = addr as u8 | 0x40; // addr with read flag
         self.cs.set_low().unwrap();
@@ -188,7 +188,8 @@ where
     }
 
     /// Write a ADC register of size in bytes. Max. size 3 bytes.
-    pub fn write(&mut self, addr: AdcReg, size: usize, data: u32) {
+    pub fn write(&mut self, addr: AdcReg, data: u32) {
+        let size = Ad7172::<SPI, CS>::get_reg_width(&addr);
         let mut buf = data.to_be_bytes();
         buf[3 - size] = addr as _;
         self.cs.set_low().unwrap();
@@ -200,7 +201,7 @@ where
     /// The DATA_STAT bit has to be set in the IFMODE register.
     /// If DATA_STAT bit is not set, the content of status is undefined but data is still valid.
     pub fn read_data(&mut self) -> (u32, u8) {
-        let data_ch = self.read(AdcReg::DATA, 4);
+        let data_ch = self.read(AdcReg::DATA);
         let ch = (data_ch & 0xff) as u8;
         let data = data_ch >> 8;
         (data, ch)
@@ -213,7 +214,6 @@ where
         // self.write(AdcReg::CH0, 2, 0x8001);
         self.write(
             AdcReg::CH0,
-            2,
             Channel::SETUP_SEL_0 | Channel::AINPOS_AIN0 | Channel::AINNEG_AIN1,
         );
 
@@ -222,14 +222,12 @@ where
         // self.write(AdcReg::CH1, 2, 0x9043);
         self.write(
             AdcReg::CH1,
-            2,
             Channel::SETUP_SEL_0 | Channel::AINPOS_AIN2 | Channel::AINNEG_AIN3,
         );
 
         // Setup firstconfiguration register
         self.write(
             AdcReg::SETUPCON0,
-            2,
             Setupcon::UNIPOLAR
                 | Setupcon::REFBUFP
                 | Setupcon::REFBUFN
@@ -242,8 +240,37 @@ where
         // self.write(AdcReg::FILTCON0, 2, 0b110 << 8 | 1 << 11 | 0b10011);
         self.write(
             AdcReg::FILTCON0,
-            2,
             Filtcon::ORDER_SINC5SINC1 | Filtcon::ODR_10,
         );
+    }
+
+    fn get_reg_width(reg: &AdcReg) -> usize {
+        match reg {
+            AdcReg::STATUS => 1,
+            AdcReg::ADCMODE => 2,
+            AdcReg::IFMODE => 2,
+            AdcReg::DATA => 4, // If DATA_STAT bit is not set this is 3 bytes but a 4 byte read will also yield 3 valid bytes.
+            AdcReg::ID => 2,
+            AdcReg::FILTCON0 => 2,
+            AdcReg::FILTCON1 => 2,
+            AdcReg::FILTCON2 => 2,
+            AdcReg::FILTCON3 => 2,
+            AdcReg::CH0 => 2,
+            AdcReg::CH1 => 2,
+            AdcReg::CH2 => 2,
+            AdcReg::CH3 => 2,
+            AdcReg::SETUPCON0 => 2,
+            AdcReg::SETUPCON1 => 2,
+            AdcReg::SETUPCON2 => 2,
+            AdcReg::SETUPCON3 => 2,
+            AdcReg::OFFSET0 => 3,
+            AdcReg::OFFSET1 => 3,
+            AdcReg::OFFSET2 => 3,
+            AdcReg::OFFSET3 => 3,
+            AdcReg::GAIN0 => 3,
+            AdcReg::GAIN1 => 3,
+            AdcReg::GAIN2 => 3,
+            AdcReg::GAIN3 => 3,
+        }
     }
 }
