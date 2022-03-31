@@ -150,18 +150,7 @@ where
         if id & 0xf0 != 0x00d0 {
             return Err(Error::AdcId);
         }
-
-        // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
-        // adc.write(AdcReg::ADCMODE, 2, 0x8008);
-        adc.write(
-            AdcReg::ADCMODE,
-            Adcmode::REF_EN | Adcmode::MODE_CONTINOUS_CONVERSION | Adcmode::CLOCKSEL_EXTERNAL_CLOCK,
-        );
-
-        // Setup IFMODE register. Only enable data stat to get channel info on conversions.
-        // adc.write(AdcReg::IFMODE, 2, 0b100_0000);
-        adc.write(AdcReg::IFMODE, Ifmode::DATA_STAT);
-
+        
         Ok(adc)
     }
 

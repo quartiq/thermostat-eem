@@ -3,7 +3,7 @@
 use num_enum::TryFromPrimitive;
 use shared_bus_rtic::SharedBus;
 
-use super::ad7172::Ad7172;
+use super::ad7172::{Ad7172, AdcReg, Adcmode, Channel, Filtcon, Ifmode, Setupcon};
 
 use super::hal::{
     gpio::{gpioe::*, Alternate, Output, PushPull, AF5},
@@ -88,13 +88,67 @@ impl Adc {
 
         let bus_manager = shared_bus_rtic::new!(spi, Spi<SPI4, Enabled>);
 
-        Adc {
+        let mut adc = Adc {
             adcs: (
                 Ad7172::new(delay, bus_manager.acquire(), pins.cs.0).unwrap(),
                 Ad7172::new(delay, bus_manager.acquire(), pins.cs.1).unwrap(),
                 Ad7172::new(delay, bus_manager.acquire(), pins.cs.2).unwrap(),
                 Ad7172::new(delay, bus_manager.acquire(), pins.cs.3).unwrap(),
             ),
-        }
+        };
+
+        Adc::setup_adc(&mut adc.adcs.0);
+        Adc::setup_adc(&mut adc.adcs.1);
+        Adc::setup_adc(&mut adc.adcs.2);
+        Adc::setup_adc(&mut adc.adcs.3);
+
+        adc
+    }
+
+    /// Setup an adc on Thermostat-EEM.
+    fn setup_adc<CS>(adc: &mut Ad7172<SharedBus<Spi<SPI4, Enabled>>, CS>)
+    where
+        CS: OutputPin,
+        <CS>::Error: core::fmt::Debug,
+    {
+        // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
+        adc.write(
+            AdcReg::ADCMODE,
+            Adcmode::REF_EN | Adcmode::MODE_CONTINOUS_CONVERSION | Adcmode::CLOCKSEL_EXTERNAL_CLOCK,
+        );
+
+        // Setup IFMODE register. Only enable data stat to get channel info on conversions.
+        adc.write(AdcReg::IFMODE, Ifmode::DATA_STAT);
+
+        // enable first channel and configure Ain0, Ain1,
+        // set config 0 for first channel.
+        adc.write(
+            AdcReg::CH0,
+            Channel::SETUP_SEL_0 | Channel::AINPOS_AIN0 | Channel::AINNEG_AIN1,
+        );
+
+        // enable second channel and configure Ain2, Ain3,
+        // set config 0 for second channel too.
+        adc.write(
+            AdcReg::CH1,
+            Channel::SETUP_SEL_0 | Channel::AINPOS_AIN2 | Channel::AINNEG_AIN3,
+        );
+
+        // Setup firstconfiguration register
+        adc.write(
+            AdcReg::SETUPCON0,
+            Setupcon::UNIPOLAR
+                | Setupcon::REFBUFP
+                | Setupcon::REFBUFN
+                | Setupcon::AINBUFP
+                | Setupcon::AINBUFN
+                | Setupcon::REF_SEL_EXTERNAL,
+        );
+
+        // Setup first filter configuration register. 10Hz data rate. Sinc5Sinc1 Filter. No postfilter.
+        adc.write(
+            AdcReg::FILTCON0,
+            Filtcon::ORDER_SINC5SINC1 | Filtcon::ODR_10,
+        );
     }
 }
