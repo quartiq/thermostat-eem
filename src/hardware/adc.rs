@@ -29,14 +29,6 @@ pub enum InputChannel {
     Seven = 7,
 }
 
-// Physical ADC devices on Thermostat
-pub enum AdcPhy {
-    Zero = 0,
-    One = 1,
-    Two = 2,
-    Three = 3,
-}
-
 type SB = SharedBus<Spi<SPI4, Enabled>>;
 type O = Output<PushPull>;
 type Adcs = (
