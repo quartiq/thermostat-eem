@@ -300,20 +300,21 @@ pub fn setup(
         &ccdr.clocks,
         ccdr.peripheral.SPI4,
         device.SPI4,
-        (
-            gpioe.pe2.into_alternate_af5(),
-            gpioe.pe5.into_alternate_af5(),
-            gpioe.pe6.into_alternate_af5(),
-        ),
         AdcPins {
+            spi: (
+                gpioe.pe2.into_alternate_af5(),
+                gpioe.pe5.into_alternate_af5(),
+                gpioe.pe6.into_alternate_af5(),
+            ),
             cs: (
                 gpioe.pe0.into_push_pull_output(),
                 gpioe.pe1.into_push_pull_output(),
                 gpioe.pe3.into_push_pull_output(),
                 gpioe.pe4.into_push_pull_output(),
             ),
+            rdyn,
+            sync: gpiob.pb11.into_push_pull_output(),
         },
-        rdyn,
     );
 
     // enable MCO 2MHz clock output to ADCs

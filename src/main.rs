@@ -276,7 +276,13 @@ mod app {
     fn adc(c: adc::Context) {
         let adc = c.local.adc;
         let data = adc.adcs.0.read_data();
-        info!("data: {:?}", data);
+        info!("data phy 0: {:?}", data);
+        let data = adc.adcs.1.read_data();
+        info!("data phy 1: {:?}", data);
+        let data = adc.adcs.2.read_data();
+        info!("data phy 2: {:?}", data);
+        let data = adc.adcs.3.read_data();
+        info!("data phy 3: {:?}", data);
         adc.adcs.0.set_cs(false);
         adc.rdyn.clear_interrupt_pending_bit();
     }

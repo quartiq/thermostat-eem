@@ -7,7 +7,7 @@ use stm32h7xx_hal::gpio::Input;
 use super::ad7172;
 
 use super::hal::{
-    gpio::{gpioc::*, gpioe::*, Alternate, Floating, Output, PushPull, AF5},
+    gpio::{gpiob::*, gpioc::*, gpioe::*, Alternate, Floating, Output, PushPull, AF5},
     hal::blocking::delay::DelayUs,
     hal::digital::v2::OutputPin,
     prelude::*,
@@ -42,14 +42,22 @@ type SpiPins = (
     PE5<Alternate<AF5>>,
     PE6<Alternate<AF5>>,
 );
-
+/// All pins for all ADCs.
+/// * `spi` - Spi clk, miso, mosi (in this order).
+/// * `cs` - The four chip select pins.
+/// * `rdyn` - ADC rdyn input (this is the same ad spi dout).
+/// * `sync` - ADC sync pin (shared for all adc phys).
 pub struct AdcPins {
+    pub spi: SpiPins,
     pub cs: (PE0<O>, PE1<O>, PE3<O>, PE4<O>),
+    pub rdyn: PC11<Input<Floating>>,
+    pub sync: PB11<O>,
 }
 
 pub struct Adc {
     pub adcs: Adcs,
     pub rdyn: PC11<Input<Floating>>,
+    // pub sync: PB11<O>,
 }
 
 impl Adc {
@@ -59,18 +67,13 @@ impl Adc {
     /// * `clocks` - Reference to CoreClocks
     /// * `spi4_rec` - Peripheral Reset and Enable Control for SPI4
     /// * `spi4` - SPI4 peripheral
-    /// * `sck` - Spi sck pin
-    /// * `miso` - Spi miso pin
-    /// * `mosi` - Spi mosi pin
     /// * `pins` - ADC chip select pins.
     pub fn new(
         delay: &mut impl DelayUs<u16>,
         clocks: &CoreClocks,
         spi4_rec: rec::Spi4,
         spi4: SPI4,
-        spi_pins: SpiPins,
         mut pins: AdcPins,
-        rdyn: PC11<Input<Floating>>,
     ) -> Self {
         // set all CS high first
         pins.cs.0.set_high().unwrap();
@@ -78,8 +81,11 @@ impl Adc {
         pins.cs.2.set_high().unwrap();
         pins.cs.3.set_high().unwrap();
 
+        // set sync low first for synchronization at rising edge
+        pins.sync.set_low().unwrap();
+
         // SPI at 1 MHz. SPI MODE_0: idle low, capture on first transition
-        let spi: Spi<_, _, u8> = spi4.spi(spi_pins, spi::MODE_0, 12500.khz(), spi4_rec, clocks);
+        let spi: Spi<_, _, u8> = spi4.spi(pins.spi, spi::MODE_0, 12500.khz(), spi4_rec, clocks);
 
         let bus_manager = shared_bus_rtic::new!(spi, Spi<SPI4, Enabled>);
 
@@ -90,13 +96,18 @@ impl Adc {
                 ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.2).unwrap(),
                 ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.3).unwrap(),
             ),
-            rdyn,
+            rdyn: pins.rdyn,
+            // sync: pins.sync,
         };
 
         Adc::setup_adc(&mut adc.adcs.0);
         Adc::setup_adc(&mut adc.adcs.1);
         Adc::setup_adc(&mut adc.adcs.2);
         Adc::setup_adc(&mut adc.adcs.3);
+
+        // set sync high after initialization of all phys
+        // TODO: double check timing after last setup and generally more datasheet studying for this
+        pins.sync.set_high().unwrap();
 
         adc
     }
