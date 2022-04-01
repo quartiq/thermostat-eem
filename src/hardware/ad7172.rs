@@ -221,6 +221,14 @@ where
         (data, ch)
     }
 
+    pub fn set_cs(&mut self, state: bool) {
+        if state {
+            self.cs.set_high().unwrap();
+        } else {
+            self.cs.set_low().unwrap();
+        }
+    }
+
     fn get_reg_width(reg: &AdcReg) -> usize {
         match reg {
             AdcReg::STATUS => 1,

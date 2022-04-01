@@ -10,6 +10,7 @@ pub mod net;
 
 use defmt::{info, Format};
 use defmt_rtt as _; // global logger
+use hal::gpio::ExtiPin;
 use panic_probe as _; // gloibal panic handler
 
 use hardware::{
@@ -250,6 +251,9 @@ mod app {
             .network
             .lock(|network| network.telemetry.publish(&telemetry));
 
+        // let stuff = c.local.adc.adcs.0.read_data();
+        // info!("stuff: {:?}", stuff);
+
         // TODO: validate telemetry period.
         let telemetry_period = c.shared.settings.lock(|settings| settings.telemetry_period);
         telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
@@ -266,5 +270,14 @@ mod app {
     #[task(binds = ETH, priority = 1)]
     fn eth(_: eth::Context) {
         unsafe { hal::ethernet::interrupt_handler() }
+    }
+
+    #[task(binds = EXTI15_10, priority = 1, local=[adc])]
+    fn adc(c: adc::Context) {
+        let adc = c.local.adc;
+        let data = adc.adcs.0.read_data();
+        info!("data: {:?}", data);
+        adc.adcs.0.set_cs(false);
+        adc.rdyn.clear_interrupt_pending_bit();
     }
 }

@@ -5,7 +5,7 @@ use stm32h7xx_hal::hal::digital::v2::OutputPin;
 use super::hal::{
     self as hal,
     ethernet::{self, PHY},
-    gpio::GpioExt,
+    gpio::{Edge, ExtiPin, GpioExt},
     prelude::*,
 };
 use crate::hardware::SRC_MAC;
@@ -288,6 +288,13 @@ pub fn setup(
 
     info!("Setup ADC");
 
+    let mut syscfg = device.SYSCFG;
+    let mut exti = device.EXTI;
+    let mut rdyn = gpioc.pc11.into_floating_input();
+    rdyn.make_interrupt_source(&mut syscfg);
+    rdyn.trigger_on_edge(&mut exti, Edge::Falling);
+    rdyn.enable_interrupt(&mut exti);
+
     let adc = Adc::new(
         &mut delay,
         &ccdr.clocks,
@@ -306,6 +313,7 @@ pub fn setup(
                 gpioe.pe4.into_push_pull_output(),
             ),
         },
+        rdyn,
     );
 
     // enable MCO 2MHz clock output to ADCs

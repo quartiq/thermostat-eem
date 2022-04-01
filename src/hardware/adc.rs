@@ -2,11 +2,12 @@
 
 use num_enum::TryFromPrimitive;
 use shared_bus_rtic::SharedBus;
+use stm32h7xx_hal::gpio::Input;
 
 use super::ad7172;
 
 use super::hal::{
-    gpio::{gpioe::*, Alternate, Output, PushPull, AF5},
+    gpio::{gpioc::*, gpioe::*, Alternate, Floating, Output, PushPull, AF5},
     hal::blocking::delay::DelayUs,
     hal::digital::v2::OutputPin,
     prelude::*,
@@ -48,6 +49,7 @@ pub struct AdcPins {
 
 pub struct Adc {
     pub adcs: Adcs,
+    pub rdyn: PC11<Input<Floating>>,
 }
 
 impl Adc {
@@ -68,6 +70,7 @@ impl Adc {
         spi4: SPI4,
         spi_pins: SpiPins,
         mut pins: AdcPins,
+        rdyn: PC11<Input<Floating>>,
     ) -> Self {
         // set all CS high first
         pins.cs.0.set_high().unwrap();
@@ -87,6 +90,7 @@ impl Adc {
                 ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.2).unwrap(),
                 ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.3).unwrap(),
             ),
+            rdyn,
         };
 
         Adc::setup_adc(&mut adc.adcs.0);
@@ -148,7 +152,7 @@ impl Adc {
         // Setup first filter configuration register. 10Hz data rate. Sinc5Sinc1 Filter. No postfilter.
         adc.write(
             ad7172::AdcReg::FILTCON0,
-            ad7172::Filtcon::Order::SINC5SINC1 | ad7172::Filtcon::Odr::ODR_10,
+            ad7172::Filtcon::Order::SINC5SINC1 | ad7172::Filtcon::Odr::ODR_1_25,
         );
     }
 }
