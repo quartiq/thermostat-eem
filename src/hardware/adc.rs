@@ -118,7 +118,8 @@ impl Adc {
         // set config 0 for first channel.
         adc.write(
             ad7172::AdcReg::CH0,
-            ad7172::Channel::SetupSel::SETUP_0
+            ad7172::Channel::ChEn::ENABLED
+                | ad7172::Channel::SetupSel::SETUP_0
                 | ad7172::Channel::Ainpos::AIN0
                 | ad7172::Channel::Ainneg::AIN1,
         );
@@ -127,7 +128,8 @@ impl Adc {
         // set config 0 for second channel too.
         adc.write(
             ad7172::AdcReg::CH1,
-            ad7172::Channel::SetupSel::SETUP_0
+            ad7172::Channel::ChEn::ENABLED
+                | ad7172::Channel::SetupSel::SETUP_0
                 | ad7172::Channel::Ainpos::AIN2
                 | ad7172::Channel::Ainneg::AIN3,
         );

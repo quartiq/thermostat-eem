@@ -173,7 +173,6 @@ where
 
         let id = adc.read(AdcReg::ID);
         // check that ID is 0x00DX, as per datasheet
-        info!("id: {:x}", id);
         if id & 0xf0 != 0x00d0 {
             return Err(Error::AdcId);
         }

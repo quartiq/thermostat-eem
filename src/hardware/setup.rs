@@ -11,6 +11,7 @@ use super::hal::{
 use crate::hardware::SRC_MAC;
 
 use super::{
+    ad7172,
     adc::{Adc, AdcPins},
     adc_internal::{AdcInternal, AdcInternalPins},
     dac::{Dac, DacPins},
