@@ -168,7 +168,7 @@ where
         let mut adc = Ad7172 { spi, cs };
         adc.reset();
 
-        // 500 us delay after reset.
+        // 5000 us delay after reset.
         delay.delay_us(5000u16);
 
         let id = adc.read(AdcReg::ID);

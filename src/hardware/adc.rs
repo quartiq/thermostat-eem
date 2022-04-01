@@ -76,7 +76,7 @@ impl Adc {
         pins.cs.3.set_high().unwrap();
 
         // SPI at 1 MHz. SPI MODE_0: idle low, capture on first transition
-        let spi: Spi<_, _, u8> = spi4.spi(spi_pins, spi::MODE_0, 1.mhz(), spi4_rec, clocks);
+        let spi: Spi<_, _, u8> = spi4.spi(spi_pins, spi::MODE_0, 12500.khz(), spi4_rec, clocks);
 
         let bus_manager = shared_bus_rtic::new!(spi, Spi<SPI4, Enabled>);
 
