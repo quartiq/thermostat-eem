@@ -113,41 +113,43 @@ impl Adc {
         // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
         adc.write(
             AdcReg::ADCMODE,
-            Adcmode::REF_EN | Adcmode::MODE_CONTINOUS_CONVERSION | Adcmode::CLOCKSEL_EXTERNAL_CLOCK,
+            Adcmode::RefEn::ENABLED
+                | Adcmode::Mode::CONTINOUS_CONVERSION
+                | Adcmode::Clocksel::EXTERNAL_CLOCK,
         );
 
         // Setup IFMODE register. Only enable data stat to get channel info on conversions.
-        adc.write(AdcReg::IFMODE, Ifmode::DATA_STAT);
+        adc.write(AdcReg::IFMODE, Ifmode::DataStat::ENABLED);
 
         // enable first channel and configure Ain0, Ain1,
         // set config 0 for first channel.
         adc.write(
             AdcReg::CH0,
-            Channel::SETUP_SEL_0 | Channel::AINPOS_AIN0 | Channel::AINNEG_AIN1,
+            Channel::SetupSel::SETUP_0 | Channel::Ainpos::AIN0 | Channel::Ainneg::AIN1,
         );
 
         // enable second channel and configure Ain2, Ain3,
         // set config 0 for second channel too.
         adc.write(
             AdcReg::CH1,
-            Channel::SETUP_SEL_0 | Channel::AINPOS_AIN2 | Channel::AINNEG_AIN3,
+            Channel::SetupSel::SETUP_0 | Channel::Ainpos::AIN2 | Channel::Ainneg::AIN3,
         );
 
         // Setup firstconfiguration register
         adc.write(
             AdcReg::SETUPCON0,
-            Setupcon::UNIPOLAR
-                | Setupcon::REFBUFP
-                | Setupcon::REFBUFN
-                | Setupcon::AINBUFP
-                | Setupcon::AINBUFN
-                | Setupcon::REF_SEL_EXTERNAL,
+            Setupcon::BiUnipolar::UNIPOLAR
+                | Setupcon::Refbufn::ENABLED
+                | Setupcon::Refbufp::ENABLED
+                | Setupcon::Ainbufn::ENABLED
+                | Setupcon::Ainbufp::ENABLED
+                | Setupcon::Refsel::EXTERNAL,
         );
 
         // Setup first filter configuration register. 10Hz data rate. Sinc5Sinc1 Filter. No postfilter.
         adc.write(
             AdcReg::FILTCON0,
-            Filtcon::ORDER_SINC5SINC1 | Filtcon::ODR_10,
+            Filtcon::Order::SINC5SINC1 | Filtcon::Odr::ODR_10,
         );
     }
 }
