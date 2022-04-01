@@ -3,7 +3,7 @@
 use num_enum::TryFromPrimitive;
 use shared_bus_rtic::SharedBus;
 
-use super::ad7172::{Ad7172, AdcReg, Adcmode, Channel, Filtcon, Ifmode, Setupcon};
+use super::ad7172;
 
 use super::hal::{
     gpio::{gpioe::*, Alternate, Output, PushPull, AF5},
@@ -29,13 +29,12 @@ pub enum InputChannel {
     Seven = 7,
 }
 
-type SB = SharedBus<Spi<SPI4, Enabled>>;
 type O = Output<PushPull>;
 type Adcs = (
-    Ad7172<SB, PE0<O>>,
-    Ad7172<SB, PE1<O>>,
-    Ad7172<SB, PE3<O>>,
-    Ad7172<SB, PE4<O>>,
+    ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE0<O>>,
+    ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE1<O>>,
+    ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE3<O>>,
+    ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE4<O>>,
 );
 type SpiPins = (
     PE2<Alternate<AF5>>,
@@ -77,22 +76,16 @@ impl Adc {
         pins.cs.3.set_high().unwrap();
 
         // SPI at 1 MHz. SPI MODE_0: idle low, capture on first transition
-        let spi: Spi<_, _, u8> = spi4.spi(
-            (spi_pins.0, spi_pins.1, spi_pins.2),
-            spi::MODE_0,
-            1.mhz(),
-            spi4_rec,
-            clocks,
-        );
+        let spi: Spi<_, _, u8> = spi4.spi(spi_pins, spi::MODE_0, 1.mhz(), spi4_rec, clocks);
 
         let bus_manager = shared_bus_rtic::new!(spi, Spi<SPI4, Enabled>);
 
         let mut adc = Adc {
             adcs: (
-                Ad7172::new(delay, bus_manager.acquire(), pins.cs.0).unwrap(),
-                Ad7172::new(delay, bus_manager.acquire(), pins.cs.1).unwrap(),
-                Ad7172::new(delay, bus_manager.acquire(), pins.cs.2).unwrap(),
-                Ad7172::new(delay, bus_manager.acquire(), pins.cs.3).unwrap(),
+                ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.0).unwrap(),
+                ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.1).unwrap(),
+                ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.2).unwrap(),
+                ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.3).unwrap(),
             ),
         };
 
@@ -105,51 +98,55 @@ impl Adc {
     }
 
     /// Setup an adc on Thermostat-EEM.
-    fn setup_adc<CS>(adc: &mut Ad7172<SB, CS>)
+    fn setup_adc<CS>(adc: &mut ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, CS>)
     where
         CS: OutputPin,
         <CS>::Error: core::fmt::Debug,
     {
         // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
         adc.write(
-            AdcReg::ADCMODE,
-            Adcmode::RefEn::ENABLED
-                | Adcmode::Mode::CONTINOUS_CONVERSION
-                | Adcmode::Clocksel::EXTERNAL_CLOCK,
+            ad7172::AdcReg::ADCMODE,
+            ad7172::Adcmode::RefEn::ENABLED
+                | ad7172::Adcmode::Mode::CONTINOUS_CONVERSION
+                | ad7172::Adcmode::Clocksel::EXTERNAL_CLOCK,
         );
 
         // Setup IFMODE register. Only enable data stat to get channel info on conversions.
-        adc.write(AdcReg::IFMODE, Ifmode::DataStat::ENABLED);
+        adc.write(ad7172::AdcReg::IFMODE, ad7172::Ifmode::DataStat::ENABLED);
 
         // enable first channel and configure Ain0, Ain1,
         // set config 0 for first channel.
         adc.write(
-            AdcReg::CH0,
-            Channel::SetupSel::SETUP_0 | Channel::Ainpos::AIN0 | Channel::Ainneg::AIN1,
+            ad7172::AdcReg::CH0,
+            ad7172::Channel::SetupSel::SETUP_0
+                | ad7172::Channel::Ainpos::AIN0
+                | ad7172::Channel::Ainneg::AIN1,
         );
 
         // enable second channel and configure Ain2, Ain3,
         // set config 0 for second channel too.
         adc.write(
-            AdcReg::CH1,
-            Channel::SetupSel::SETUP_0 | Channel::Ainpos::AIN2 | Channel::Ainneg::AIN3,
+            ad7172::AdcReg::CH1,
+            ad7172::Channel::SetupSel::SETUP_0
+                | ad7172::Channel::Ainpos::AIN2
+                | ad7172::Channel::Ainneg::AIN3,
         );
 
         // Setup firstconfiguration register
         adc.write(
-            AdcReg::SETUPCON0,
-            Setupcon::BiUnipolar::UNIPOLAR
-                | Setupcon::Refbufn::ENABLED
-                | Setupcon::Refbufp::ENABLED
-                | Setupcon::Ainbufn::ENABLED
-                | Setupcon::Ainbufp::ENABLED
-                | Setupcon::Refsel::EXTERNAL,
+            ad7172::AdcReg::SETUPCON0,
+            ad7172::Setupcon::BiUnipolar::UNIPOLAR
+                | ad7172::Setupcon::Refbufn::ENABLED
+                | ad7172::Setupcon::Refbufp::ENABLED
+                | ad7172::Setupcon::Ainbufn::ENABLED
+                | ad7172::Setupcon::Ainbufp::ENABLED
+                | ad7172::Setupcon::Refsel::EXTERNAL,
         );
 
         // Setup first filter configuration register. 10Hz data rate. Sinc5Sinc1 Filter. No postfilter.
         adc.write(
-            AdcReg::FILTCON0,
-            Filtcon::Order::SINC5SINC1 | Filtcon::Odr::ODR_10,
+            ad7172::AdcReg::FILTCON0,
+            ad7172::Filtcon::Order::SINC5SINC1 | ad7172::Filtcon::Odr::ODR_10,
         );
     }
 }
