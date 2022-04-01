@@ -2,17 +2,17 @@ use crate::hardware::system_timer;
 use smoltcp_nal::smoltcp;
 use stm32h7xx_hal::hal::digital::v2::OutputPin;
 
-use crate::hardware::SRC_MAC;
-
 use super::hal::{
     self as hal,
     ethernet::{self, PHY},
     gpio::GpioExt,
     prelude::*,
 };
+use crate::hardware::SRC_MAC;
 
 use super::{
-    adc_internal::{AdcInternal, AdcPins},
+    adc::{Adc, AdcPins},
+    adc_internal::{AdcInternal, AdcInternalPins},
     dac::{Dac, DacPins},
     fan::{Fan, FanPins},
     gpio::{Gpio, GpioPins},
@@ -101,6 +101,7 @@ pub struct ThermostatDevices {
     pub gpio: Gpio,
     pub fan: Fan,
     pub adc_internal: AdcInternal,
+    pub adc: Adc,
 }
 
 #[link_section = ".sram3.eth"]
@@ -131,6 +132,7 @@ pub fn setup(
         .per_ck(100.mhz())
         .pll2_p_ck(100.mhz())
         .pll2_q_ck(100.mhz())
+        .mco1_from_hse(2.mhz())
         .freeze(vos, &device.SYSCFG);
 
     info!("--- Starting hardware setup");
@@ -243,7 +245,7 @@ pub fn setup(
     );
 
     info!("Setup CPU ADCs");
-    let adc_pins = AdcPins {
+    let adc_internal_pins = AdcInternalPins {
         output_voltage: (
             gpioc.pc3.into_analog(),
             gpioa.pa0.into_analog(),
@@ -273,7 +275,7 @@ pub fn setup(
         &ccdr.clocks,
         (ccdr.peripheral.ADC12, ccdr.peripheral.ADC3),
         (device.ADC1, device.ADC2, device.ADC3),
-        adc_pins,
+        adc_internal_pins,
     );
 
     info!("P3V3: {} V", adc_internal.read_p3v3_voltage());
@@ -283,6 +285,31 @@ pub fn setup(
         adc_internal.read_p12v_voltage(),
         adc_internal.read_p12v_current()
     );
+
+    info!("Setup ADC");
+
+    let adc = Adc::new(
+        &mut delay,
+        &ccdr.clocks,
+        ccdr.peripheral.SPI4,
+        device.SPI4,
+        (
+            gpioe.pe2.into_alternate_af5(),
+            gpioe.pe5.into_alternate_af5(),
+            gpioe.pe6.into_alternate_af5(),
+        ),
+        AdcPins {
+            cs: (
+                gpioe.pe0.into_push_pull_output(),
+                gpioe.pe1.into_push_pull_output(),
+                gpioe.pe3.into_push_pull_output(),
+                gpioe.pe4.into_push_pull_output(),
+            ),
+        },
+    );
+
+    // enable MCO 2MHz clock output to ADCs
+    gpioa.pa8.into_alternate_af0();
 
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
@@ -448,5 +475,6 @@ pub fn setup(
         gpio,
         fan,
         adc_internal,
+        adc,
     }
 }

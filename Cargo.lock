@@ -774,6 +774,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "shared-bus-rtic"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb1899470d03c5728db375f63be8f2bbfb93d8c35ec932061f3b593434c2273b"
+dependencies = [
+ "cortex-m 0.6.7",
+ "embedded-hal",
+ "nb 1.0.0",
+]
+
+[[package]]
 name = "smlang"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -890,6 +901,7 @@ name = "thermostat-eem"
 version = "0.1.0"
 dependencies = [
  "asm-delay",
+ "byteorder",
  "cortex-m 0.7.4",
  "cortex-m-rt",
  "cortex-m-rtic",
@@ -905,6 +917,7 @@ dependencies = [
  "panic-probe",
  "serde",
  "serde-json-core",
+ "shared-bus-rtic",
  "smoltcp-nal",
  "stm32h7xx-hal",
  "systick-monotonic",
