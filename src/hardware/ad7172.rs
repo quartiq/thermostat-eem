@@ -2,8 +2,6 @@
 
 use core::fmt::Debug;
 
-use defmt::info;
-
 use super::hal::hal::{
     blocking::{
         delay::DelayUs,
@@ -45,7 +43,7 @@ pub enum AdcReg {
 // *Note*: Register bitfields are not exhaustive.
 
 /// ADCMODE register settings.
-
+#[allow(non_snake_case)]
 pub mod Adcmode {
     pub mod RefEn {
         pub const ENABLED: u32 = 1 << 15; // Internal reference enable
@@ -62,6 +60,7 @@ pub mod Adcmode {
 }
 
 /// ADC IFMODE register settings.
+#[allow(non_snake_case)]
 pub mod Ifmode {
     pub mod DataStat {
         pub const ENABLED: u32 = 1 << 6; // enable status reg to be appended after data output
@@ -69,6 +68,7 @@ pub mod Ifmode {
 }
 
 /// ADC CH register settings. Valid for registers CH0-CH3.
+#[allow(non_snake_case)]
 pub mod Channel {
     pub mod ChEn {
         pub const ENABLED: u32 = 1 << 15; // enable channel
@@ -96,6 +96,7 @@ pub mod Channel {
 }
 
 /// ADC SETUPCON register settings. Valid for registers SETUPCON0-SETUPCON3.
+#[allow(non_snake_case)]
 pub mod Setupcon {
     pub mod BiUnipolar {
         pub const BIPOLAR: u32 = 1 << 12; // Bipolar input
@@ -121,6 +122,7 @@ pub mod Setupcon {
 }
 
 /// ADC FILTCON register settings. Valid for registers FILTCON0-FILTCON3.
+#[allow(non_snake_case)]
 pub mod Filtcon {
     pub mod Enhfilten {
         pub const ENABLED: u32 = 1 << 11; // enable postfilter
