@@ -7,7 +7,7 @@ use stm32h7xx_hal::gpio::Input;
 use super::ad7172;
 
 use super::hal::{
-    gpio::{gpiob::*, gpioc::*, gpioe::*, Alternate, Floating, Output, PushPull, AF5},
+    gpio::{gpiob::*, gpioc::*, gpioe::*, Alternate, Output, PullUp, PushPull, AF5},
     hal::blocking::delay::DelayUs,
     hal::digital::v2::OutputPin,
     prelude::*,
@@ -50,14 +50,14 @@ type SpiPins = (
 pub struct AdcPins {
     pub spi: SpiPins,
     pub cs: (PE0<O>, PE1<O>, PE3<O>, PE4<O>),
-    pub rdyn: PC11<Input<Floating>>,
+    pub rdyn: PC11<Input<PullUp>>,
     pub sync: PB11<O>,
 }
 
 pub struct Adc {
     pub adcs: Adcs,
-    pub rdyn: PC11<Input<Floating>>,
-    // pub sync: PB11<O>,
+    pub rdyn: PC11<Input<PullUp>>,
+    pub sync: PB11<O>,
 }
 
 impl Adc {
@@ -67,7 +67,7 @@ impl Adc {
     /// * `clocks` - Reference to CoreClocks
     /// * `spi4_rec` - Peripheral Reset and Enable Control for SPI4
     /// * `spi4` - SPI4 peripheral
-    /// * `pins` - ADC chip select pins.
+    /// * `pins` - All ADC pins
     pub fn new(
         delay: &mut impl DelayUs<u16>,
         clocks: &CoreClocks,
@@ -97,7 +97,7 @@ impl Adc {
                 ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.3).unwrap(),
             ),
             rdyn: pins.rdyn,
-            // sync: pins.sync,
+            sync: pins.sync,
         };
 
         Adc::setup_adc(&mut adc.adcs.0);
@@ -107,7 +107,7 @@ impl Adc {
 
         // set sync high after initialization of all phys
         // TODO: double check timing after last setup and generally more datasheet studying for this
-        pins.sync.set_high().unwrap();
+        adc.sync.set_high().unwrap();
 
         adc
     }

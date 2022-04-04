@@ -290,7 +290,7 @@ pub fn setup(
 
     let mut syscfg = device.SYSCFG;
     let mut exti = device.EXTI;
-    let mut rdyn = gpioc.pc11.into_floating_input();
+    let mut rdyn = gpioc.pc11.into_pull_up_input();
     rdyn.make_interrupt_source(&mut syscfg);
     rdyn.trigger_on_edge(&mut exti, Edge::Falling);
     rdyn.enable_interrupt(&mut exti);
