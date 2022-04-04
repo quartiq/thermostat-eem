@@ -68,7 +68,7 @@ pub mod Ifmode {
     }
 }
 
-/// ADC GPIOCON register settings. Valid for registers CH0-CH3.
+/// ADC GPIOCON register settings.
 #[allow(non_snake_case)]
 pub mod Gpiocon {
     pub mod SyncEn {
