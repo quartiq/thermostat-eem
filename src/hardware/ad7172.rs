@@ -7,7 +7,7 @@ use super::hal::hal::{
         delay::DelayUs,
         spi::{Transfer, Write},
     },
-    digital::v2::OutputPin,
+    digital::v2::{OutputPin, PinState},
 };
 
 // ADC Register Adresses
@@ -222,11 +222,7 @@ where
     }
 
     pub fn set_cs(&mut self, state: bool) {
-        if state {
-            self.cs.set_high().unwrap();
-        } else {
-            self.cs.set_low().unwrap();
-        }
+        self.cs.set_state(PinState::from(state)).unwrap();
     }
 
     fn get_reg_width(reg: &AdcReg) -> usize {
