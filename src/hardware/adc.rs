@@ -165,5 +165,8 @@ impl Adc {
             ad7172::AdcReg::FILTCON0,
             ad7172::Filtcon::Order::SINC5SINC1 | ad7172::Filtcon::Odr::ODR_1_25,
         );
+
+        // Re-apply (also set after ADC reset) SYNC_EN flag in gpio register for standard synchronization
+        adc.write(ad7172::AdcReg::GPIOCON, ad7172::Gpiocon::SyncEn::ENABLED);
     }
 }

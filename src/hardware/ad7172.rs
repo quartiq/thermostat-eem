@@ -17,6 +17,7 @@ pub enum AdcReg {
     ADCMODE = 0x1,
     IFMODE = 0x2,
     DATA = 0x04,
+    GPIOCON = 0x06,
     ID = 0x7,
     FILTCON0 = 0x28,
     FILTCON1 = 0x29,
@@ -64,6 +65,15 @@ pub mod Adcmode {
 pub mod Ifmode {
     pub mod DataStat {
         pub const ENABLED: u32 = 1 << 6; // enable status reg to be appended after data output
+    }
+}
+
+/// ADC GPIOCON register settings. Valid for registers CH0-CH3.
+#[allow(non_snake_case)]
+pub mod Gpiocon {
+    pub mod SyncEn {
+        pub const ENABLED: u32 = 1 << 11; // enable sync input.
+        pub const DISABLED: u32 = 0 << 11; // disable sync input.
     }
 }
 
@@ -232,6 +242,7 @@ where
             AdcReg::IFMODE => 2,
             AdcReg::DATA => 4, // If DATA_STAT bit is not set this is 3 bytes but a 4 byte read will also yield 3 valid bytes.
             AdcReg::ID => 2,
+            AdcReg::GPIOCON => 2,
             AdcReg::FILTCON0 => 2,
             AdcReg::FILTCON1 => 2,
             AdcReg::FILTCON2 => 2,
