@@ -175,7 +175,7 @@ where
 
         let id = adc.read(AdcReg::ID);
         // check that ID is 0x00DX, as per datasheet
-        if id & 0xf0 != 0x00d0 {
+        if id & 0xfff0 != 0x00d0 {
             return Err(Error::AdcId);
         }
 
