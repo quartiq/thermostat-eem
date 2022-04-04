@@ -293,9 +293,8 @@ pub fn setup(
     let mut rdyn = gpioc.pc11.into_pull_up_input();
     rdyn.make_interrupt_source(&mut syscfg);
     rdyn.trigger_on_edge(&mut exti, Edge::Falling);
-    rdyn.enable_interrupt(&mut exti);
 
-    let adc = Adc::new(
+    let mut adc = Adc::new(
         &mut delay,
         &ccdr.clocks,
         ccdr.peripheral.SPI4,
@@ -319,6 +318,11 @@ pub fn setup(
 
     // enable MCO 2MHz clock output to ADCs
     gpioa.pa8.into_alternate_af0();
+
+    // enable interrupt and setup initiate sampling sequency by selection first adc.
+    // TODO change this
+    adc.rdyn.enable_interrupt(&mut exti);
+    adc.adcs.0.set_cs(false);
 
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);

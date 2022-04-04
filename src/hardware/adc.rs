@@ -19,6 +19,19 @@ use super::hal::{
     stm32::SPI4,
 };
 
+macro_rules! read_adc {
+    ($self:ident, $adcs:ident, $adc:tt, $nextadc:tt) => {{
+        let data = $self.$adcs.$adc.read_data();
+        $self.rdyn.clear_interrupt_pending_bit();
+        $self.current += 1;
+        if $self.current >= Self::SCHEDULE.len() {
+            $self.current = 0;
+        }
+        $self.$adcs.$nextadc.set_cs(false);
+        data
+    }};
+}
+
 #[derive(Clone, Copy, TryFromPrimitive, Debug, Format)]
 #[repr(usize)]
 pub enum InputChannel {
@@ -76,15 +89,14 @@ pub struct Adc {
 impl Adc {
     const SCHEDULE: [(AdcPhy, InputChannel); 8] = [
         (AdcPhy::Zero, InputChannel::Zero),
-        (AdcPhy::Zero, InputChannel::One),
         (AdcPhy::One, InputChannel::Two),
-        (AdcPhy::One, InputChannel::Three),
         (AdcPhy::Two, InputChannel::Four),
-        (AdcPhy::Two, InputChannel::Five),
         (AdcPhy::Three, InputChannel::Six),
+        (AdcPhy::Zero, InputChannel::One),
+        (AdcPhy::One, InputChannel::Three),
+        (AdcPhy::Two, InputChannel::Five),
         (AdcPhy::Three, InputChannel::Seven),
-
-        ];
+    ];
     /// Construct a new ADC driver for all Thermostat input channels.
     ///
     /// # Args
@@ -195,35 +207,18 @@ impl Adc {
         adc.write(ad7172::AdcReg::GPIOCON, ad7172::Gpiocon::SyncEn::ENABLED);
     }
 
-    fn adc_by_index<CS>(
-        &mut self,
-        idx: AdcPhy,
-    ) -> &mut ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, CS>
-    where
-        CS: OutputPin,
-        <CS>::Error: core::fmt::Debug,
-    {
-        match idx {
-            AdcPhy::Zero => &mut self.adcs.0,
-            AdcPhy::One => &mut self.adcs.1,
-            AdcPhy::Two => &mut self.adcs.2,
-            AdcPhy::Three => &mut self.adcs.3,
-        }
-    }
-
     /// Handle adc interrupt.
     pub fn handle_interrupt(&mut self) -> (InputChannel, u32) {
         let (phy, ch) = Self::SCHEDULE[self.current];
-        let (data, status) = self.adc_by_index(phy).read_data();
-        self.rdyn.clear_interrupt_pending_bit();
-        self.current += 1;
-        if self.current >= Self::SCHEDULE.len() {
-            self.current = 0;
-        }
-        self.adc_by_index(Self::SCHEDULE[self.current].0)
-            .set_cs(false);
-
-        assert_eq!(status & 0x3, ch as u8 & 1); // check if correct input channelz
+        let (data, status) = match phy {
+            AdcPhy::Zero => read_adc!(self, adcs, 0, 1),
+            AdcPhy::One => read_adc!(self, adcs, 1, 2),
+            AdcPhy::Two => read_adc!(self, adcs, 2, 3),
+            AdcPhy::Three => read_adc!(self, adcs, 3, 0),
+        };
+        info!("ch: {:?}", ch as u8);
+        info!("status: {:?}", status);
+        assert_eq!(status & 0x3, ch as u8 & 1); // check if correct input channels
 
         (ch, data) // data as °C
     }
