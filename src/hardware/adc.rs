@@ -70,10 +70,21 @@ pub struct Adc {
     pub adcs: Adcs,
     pub rdyn: PC11<Input<PullUp>>,
     pub sync: PB11<O>,
-    pub phy_selected: AdcPhy, // retain info about which CS is currently low
+    pub current: usize, // Schedule position
 }
 
 impl Adc {
+    const SCHEDULE: [(AdcPhy, InputChannel); 8] = [
+        (AdcPhy::Zero, InputChannel::Zero),
+        (AdcPhy::Zero, InputChannel::One),
+        (AdcPhy::One, InputChannel::Two),
+        (AdcPhy::One, InputChannel::Three),
+        (AdcPhy::Two, InputChannel::Four),
+        (AdcPhy::Two, InputChannel::Five),
+        (AdcPhy::Three, InputChannel::Six),
+        (AdcPhy::Three, InputChannel::Seven),
+
+        ];
     /// Construct a new ADC driver for all Thermostat input channels.
     ///
     /// # Args
@@ -111,7 +122,7 @@ impl Adc {
             ),
             rdyn: pins.rdyn,
             sync: pins.sync,
-            phy_selected: AdcPhy::Zero,
+            current: 0,
         };
 
         Adc::setup_adc(&mut adc.adcs.0);
@@ -184,50 +195,36 @@ impl Adc {
         adc.write(ad7172::AdcReg::GPIOCON, ad7172::Gpiocon::SyncEn::ENABLED);
     }
 
-    /// Handle adc interrupt. Sorts the data and converts to °C.
+    fn adc_by_index<CS>(
+        &mut self,
+        idx: AdcPhy,
+    ) -> &mut ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, CS>
+    where
+        CS: OutputPin,
+        <CS>::Error: core::fmt::Debug,
+    {
+        match idx {
+            AdcPhy::Zero => &mut self.adcs.0,
+            AdcPhy::One => &mut self.adcs.1,
+            AdcPhy::Two => &mut self.adcs.2,
+            AdcPhy::Three => &mut self.adcs.3,
+        }
+    }
+
+    /// Handle adc interrupt.
     pub fn handle_interrupt(&mut self) -> (InputChannel, u32) {
-        let currently_selected = self.phy_selected;
-        let data = match currently_selected {
-            AdcPhy::Zero => {
-                let data = self.adcs.0.read_data();
-                self.rdyn.clear_interrupt_pending_bit();
-                self.adcs.1.set_cs(false);
-                self.phy_selected = AdcPhy::One;
-                data
-            }
-            AdcPhy::One => {
-                let data = self.adcs.1.read_data();
-                self.rdyn.clear_interrupt_pending_bit();
-                self.adcs.2.set_cs(false);
-                self.phy_selected = AdcPhy::Two;
-                data
-            }
-            AdcPhy::Two => {
-                let data = self.adcs.2.read_data();
-                self.rdyn.clear_interrupt_pending_bit();
-                self.adcs.3.set_cs(false);
-                self.phy_selected = AdcPhy::Three;
-                data
-            }
-            AdcPhy::Three => {
-                let data = self.adcs.3.read_data();
-                self.rdyn.clear_interrupt_pending_bit();
-                self.adcs.0.set_cs(false);
-                self.phy_selected = AdcPhy::Zero;
-                data
-            }
-        };
-        let is_phy_channel_one = (data.1 & 0x1) == 1;
-        let thermostat_channel = match (currently_selected, is_phy_channel_one) {
-            (AdcPhy::Zero, false) => InputChannel::Zero,
-            (AdcPhy::Zero, true) => InputChannel::One,
-            (AdcPhy::One, false) => InputChannel::Two,
-            (AdcPhy::One, true) => InputChannel::Three,
-            (AdcPhy::Two, false) => InputChannel::Four,
-            (AdcPhy::Two, true) => InputChannel::Five,
-            (AdcPhy::Three, false) => InputChannel::Six,
-            (AdcPhy::Three, true) => InputChannel::Seven,
-        };
-        (thermostat_channel, data.0) // data as °C
+        let (phy, ch) = Self::SCHEDULE[self.current];
+        let (data, status) = self.adc_by_index(phy).read_data();
+        self.rdyn.clear_interrupt_pending_bit();
+        self.current += 1;
+        if self.current >= Self::SCHEDULE.len() {
+            self.current = 0;
+        }
+        self.adc_by_index(Self::SCHEDULE[self.current].0)
+            .set_cs(false);
+
+        assert_eq!(status & 0x3, ch as u8 & 1); // check if correct input channelz
+
+        (ch, data) // data as °C
     }
 }
