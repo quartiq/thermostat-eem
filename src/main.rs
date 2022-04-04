@@ -10,7 +10,6 @@ pub mod net;
 
 use defmt::{info, Format};
 use defmt_rtt as _; // global logger
-use hal::gpio::ExtiPin;
 use panic_probe as _; // gloibal panic handler
 
 use hardware::{
@@ -275,15 +274,23 @@ mod app {
     #[task(binds = EXTI15_10, priority = 1, local=[adc])]
     fn adc(c: adc::Context) {
         let adc = c.local.adc;
-        let data = adc.adcs.0.read_data();
-        info!("data phy 0: {:?}", data);
-        let data = adc.adcs.1.read_data();
-        info!("data phy 1: {:?}", data);
-        let data = adc.adcs.2.read_data();
-        info!("data phy 2: {:?}", data);
-        let data = adc.adcs.3.read_data();
-        info!("data phy 3: {:?}", data);
-        adc.adcs.0.set_cs(false);
-        adc.rdyn.clear_interrupt_pending_bit();
+        let isr_out = adc.handle_interrupt();
+        info!("isr_out: {:?}", isr_out);
+        // spawn iir (isr_out)
     }
+
+    // #[task(binds = EXTI15_10, priority = 1, local=[adc])]
+    // fn adc(c: adc::Context) {
+    //     let adc = c.local.adc;
+    //     let data = adc.adcs.0.read_data();
+    //     info!("data phy 0: {:?}", data);
+    //     let data = adc.adcs.1.read_data();
+    //     info!("data phy 1: {:?}", data);
+    //     let data = adc.adcs.2.read_data();
+    //     info!("data phy 2: {:?}", data);
+    //     let data = adc.adcs.3.read_data();
+    //     info!("data phy 3: {:?}", data);
+    //     adc.adcs.0.set_cs(false);
+    //     adc.rdyn.clear_interrupt_pending_bit();
+    // }
 }

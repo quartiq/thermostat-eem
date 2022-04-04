@@ -1,13 +1,15 @@
 // Thermostat ADC struct.
 
+use defmt::{info, Format};
 use num_enum::TryFromPrimitive;
 use shared_bus_rtic::SharedBus;
-use stm32h7xx_hal::gpio::Input;
 
 use super::ad7172;
 
 use super::hal::{
-    gpio::{gpiob::*, gpioc::*, gpioe::*, Alternate, Output, PullUp, PushPull, AF5},
+    gpio::{
+        gpiob::*, gpioc::*, gpioe::*, Alternate, ExtiPin, Input, Output, PullUp, PushPull, AF5,
+    },
     hal::blocking::delay::DelayUs,
     hal::digital::v2::OutputPin,
     prelude::*,
@@ -17,7 +19,7 @@ use super::hal::{
     stm32::SPI4,
 };
 
-#[derive(Clone, Copy, TryFromPrimitive)]
+#[derive(Clone, Copy, TryFromPrimitive, Debug, Format)]
 #[repr(usize)]
 pub enum InputChannel {
     Zero = 0,
@@ -28,6 +30,16 @@ pub enum InputChannel {
     Five = 5,
     Six = 6,
     Seven = 7,
+}
+
+// Physical ADC devices on Thermostat
+#[derive(Clone, Copy)]
+
+pub enum AdcPhy {
+    Zero = 0,
+    One = 1,
+    Two = 2,
+    Three = 3,
 }
 
 type O = Output<PushPull>;
@@ -58,6 +70,7 @@ pub struct Adc {
     pub adcs: Adcs,
     pub rdyn: PC11<Input<PullUp>>,
     pub sync: PB11<O>,
+    pub phy_selected: AdcPhy, // retain info about which CS is currently low
 }
 
 impl Adc {
@@ -98,6 +111,7 @@ impl Adc {
             ),
             rdyn: pins.rdyn,
             sync: pins.sync,
+            phy_selected: AdcPhy::Zero,
         };
 
         Adc::setup_adc(&mut adc.adcs.0);
@@ -168,5 +182,52 @@ impl Adc {
 
         // Re-apply (also set after ADC reset) SYNC_EN flag in gpio register for standard synchronization
         adc.write(ad7172::AdcReg::GPIOCON, ad7172::Gpiocon::SyncEn::ENABLED);
+    }
+
+    /// Handle adc interrupt. Sorts the data and converts to °C.
+    pub fn handle_interrupt(&mut self) -> (InputChannel, u32) {
+        let currently_selected = self.phy_selected;
+        let data = match currently_selected {
+            AdcPhy::Zero => {
+                let data = self.adcs.0.read_data();
+                self.rdyn.clear_interrupt_pending_bit();
+                self.adcs.1.set_cs(false);
+                self.phy_selected = AdcPhy::One;
+                data
+            }
+            AdcPhy::One => {
+                let data = self.adcs.1.read_data();
+                self.rdyn.clear_interrupt_pending_bit();
+                self.adcs.2.set_cs(false);
+                self.phy_selected = AdcPhy::Two;
+                data
+            }
+            AdcPhy::Two => {
+                let data = self.adcs.2.read_data();
+                self.rdyn.clear_interrupt_pending_bit();
+                self.adcs.3.set_cs(false);
+                self.phy_selected = AdcPhy::Three;
+                data
+            }
+            AdcPhy::Three => {
+                let data = self.adcs.3.read_data();
+                self.rdyn.clear_interrupt_pending_bit();
+                self.adcs.0.set_cs(false);
+                self.phy_selected = AdcPhy::Zero;
+                data
+            }
+        };
+        let is_phy_channel_one = (data.1 & 0x1) == 1;
+        let thermostat_channel = match (currently_selected, is_phy_channel_one) {
+            (AdcPhy::Zero, false) => InputChannel::Zero,
+            (AdcPhy::Zero, true) => InputChannel::One,
+            (AdcPhy::One, false) => InputChannel::Two,
+            (AdcPhy::One, true) => InputChannel::Three,
+            (AdcPhy::Two, false) => InputChannel::Four,
+            (AdcPhy::Two, true) => InputChannel::Five,
+            (AdcPhy::Three, false) => InputChannel::Six,
+            (AdcPhy::Three, true) => InputChannel::Seven,
+        };
+        (thermostat_channel, data.0) // data as °C
     }
 }
