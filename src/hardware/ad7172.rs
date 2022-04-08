@@ -176,10 +176,9 @@ impl Ad7172 {
         // 5000 us delay after reset.
         delay.delay_us(5000u16);
 
-        // TODO move that
-        // let id = adc.read(AdcReg::ID);
-        // // check that ID is 0x00DX, as per datasheet
-        // if id & 0xf0 != 0x00d0 {
+        let id = adc.read(AdcReg::ID);
+        // check that ID is 0x00DX, as per datasheet
+        // if id & 0xfff0 != 0x00d0 {
         //     return Err(Error::AdcId);
         // }
 
