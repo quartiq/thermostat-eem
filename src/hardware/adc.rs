@@ -122,7 +122,7 @@ impl Adc {
         // set sync low first for synchronization at rising edge
         pins.sync.set_low().unwrap();
 
-        // SPI at 1 MHz. SPI MODE_0: idle high, capture on second transition
+        // SPI MODE_3: idle high, capture on second transition
         let spi: Spi<_, _, u8> = spi4.spi(pins.spi, spi::MODE_3, 12500.khz(), spi4_rec, clocks);
 
         let mut adc = Adc {
