@@ -2,34 +2,30 @@
 
 use defmt::{info, Format};
 use num_enum::TryFromPrimitive;
-use shared_bus_rtic::SharedBus;
 
 use super::ad7172;
 
 use super::hal::{
-    gpio::{
-        gpiob::*, gpioc::*, gpioe::*, Alternate, ExtiPin, Input, Output, PullUp, PushPull, AF5,
-    },
+    gpio::{gpiob::*, gpioc::*, gpioe::*, Alternate, Input, Output, PullUp, PushPull, AF5},
     hal::blocking::delay::DelayUs,
     hal::digital::v2::OutputPin,
+    hal::digital::v2::PinState,
     prelude::*,
     rcc::{rec, CoreClocks},
     spi,
-    spi::{Enabled, Spi},
+    spi::Spi,
     stm32::SPI4,
 };
 
-macro_rules! read_adc {
-    ($self:ident, $adcs:ident, $adc:tt, $nextadc:tt) => {{
-        let data = $self.$adcs.$adc.read_data();
-        $self.rdyn.clear_interrupt_pending_bit();
-        $self.current += 1;
-        if $self.current >= Self::SCHEDULE.len() {
-            $self.current = 0;
-        }
-        $self.$adcs.$nextadc.set_cs(false);
-        data
-    }};
+macro_rules! set_cs {
+    ($self:ident, $phy:ident, $state:ident) => {
+        match $phy {
+            AdcPhy::Zero => $self.cs.0.set_state(PinState::from($state)).unwrap(),
+            AdcPhy::One => $self.cs.1.set_state(PinState::from($state)).unwrap(),
+            AdcPhy::Two => $self.cs.2.set_state(PinState::from($state)).unwrap(),
+            AdcPhy::Three => $self.cs.3.set_state(PinState::from($state)).unwrap(),
+        };
+    };
 }
 
 #[derive(Clone, Copy, TryFromPrimitive, Debug, Format)]
@@ -56,12 +52,7 @@ pub enum AdcPhy {
 }
 
 type O = Output<PushPull>;
-type Adcs = (
-    ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE0<O>>,
-    ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE1<O>>,
-    ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE3<O>>,
-    ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE4<O>>,
-);
+type Adcs = ad7172::Ad7172;
 type SpiPins = (
     PE2<Alternate<AF5>>,
     PE5<Alternate<AF5>>,
@@ -83,7 +74,8 @@ pub struct Adc {
     pub adcs: Adcs,
     pub rdyn: PC11<Input<PullUp>>,
     pub sync: PB11<O>,
-    pub current: usize, // Schedule position
+    pub cs: (PE0<O>, PE1<O>, PE3<O>, PE4<O>),
+    pub current_position: usize, // Schedule position
 }
 
 impl Adc {
@@ -123,38 +115,41 @@ impl Adc {
         // SPI at 1 MHz. SPI MODE_0: idle low, capture on first transition
         let spi: Spi<_, _, u8> = spi4.spi(pins.spi, spi::MODE_0, 12500.khz(), spi4_rec, clocks);
 
-        let bus_manager = shared_bus_rtic::new!(spi, Spi<SPI4, Enabled>);
-
         let mut adc = Adc {
-            adcs: (
-                ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.0).unwrap(),
-                ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.1).unwrap(),
-                ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.2).unwrap(),
-                ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.3).unwrap(),
-            ),
+            adcs: ad7172::Ad7172::new(delay, spi).unwrap(),
             rdyn: pins.rdyn,
             sync: pins.sync,
-            current: 0,
+            cs: pins.cs,
+            current_position: 0,
         };
 
-        Adc::setup_adc(&mut adc.adcs.0);
-        Adc::setup_adc(&mut adc.adcs.1);
-        Adc::setup_adc(&mut adc.adcs.2);
-        Adc::setup_adc(&mut adc.adcs.3);
+        // TODO put macro
+        adc.cs.0.set_low().unwrap();
+        Adc::setup_adc(&mut adc.adcs);
+        adc.cs.0.set_high().unwrap();
+        adc.cs.1.set_low().unwrap();
+        Adc::setup_adc(&mut adc.adcs);
+        adc.cs.1.set_high().unwrap();
+        adc.cs.2.set_low().unwrap();
+        Adc::setup_adc(&mut adc.adcs);
+        adc.cs.2.set_high().unwrap();
+        adc.cs.3.set_low().unwrap();
+        Adc::setup_adc(&mut adc.adcs);
+        adc.cs.3.set_high().unwrap();
 
         // set sync high after initialization of all phys
         // TODO: double check timing after last setup and generally more datasheet studying for this
         adc.sync.set_high().unwrap();
 
+        // select first adc to initiate sampling sequence
+        // TODO decide where this should happen
+        adc.cs.0.set_low().unwrap();
+
         adc
     }
 
     /// Setup an adc on Thermostat-EEM.
-    fn setup_adc<CS>(adc: &mut ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, CS>)
-    where
-        CS: OutputPin,
-        <CS>::Error: core::fmt::Debug,
-    {
+    fn setup_adc(adc: &mut ad7172::Ad7172) {
         // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
         adc.write(
             ad7172::AdcReg::ADCMODE,
@@ -209,13 +204,18 @@ impl Adc {
 
     /// Handle adc interrupt.
     pub fn handle_interrupt(&mut self) -> (InputChannel, u32) {
-        let (phy, ch) = Self::SCHEDULE[self.current];
-        let (data, status) = match phy {
-            AdcPhy::Zero => read_adc!(self, adcs, 0, 1),
-            AdcPhy::One => read_adc!(self, adcs, 1, 2),
-            AdcPhy::Two => read_adc!(self, adcs, 2, 3),
-            AdcPhy::Three => read_adc!(self, adcs, 3, 0),
-        };
+        let (current_phy, ch) = Self::SCHEDULE[self.current_position];
+
+        let (data, status) = self.adcs.read_data();
+
+        set_cs!(self, current_phy, false);
+
+        self.current_position = (self.current_position + 1) % Self::SCHEDULE.len();
+
+        let (current_phy, ch) = Self::SCHEDULE[self.current_position];
+
+        set_cs!(self, current_phy, true);
+
         info!("ch: {:?}", ch as u8);
         info!("status: {:?}", status);
         assert_eq!(status & 0x3, ch as u8 & 1); // check if correct input channels

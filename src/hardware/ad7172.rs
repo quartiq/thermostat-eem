@@ -2,12 +2,11 @@
 
 use core::fmt::Debug;
 
-use super::hal::hal::{
-    blocking::{
-        delay::DelayUs,
-        spi::{Transfer, Write},
-    },
-    digital::v2::{OutputPin, PinState},
+use stm32h7xx_hal::spi::Spi;
+
+use super::hal::hal::blocking::{
+    delay::DelayUs,
+    spi::{Transfer, Write},
 };
 
 // ADC Register Adresses
@@ -161,23 +160,17 @@ pub enum Error {
     AdcId,
 }
 
-pub struct Ad7172<SPI, CS> {
-    spi: SPI,
-    cs: CS,
+pub struct Ad7172 {
+    spi: Spi<stm32h7xx_hal::stm32::SPI4, stm32h7xx_hal::spi::Enabled>,
 }
 
-impl<SPI, CS> Ad7172<SPI, CS>
-where
-    SPI: Transfer<u8> + Write<u8>,
-    <SPI as Write<u8>>::Error: core::fmt::Debug,
-    <SPI as Transfer<u8>>::Error: core::fmt::Debug,
-    CS: OutputPin,
-    <CS>::Error: core::fmt::Debug,
-{
-    pub fn new(delay: &mut impl DelayUs<u16>, spi: SPI, mut cs: CS) -> Result<Self, Error> {
+impl Ad7172 {
+    pub fn new(
+        delay: &mut impl DelayUs<u16>,
+        spi: Spi<stm32h7xx_hal::stm32::SPI4, stm32h7xx_hal::spi::Enabled>,
+    ) -> Result<Self, Error> {
         // set CS high first
-        cs.set_high().unwrap();
-        let mut adc = Ad7172 { spi, cs };
+        let mut adc = Ad7172 { spi };
         adc.reset();
 
         // 5000 us delay after reset.
@@ -195,30 +188,24 @@ where
     pub fn reset(&mut self) {
         // 64 cycles high for ADC reset
         let mut buf = [0xFFu8; 8];
-        self.cs.set_low().unwrap();
         let _result = self.spi.transfer(&mut buf).unwrap();
-        self.cs.set_high().unwrap();
     }
 
     /// Read a ADC register of size in bytes. Max. size 4 bytes.
     pub fn read(&mut self, addr: AdcReg) -> u32 {
-        let size = Ad7172::<SPI, CS>::get_reg_width(&addr);
+        let size = Ad7172::get_reg_width(&addr);
         let mut buf = [0u8; 8];
         buf[7 - size] = addr as u8 | 0x40; // addr with read flag
-        self.cs.set_low().unwrap();
         self.spi.transfer(&mut buf[7 - size..]).unwrap();
-        self.cs.set_high().unwrap();
         (u64::from_be_bytes(buf) & ((1 << (size * 8)) - 1)) as u32
     }
 
     /// Write a ADC register of size in bytes. Max. size 3 bytes.
     pub fn write(&mut self, addr: AdcReg, data: u32) {
-        let size = Ad7172::<SPI, CS>::get_reg_width(&addr);
+        let size = Ad7172::get_reg_width(&addr);
         let mut buf = data.to_be_bytes();
         buf[3 - size] = addr as _;
-        self.cs.set_low().unwrap();
         self.spi.write(&buf[3 - size..]).unwrap();
-        self.cs.set_high().unwrap();
     }
 
     /// Reads the data register and returns data and status information.
@@ -229,10 +216,6 @@ where
         let ch = (data_ch & 0xff) as u8;
         let data = data_ch >> 8;
         (data, ch)
-    }
-
-    pub fn set_cs(&mut self, state: bool) {
-        self.cs.set_state(PinState::from(state)).unwrap();
     }
 
     fn get_reg_width(reg: &AdcReg) -> usize {
