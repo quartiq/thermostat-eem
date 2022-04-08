@@ -2,11 +2,7 @@
 
 use core::fmt::Debug;
 
-use stm32h7xx_hal::spi::Spi;
-
-use super::hal::hal::blocking::{
-    spi::{Transfer, Write},
-};
+use super::hal::hal::blocking::spi::{Transfer, Write};
 
 // ADC Register Adresses
 #[allow(unused)]
@@ -159,12 +155,17 @@ pub enum Error {
     AdcId,
 }
 
-pub struct Ad7172 {
-    spi: Spi<stm32h7xx_hal::stm32::SPI4, stm32h7xx_hal::spi::Enabled>,
+pub struct Ad7172<SPI> {
+    spi: SPI,
 }
 
-impl Ad7172 {
-    pub fn new(spi: Spi<stm32h7xx_hal::stm32::SPI4, stm32h7xx_hal::spi::Enabled>) -> Self {
+impl<SPI> Ad7172<SPI>
+where
+    SPI: Transfer<u8> + Write<u8>,
+    <SPI as Write<u8>>::Error: core::fmt::Debug,
+    <SPI as Transfer<u8>>::Error: core::fmt::Debug,
+{
+    pub fn new(spi: SPI) -> Self {
         Ad7172 { spi }
     }
 
@@ -176,7 +177,7 @@ impl Ad7172 {
 
     /// Read a ADC register of size in bytes. Max. size 4 bytes.
     pub fn read(&mut self, addr: AdcReg) -> u32 {
-        let size = Ad7172::get_reg_width(&addr);
+        let size = Ad7172::<SPI>::get_reg_width(&addr);
         let mut buf = [0u8; 8];
         buf[7 - size] = addr as u8 | 0x40; // addr with read flag
         self.spi.transfer(&mut buf[7 - size..]).unwrap();
@@ -185,7 +186,7 @@ impl Ad7172 {
 
     /// Write a ADC register of size in bytes. Max. size 3 bytes.
     pub fn write(&mut self, addr: AdcReg, data: u32) {
-        let size = Ad7172::get_reg_width(&addr);
+        let size = Ad7172::<SPI>::get_reg_width(&addr);
         let mut buf = data.to_be_bytes();
         buf[3 - size] = addr as _;
         self.spi.write(&buf[3 - size..]).unwrap();

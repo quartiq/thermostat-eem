@@ -15,7 +15,7 @@ use super::hal::{
     prelude::*,
     rcc::{rec, CoreClocks},
     spi,
-    spi::Spi,
+    spi::{Enabled, Spi},
     stm32::SPI4,
 };
 
@@ -62,7 +62,7 @@ pub enum AdcPhy {
 }
 
 type O = Output<PushPull>;
-type Adcs = ad7172::Ad7172;
+type Adcs = ad7172::Ad7172<Spi<SPI4, Enabled>>;
 type SpiPins = (
     PE2<Alternate<AF5>>,
     PE5<Alternate<AF5>>,
@@ -146,7 +146,7 @@ impl Adc {
     }
 
     /// Setup an adc on Thermostat-EEM.
-    fn setup_adc(adc: &mut ad7172::Ad7172, delay: &mut impl DelayUs<u16>) {
+    fn setup_adc(adc: &mut ad7172::Ad7172<Spi<SPI4, Enabled>>, delay: &mut impl DelayUs<u16>) {
         adc.reset();
 
         // TODO investigate why this needs to be higher than 500 us. Is it even?
