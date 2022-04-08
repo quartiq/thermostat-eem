@@ -6,7 +6,9 @@ use num_enum::TryFromPrimitive;
 use super::ad7172;
 
 use super::hal::{
-    gpio::{gpiob::*, gpioc::*, gpioe::*, Alternate, Input, Output, PullUp, PushPull, AF5},
+    gpio::{
+        gpiob::*, gpioc::*, gpioe::*, Alternate, ExtiPin, Input, Output, PullUp, PushPull, AF5,
+    },
     hal::blocking::delay::DelayUs,
     hal::digital::v2::OutputPin,
     hal::digital::v2::PinState,
@@ -141,10 +143,6 @@ impl Adc {
         // TODO: double check timing after last setup and generally more datasheet studying for this
         adc.sync.set_high().unwrap();
 
-        // select first adc to initiate sampling sequence
-        // TODO decide where this should happen
-        adc.cs.0.set_low().unwrap();
-
         adc
     }
 
@@ -208,18 +206,26 @@ impl Adc {
 
         let (data, status) = self.adcs.read_data();
 
-        set_cs!(self, current_phy, false);
+        self.rdyn.clear_interrupt_pending_bit();
+
+        set_cs!(self, current_phy, true);
 
         self.current_position = (self.current_position + 1) % Self::SCHEDULE.len();
 
-        let (current_phy, ch) = Self::SCHEDULE[self.current_position];
+        let (current_phy, _) = Self::SCHEDULE[self.current_position];
 
-        set_cs!(self, current_phy, true);
+        set_cs!(self, current_phy, false);
 
         info!("ch: {:?}", ch as u8);
         info!("status: {:?}", status);
         assert_eq!(status & 0x3, ch as u8 & 1); // check if correct input channels
 
         (ch, data) // data as °C
+    }
+
+    /// Initiate the sampling sequence.
+    pub fn initiate_sampling(&mut self) {
+        // select first adc to initiate sampling sequence
+        self.cs.0.set_low().unwrap();
     }
 }

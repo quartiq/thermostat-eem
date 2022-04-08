@@ -322,6 +322,7 @@ pub fn setup(
     // enable interrupt and setup initiate sampling sequency by selection first adc.
     // TODO change this
     adc.rdyn.enable_interrupt(&mut exti);
+    adc.initiate_sampling();
 
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
