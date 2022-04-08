@@ -30,6 +30,14 @@ macro_rules! set_cs {
     };
 }
 
+macro_rules! setup_adc {
+    ($adc:ident, $phy:tt) => {
+        $adc.cs.$phy.set_low().unwrap();
+        Adc::setup_adc(&mut $adc.adcs);
+        $adc.cs.$phy.set_high().unwrap();
+    };
+}
+
 #[derive(Clone, Copy, TryFromPrimitive, Debug, Format)]
 #[repr(usize)]
 pub enum InputChannel {
@@ -125,19 +133,10 @@ impl Adc {
             current_position: 0,
         };
 
-        // TODO put macro
-        adc.cs.0.set_low().unwrap();
-        Adc::setup_adc(&mut adc.adcs);
-        adc.cs.0.set_high().unwrap();
-        adc.cs.1.set_low().unwrap();
-        Adc::setup_adc(&mut adc.adcs);
-        adc.cs.1.set_high().unwrap();
-        adc.cs.2.set_low().unwrap();
-        Adc::setup_adc(&mut adc.adcs);
-        adc.cs.2.set_high().unwrap();
-        adc.cs.3.set_low().unwrap();
-        Adc::setup_adc(&mut adc.adcs);
-        adc.cs.3.set_high().unwrap();
+        setup_adc!(adc, 0);
+        setup_adc!(adc, 1);
+        setup_adc!(adc, 2);
+        setup_adc!(adc, 3);
 
         // set sync high after initialization of all phys
         // TODO: double check timing after last setup and generally more datasheet studying for this
@@ -226,6 +225,7 @@ impl Adc {
     /// Initiate the sampling sequence.
     pub fn initiate_sampling(&mut self) {
         // select first adc to initiate sampling sequence
-        self.cs.0.set_low().unwrap();
+        let (first_phy, _) = Self::SCHEDULE[self.current_position];
+        set_cs!(self, first_phy, false);
     }
 }
