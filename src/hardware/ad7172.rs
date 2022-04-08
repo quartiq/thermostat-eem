@@ -5,7 +5,6 @@ use core::fmt::Debug;
 use stm32h7xx_hal::spi::Spi;
 
 use super::hal::hal::blocking::{
-    delay::DelayUs,
     spi::{Transfer, Write},
 };
 
@@ -165,24 +164,8 @@ pub struct Ad7172 {
 }
 
 impl Ad7172 {
-    pub fn new(
-        delay: &mut impl DelayUs<u16>,
-        spi: Spi<stm32h7xx_hal::stm32::SPI4, stm32h7xx_hal::spi::Enabled>,
-    ) -> Result<Self, Error> {
-        // set CS high first
-        let mut adc = Ad7172 { spi };
-        adc.reset();
-
-        // 5000 us delay after reset.
-        delay.delay_us(5000u16);
-
-        let id = adc.read(AdcReg::ID);
-        // check that ID is 0x00DX, as per datasheet
-        // if id & 0xfff0 != 0x00d0 {
-        //     return Err(Error::AdcId);
-        // }
-
-        Ok(adc)
+    pub fn new(spi: Spi<stm32h7xx_hal::stm32::SPI4, stm32h7xx_hal::spi::Enabled>) -> Self {
+        Ad7172 { spi }
     }
 
     pub fn reset(&mut self) {

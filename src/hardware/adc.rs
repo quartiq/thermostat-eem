@@ -11,7 +11,7 @@ use super::hal::{
     },
     hal::blocking::delay::DelayUs,
     hal::digital::v2::OutputPin,
-    hal::digital::v2::PinState,
+    hal::digital::v2::PinState::{High, Low},
     prelude::*,
     rcc::{rec, CoreClocks},
     spi,
@@ -22,18 +22,18 @@ use super::hal::{
 macro_rules! set_cs {
     ($self:ident, $phy:ident, $state:ident) => {
         match $phy {
-            AdcPhy::Zero => $self.cs.0.set_state(PinState::from($state)).unwrap(),
-            AdcPhy::One => $self.cs.1.set_state(PinState::from($state)).unwrap(),
-            AdcPhy::Two => $self.cs.2.set_state(PinState::from($state)).unwrap(),
-            AdcPhy::Three => $self.cs.3.set_state(PinState::from($state)).unwrap(),
+            AdcPhy::Zero => $self.cs.0.set_state($state).unwrap(),
+            AdcPhy::One => $self.cs.1.set_state($state).unwrap(),
+            AdcPhy::Two => $self.cs.2.set_state($state).unwrap(),
+            AdcPhy::Three => $self.cs.3.set_state($state).unwrap(),
         };
     };
 }
 
 macro_rules! setup_adc {
-    ($adc:ident, $phy:tt) => {
+    ($adc:ident, $delay:ident, $phy:tt) => {
         $adc.cs.$phy.set_low().unwrap();
-        Adc::setup_adc(&mut $adc.adcs);
+        Adc::setup_adc(&mut $adc.adcs, $delay);
         $adc.cs.$phy.set_high().unwrap();
     };
 }
@@ -126,17 +126,17 @@ impl Adc {
         let spi: Spi<_, _, u8> = spi4.spi(pins.spi, spi::MODE_3, 12500.khz(), spi4_rec, clocks);
 
         let mut adc = Adc {
-            adcs: ad7172::Ad7172::new(delay, spi).unwrap(),
+            adcs: ad7172::Ad7172::new(spi),
             rdyn: pins.rdyn,
             sync: pins.sync,
             cs: pins.cs,
             current_position: 0,
         };
 
-        setup_adc!(adc, 0);
-        setup_adc!(adc, 1);
-        setup_adc!(adc, 2);
-        setup_adc!(adc, 3);
+        setup_adc!(adc, delay, 0);
+        setup_adc!(adc, delay, 1);
+        setup_adc!(adc, delay, 2);
+        setup_adc!(adc, delay, 3);
 
         // set sync high after initialization of all phys
         // TODO: double check timing after last setup and generally more datasheet studying for this
@@ -146,7 +146,19 @@ impl Adc {
     }
 
     /// Setup an adc on Thermostat-EEM.
-    fn setup_adc(adc: &mut ad7172::Ad7172) {
+    fn setup_adc(adc: &mut ad7172::Ad7172, delay: &mut impl DelayUs<u16>) {
+        adc.reset();
+
+        // TODO investigate why this needs to be higher than 500 us. Is it even?
+        delay.delay_us(5000u16);
+
+        let id = adc.read(ad7172::AdcReg::ID);
+        // check that ID is 0x00DX, as per datasheet
+        if id & 0xfff0 != 0x00d0 {
+            // return Err(Error::AdcId);
+            panic!();
+        }
+
         // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
         adc.write(
             ad7172::AdcReg::ADCMODE,
@@ -207,13 +219,13 @@ impl Adc {
 
         self.rdyn.clear_interrupt_pending_bit();
 
-        set_cs!(self, current_phy, true);
+        set_cs!(self, current_phy, High);
 
         self.current_position = (self.current_position + 1) % Self::SCHEDULE.len();
 
         let (current_phy, _) = Self::SCHEDULE[self.current_position];
 
-        set_cs!(self, current_phy, false);
+        set_cs!(self, current_phy, Low);
 
         info!("ch: {:?}", ch as u8);
         info!("status: {:?}", status);
@@ -226,6 +238,6 @@ impl Adc {
     pub fn initiate_sampling(&mut self) {
         // select first adc to initiate sampling sequence
         let (first_phy, _) = Self::SCHEDULE[self.current_position];
-        set_cs!(self, first_phy, false);
+        set_cs!(self, first_phy, Low);
     }
 }
