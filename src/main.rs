@@ -250,9 +250,6 @@ mod app {
             .network
             .lock(|network| network.telemetry.publish(&telemetry));
 
-        // let stuff = c.local.adc.adcs.0.read_data();
-        // info!("stuff: {:?}", stuff);
-
         // TODO: validate telemetry period.
         let telemetry_period = c.shared.settings.lock(|settings| settings.telemetry_period);
         telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();

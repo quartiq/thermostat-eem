@@ -320,8 +320,7 @@ pub fn setup(
     // enable MCO 2MHz clock output to ADCs
     gpioa.pa8.into_alternate_af0();
 
-    // enable interrupt and setup initiate sampling sequency by selection first adc.
-    // TODO change this
+    // enable interrupt and initiate sampling sequency by selection first adc.
     adc.rdyn.enable_interrupt(&mut exti);
     adc.initiate_sampling();
 
