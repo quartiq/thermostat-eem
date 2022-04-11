@@ -50,30 +50,40 @@ pub enum AdcPhy {
     Three = 3,
 }
 
-type O = Output<PushPull>;
 type Adcs = ad7172::Ad7172<Spi<SPI4, Enabled>>;
-type SpiPins = (
-    PE2<Alternate<AF5>>,
-    PE5<Alternate<AF5>>,
-    PE6<Alternate<AF5>>,
-);
+
+#[allow(complex_type)]
 /// All pins for all ADCs.
 /// * `spi` - Spi clk, miso, mosi (in this order).
 /// * `cs` - The four chip select pins.
 /// * `rdyn` - ADC rdyn input (this is the same ad spi dout).
 /// * `sync` - ADC sync pin (shared for all adc phys).
 pub struct AdcPins {
-    pub spi: SpiPins,
-    pub cs: (PE0<O>, PE1<O>, PE3<O>, PE4<O>),
+    pub spi: (
+        PE2<Alternate<AF5>>,
+        PE5<Alternate<AF5>>,
+        PE6<Alternate<AF5>>,
+    ),
+    pub cs: (
+        PE0<Output<PushPull>>,
+        PE1<Output<PushPull>>,
+        PE3<Output<PushPull>>,
+        PE4<Output<PushPull>>,
+    ),
     pub rdyn: PC11<Input<PullUp>>,
-    pub sync: PB11<O>,
+    pub sync: PB11<Output<PushPull>>,
 }
 
 pub struct Adc {
     pub adcs: Adcs,
     pub rdyn: PC11<Input<PullUp>>,
-    pub sync: PB11<O>,
-    pub cs: (PE0<O>, PE1<O>, PE3<O>, PE4<O>),
+    pub sync: PB11<Output<PushPull>>,
+    pub cs: (
+        PE0<Output<PushPull>>,
+        PE1<Output<PushPull>>,
+        PE3<Output<PushPull>>,
+        PE4<Output<PushPull>>,
+    ),
     pub current_position: usize, // Schedule position
 }
 
