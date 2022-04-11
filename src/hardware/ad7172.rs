@@ -41,16 +41,16 @@ pub enum AdcReg {
 #[allow(non_snake_case)]
 pub mod Adcmode {
     pub mod RefEn {
-        pub const ENABLED: u32 = 1 << 15; // Internal reference enable
+        pub const ENABLED: u32 = 1 << 15;
     }
     pub mod Mode {
-        pub const CONTINOUS_CONVERSION: u32 = 0b000 << 4; // Continuous conversion mode
+        pub const CONTINOUS_CONVERSION: u32 = 0b000 << 4;
     }
     pub mod Clocksel {
-        pub const INTERNAL_OSC: u32 = 0b00 << 2; // Internal oscillator clock source
-        pub const INTERNAL_OSC_OUT: u32 = 0b01 << 2; // Internal oscillator clock source and output
-        pub const EXTERNAL_CLOCK: u32 = 0b10 << 2; // External clock input
-        pub const EXTERNAL_OSC: u32 = 0b11 << 2; // External oscillator clock source
+        pub const INTERNAL_OSC: u32 = 0b00 << 2;
+        pub const INTERNAL_OSC_OUT: u32 = 0b01 << 2;
+        pub const EXTERNAL_CLOCK: u32 = 0b10 << 2;
+        pub const EXTERNAL_OSC: u32 = 0b11 << 2;
     }
 }
 
@@ -58,7 +58,7 @@ pub mod Adcmode {
 #[allow(non_snake_case)]
 pub mod Ifmode {
     pub mod DataStat {
-        pub const ENABLED: u32 = 1 << 6; // enable status reg to be appended after data output
+        pub const ENABLED: u32 = 1 << 6;
     }
 }
 
@@ -66,8 +66,8 @@ pub mod Ifmode {
 #[allow(non_snake_case)]
 pub mod Gpiocon {
     pub mod SyncEn {
-        pub const ENABLED: u32 = 1 << 11; // enable sync input.
-        pub const DISABLED: u32 = 0 << 11; // disable sync input.
+        pub const ENABLED: u32 = 1 << 11;
+        pub const DISABLED: u32 = 0 << 11;
     }
 }
 
@@ -75,27 +75,27 @@ pub mod Gpiocon {
 #[allow(non_snake_case)]
 pub mod Channel {
     pub mod ChEn {
-        pub const ENABLED: u32 = 1 << 15; // enable channel
+        pub const ENABLED: u32 = 1 << 15;
     }
     pub mod SetupSel {
-        pub const SETUP_0: u32 = 0b00 << 12; // Use setup register set 0
-        pub const SETUP_1: u32 = 0b01 << 12; // Use setup register set 1
-        pub const SETUP_2: u32 = 0b10 << 12; // Use setup register set 2
-        pub const SETUP_3: u32 = 0b11 << 12; // Use setup register set 3
+        pub const SETUP_0: u32 = 0b00 << 12;
+        pub const SETUP_1: u32 = 0b01 << 12;
+        pub const SETUP_2: u32 = 0b10 << 12;
+        pub const SETUP_3: u32 = 0b11 << 12;
     }
     pub mod Ainpos {
-        pub const AIN0: u32 = 0b00000 << 5; // select AIN0 for positive channel input
-        pub const AIN1: u32 = 0b00001 << 5; // select AIN1 for positive channel input
-        pub const AIN2: u32 = 0b00010 << 5; // select AIN2 for positive channel input
-        pub const AIN3: u32 = 0b00011 << 5; // select AIN3 for positive channel input
-        pub const AIN4: u32 = 0b00100 << 5; // select AIN4 for positive channel input
+        pub const AIN0: u32 = 0b00000 << 5;
+        pub const AIN1: u32 = 0b00001 << 5;
+        pub const AIN2: u32 = 0b00010 << 5;
+        pub const AIN3: u32 = 0b00011 << 5;
+        pub const AIN4: u32 = 0b00100 << 5;
     }
     pub mod Ainneg {
-        pub const AIN0: u32 = 0b00000; // select AIN0 for negative channel input
-        pub const AIN1: u32 = 0b00001; // select AIN1 for negative channel input
-        pub const AIN2: u32 = 0b00010; // select AIN2 for negative channel input
-        pub const AIN3: u32 = 0b00011; // select AIN3 for negative channel input
-        pub const AIN4: u32 = 0b00100; // select AIN4 for negative channel input
+        pub const AIN0: u32 = 0b00000;
+        pub const AIN1: u32 = 0b00001;
+        pub const AIN2: u32 = 0b00010;
+        pub const AIN3: u32 = 0b00011;
+        pub const AIN4: u32 = 0b00100;
     }
 }
 
@@ -103,25 +103,25 @@ pub mod Channel {
 #[allow(non_snake_case)]
 pub mod Setupcon {
     pub mod BiUnipolar {
-        pub const BIPOLAR: u32 = 1 << 12; // Bipolar input
-        pub const UNIPOLAR: u32 = 0 << 12; // Unipolar input
+        pub const BIPOLAR: u32 = 1 << 12;
+        pub const UNIPOLAR: u32 = 0 << 12;
     }
     pub mod Refbufp {
-        pub const ENABLED: u32 = 1 << 11; // REFBUF+
+        pub const ENABLED: u32 = 1 << 11;
     }
     pub mod Refbufn {
-        pub const ENABLED: u32 = 1 << 10; // REFBUF-
+        pub const ENABLED: u32 = 1 << 10;
     }
     pub mod Ainbufp {
-        pub const ENABLED: u32 = 1 << 9; // AINBUF+
+        pub const ENABLED: u32 = 1 << 9;
     }
     pub mod Ainbufn {
-        pub const ENABLED: u32 = 1 << 8; // AINBUF-
+        pub const ENABLED: u32 = 1 << 8;
     }
     pub mod Refsel {
-        pub const EXTERNAL: u32 = 0b00 << 4; // External reference
-        pub const INTERNAL: u32 = 0b10 << 4; // Internal 2,5V reference
-        pub const DIAGNOSTIC: u32 = 0b11 << 4; // diagnostic reference
+        pub const EXTERNAL: u32 = 0b00 << 4;
+        pub const INTERNAL: u32 = 0b10 << 4;
+        pub const DIAGNOSTIC: u32 = 0b11 << 4;
     }
 }
 
@@ -129,23 +129,23 @@ pub mod Setupcon {
 #[allow(non_snake_case)]
 pub mod Filtcon {
     pub mod Enhfilten {
-        pub const ENABLED: u32 = 1 << 11; // enable postfilter
+        pub const ENABLED: u32 = 1 << 11;
     }
     pub mod Enhfilt {
-        pub const SPS_27: u32 = 0b010 << 8; // 27 SPS, 47 dB rejection, 36.7 ms settling postfilter
-        pub const SPS_21: u32 = 0b011 << 8; // 21.25 SPS, 62 dB rejection, 40 ms settling postfilter
-        pub const SPS_20: u32 = 0b101 << 8; // 20 SPS, 86 dB rejection, 50 ms settling postfilter
-        pub const SPS_16: u32 = 0b110 << 8; // 16.67 SPS, 92 dB rejection, 60 ms settling postfilter
+        pub const SPS_27: u32 = 0b010 << 8;
+        pub const SPS_21: u32 = 0b011 << 8;
+        pub const SPS_20: u32 = 0b101 << 8;
+        pub const SPS_16: u32 = 0b110 << 8;
     }
     pub mod Order {
-        pub const SINC5SINC1: u32 = 0b00 << 5; // Sinc5 + Sinc1 sigma delta filter
-        pub const SINC3: u32 = 0b11 << 5; // Sinc3 sigma delta filter
+        pub const SINC5SINC1: u32 = 0b00 << 5;
+        pub const SINC3: u32 = 0b11 << 5;
     }
     pub mod Odr {
-        pub const ODR_1_25: u32 = 0b10110; // Output data rate 1.25 Hz
-        pub const ODR_10: u32 = 0b10011; // Output data rate 10 Hz
-        pub const ODR_20: u32 = 0b10001; // Output data rate 20 Hz
-        pub const ODR_1007: u32 = 0b01010; // Output data rate 1007 Hz
+        pub const ODR_1_25: u32 = 0b10110;
+        pub const ODR_10: u32 = 0b10011;
+        pub const ODR_20: u32 = 0b10001;
+        pub const ODR_1007: u32 = 0b01010;
     }
 }
 
