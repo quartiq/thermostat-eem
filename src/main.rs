@@ -271,7 +271,8 @@ mod app {
     #[task(binds = EXTI15_10, priority = 2, local=[adc])]
     fn adc(c: adc::Context) {
         let adc = c.local.adc;
-        let _ = adc.handle_interrupt();
+        let isr_out = adc.handle_interrupt();
+        info!("isr_out: {:?}", isr_out);
         // spawn iir (isr_out)
     }
 }
