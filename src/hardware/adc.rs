@@ -30,14 +30,6 @@ macro_rules! set_cs {
     };
 }
 
-macro_rules! setup_adc {
-    ($adc:ident, $delay:ident, $phy:tt) => {
-        $adc.cs.$phy.set_low().unwrap();
-        $adc.setup_adc($delay);
-        $adc.cs.$phy.set_high().unwrap();
-    };
-}
-
 #[derive(Clone, Copy, TryFromPrimitive, Debug, Format)]
 #[repr(usize)]
 pub enum InputChannel {
@@ -50,9 +42,6 @@ pub enum InputChannel {
     Six = 6,
     Seven = 7,
 }
-
-// Physical ADC devices on Thermostat
-#[derive(Clone, Copy)]
 
 pub enum AdcPhy {
     Zero = 0,
