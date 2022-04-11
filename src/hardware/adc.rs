@@ -133,10 +133,18 @@ impl Adc {
             current_position: 0,
         };
 
-        setup_adc!(adc, delay, 0);
-        setup_adc!(adc, delay, 1);
-        setup_adc!(adc, delay, 2);
-        setup_adc!(adc, delay, 3);
+        adc.cs.0.set_low().unwrap();
+        adc.setup_adc(delay);
+        adc.cs.0.set_high().unwrap();
+        adc.cs.1.set_low().unwrap();
+        adc.setup_adc(delay);
+        adc.cs.1.set_high().unwrap();
+        adc.cs.2.set_low().unwrap();
+        adc.setup_adc(delay);
+        adc.cs.2.set_high().unwrap();
+        adc.cs.3.set_low().unwrap();
+        adc.setup_adc(delay);
+        adc.cs.3.set_high().unwrap();
 
         // set sync high after initialization of all phys
         // TODO: double check timing after last setup and generally more datasheet studying for this
