@@ -33,7 +33,7 @@ macro_rules! set_cs {
 macro_rules! setup_adc {
     ($adc:ident, $delay:ident, $phy:tt) => {
         $adc.cs.$phy.set_low().unwrap();
-        Adc::setup_adc(&mut $adc.adcs, $delay);
+        $adc.setup_adc($delay);
         $adc.cs.$phy.set_high().unwrap();
     };
 }
@@ -146,12 +146,12 @@ impl Adc {
     }
 
     /// Setup an adc on Thermostat-EEM.
-    fn setup_adc(adc: &mut Adcs, delay: &mut impl DelayUs<u16>) {
-        adc.reset();
+    fn setup_adc(&mut self, delay: &mut impl DelayUs<u16>) {
+        self.adcs.reset();
 
         delay.delay_us(500u16);
 
-        let id = adc.read(ad7172::AdcReg::ID);
+        let id = self.adcs.read(ad7172::AdcReg::ID);
         // check that ID is 0x00DX, as per datasheet
         if id & 0xfff0 != 0x00d0 {
             // return Err(Error::AdcId);
@@ -160,7 +160,7 @@ impl Adc {
         }
 
         // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
-        adc.write(
+        self.adcs.write(
             ad7172::AdcReg::ADCMODE,
             ad7172::Adcmode::RefEn::ENABLED
                 | ad7172::Adcmode::Mode::CONTINOUS_CONVERSION
@@ -168,11 +168,12 @@ impl Adc {
         );
 
         // Setup IFMODE register. Only enable data stat to get channel info on conversions.
-        adc.write(ad7172::AdcReg::IFMODE, ad7172::Ifmode::DataStat::ENABLED);
+        self.adcs
+            .write(ad7172::AdcReg::IFMODE, ad7172::Ifmode::DataStat::ENABLED);
 
         // enable first channel and configure Ain0, Ain1,
         // set config 0 for first channel.
-        adc.write(
+        self.adcs.write(
             ad7172::AdcReg::CH0,
             ad7172::Channel::ChEn::ENABLED
                 | ad7172::Channel::SetupSel::SETUP_0
@@ -182,7 +183,7 @@ impl Adc {
 
         // enable second channel and configure Ain2, Ain3,
         // set config 0 for second channel too.
-        adc.write(
+        self.adcs.write(
             ad7172::AdcReg::CH1,
             ad7172::Channel::ChEn::ENABLED
                 | ad7172::Channel::SetupSel::SETUP_0
@@ -191,7 +192,7 @@ impl Adc {
         );
 
         // Setup firstconfiguration register
-        adc.write(
+        self.adcs.write(
             ad7172::AdcReg::SETUPCON0,
             ad7172::Setupcon::BiUnipolar::UNIPOLAR
                 | ad7172::Setupcon::Refbufn::ENABLED
@@ -202,13 +203,14 @@ impl Adc {
         );
 
         // Setup first filter configuration register. 10Hz data rate. Sinc5Sinc1 Filter. No postfilter.
-        adc.write(
+        self.adcs.write(
             ad7172::AdcReg::FILTCON0,
             ad7172::Filtcon::Order::SINC5SINC1 | ad7172::Filtcon::Odr::ODR_1_25,
         );
 
         // Re-apply (also set after ADC reset) SYNC_EN flag in gpio register for standard synchronization
-        adc.write(ad7172::AdcReg::GPIOCON, ad7172::Gpiocon::SyncEn::ENABLED);
+        self.adcs
+            .write(ad7172::AdcReg::GPIOCON, ad7172::Gpiocon::SyncEn::ENABLED);
     }
 
     /// Handle adc interrupt.
