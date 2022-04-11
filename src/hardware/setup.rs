@@ -14,6 +14,7 @@ use super::{
     adc::{Adc, AdcPins},
     adc_internal::{AdcInternal, AdcInternalPins},
     dac::{Dac, DacPins},
+    delay,
     fan::{Fan, FanPins},
     gpio::{Gpio, GpioPins},
     pwm::{Pwm, PwmPins},
@@ -137,7 +138,7 @@ pub fn setup(
 
     info!("--- Starting hardware setup");
 
-    let mut delay = asm_delay::AsmDelay::new(asm_delay::bitrate::Hertz(ccdr.clocks.c_ck().0));
+    let mut delay = delay::AsmDelay::new(ccdr.clocks.c_ck().0);
 
     // Take GPIOs
     let gpioa = device.GPIOA.split(ccdr.peripheral.GPIOA);

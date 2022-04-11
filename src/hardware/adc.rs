@@ -1,6 +1,6 @@
 // Thermostat ADC struct.
 
-use defmt::{info, Format};
+use defmt::Format;
 use num_enum::TryFromPrimitive;
 
 use super::ad7172;
@@ -9,7 +9,7 @@ use super::hal::{
     gpio::{
         gpiob::*, gpioc::*, gpioe::*, Alternate, ExtiPin, Input, Output, PullUp, PushPull, AF5,
     },
-    hal::blocking::delay::DelayMs,
+    hal::blocking::delay::DelayUs,
     hal::digital::v2::OutputPin,
     hal::digital::v2::PinState::{High, Low},
     prelude::*,
@@ -107,7 +107,7 @@ impl Adc {
     /// * `spi4` - SPI4 peripheral
     /// * `pins` - All ADC pins
     pub fn new(
-        delay: &mut impl DelayMs<u16>,
+        delay: &mut impl DelayUs<u16>,
         clocks: &CoreClocks,
         spi4_rec: rec::Spi4,
         spi4: SPI4,
@@ -146,11 +146,10 @@ impl Adc {
     }
 
     /// Setup an adc on Thermostat-EEM.
-    fn setup_adc(adc: &mut Adcs, delay: &mut impl DelayMs<u16>) {
+    fn setup_adc(adc: &mut Adcs, delay: &mut impl DelayUs<u16>) {
         adc.reset();
 
-        // TODO use something else that actually waits for the specified time.
-        delay.delay_ms(5u16);
+        delay.delay_us(500u16);
 
         let id = adc.read(ad7172::AdcReg::ID);
         // check that ID is 0x00DX, as per datasheet
@@ -228,8 +227,6 @@ impl Adc {
 
         set_cs!(self, current_phy, Low);
 
-        info!("ch: {:?}", ch as u8);
-        info!("status: {:?}", status);
         assert_eq!(status & 0x3, ch as u8 & 1); // check if correct input channels
 
         (ch, data) // data as °C
