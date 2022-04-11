@@ -227,7 +227,7 @@ impl Adc {
 
         set_cs!(self, current_phy, Low);
 
-        assert_eq!(status & 0x3, ch as u8 & 1); // check if correct input channels
+        assert_eq!(status & 0x3, ch as u8 & 1); // check if correct input channel
 
         (ch, data) // data as °C
     }
