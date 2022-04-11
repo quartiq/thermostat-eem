@@ -9,7 +9,7 @@ use super::hal::{
     gpio::{
         gpiob::*, gpioc::*, gpioe::*, Alternate, ExtiPin, Input, Output, PullUp, PushPull, AF5,
     },
-    hal::blocking::delay::DelayUs,
+    hal::blocking::delay::DelayMs,
     hal::digital::v2::OutputPin,
     hal::digital::v2::PinState::{High, Low},
     prelude::*,
@@ -107,7 +107,7 @@ impl Adc {
     /// * `spi4` - SPI4 peripheral
     /// * `pins` - All ADC pins
     pub fn new(
-        delay: &mut impl DelayUs<u16>,
+        delay: &mut impl DelayMs<u16>,
         clocks: &CoreClocks,
         spi4_rec: rec::Spi4,
         spi4: SPI4,
@@ -146,16 +146,17 @@ impl Adc {
     }
 
     /// Setup an adc on Thermostat-EEM.
-    fn setup_adc(adc: &mut ad7172::Ad7172<Spi<SPI4, Enabled>>, delay: &mut impl DelayUs<u16>) {
+    fn setup_adc(adc: &mut Adcs, delay: &mut impl DelayMs<u16>) {
         adc.reset();
 
-        // TODO investigate why this needs to be higher than 500 us. Is it even?
-        delay.delay_us(5000u16);
+        // TODO use something else that actually waits for the specified time.
+        delay.delay_ms(5u16);
 
         let id = adc.read(ad7172::AdcReg::ID);
         // check that ID is 0x00DX, as per datasheet
         if id & 0xfff0 != 0x00d0 {
             // return Err(Error::AdcId);
+            // TODO return error insted of panicing here
             panic!();
         }
 

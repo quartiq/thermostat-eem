@@ -177,7 +177,7 @@ where
 
     /// Read a ADC register of size in bytes. Max. size 4 bytes.
     pub fn read(&mut self, addr: AdcReg) -> u32 {
-        let size = Ad7172::<SPI>::get_reg_width(&addr);
+        let size = Self::get_reg_width(&addr);
         let mut buf = [0u8; 8];
         buf[7 - size] = addr as u8 | 0x40; // addr with read flag
         self.spi.transfer(&mut buf[7 - size..]).unwrap();
@@ -186,7 +186,7 @@ where
 
     /// Write a ADC register of size in bytes. Max. size 3 bytes.
     pub fn write(&mut self, addr: AdcReg, data: u32) {
-        let size = Ad7172::<SPI>::get_reg_width(&addr);
+        let size = Self::get_reg_width(&addr);
         let mut buf = data.to_be_bytes();
         buf[3 - size] = addr as _;
         self.spi.write(&buf[3 - size..]).unwrap();
