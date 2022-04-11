@@ -52,7 +52,7 @@ pub enum AdcPhy {
 
 type Adcs = ad7172::Ad7172<Spi<SPI4, Enabled>>;
 
-#[allow(complex_type)]
+#[allow(clippy::complexity)]
 /// All pins for all ADCs.
 /// * `spi` - Spi clk, miso, mosi (in this order).
 /// * `cs` - The four chip select pins.
@@ -74,6 +74,7 @@ pub struct AdcPins {
     pub sync: PB11<Output<PushPull>>,
 }
 
+#[allow(clippy::complexity)]
 pub struct Adc {
     pub adcs: Adcs,
     pub rdyn: PC11<Input<PullUp>>,
