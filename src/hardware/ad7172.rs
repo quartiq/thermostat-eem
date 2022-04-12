@@ -10,13 +10,10 @@ pub enum AdcReg {
     STATUS = 0x00,
     ADCMODE = 0x1,
     IFMODE = 0x2,
+    REGCHECK = 0x3,
     DATA = 0x04,
     GPIOCON = 0x06,
     ID = 0x7,
-    FILTCON0 = 0x28,
-    FILTCON1 = 0x29,
-    FILTCON2 = 0x2a,
-    FILTCON3 = 0x2b,
     CH0 = 0x10,
     CH1 = 0x11,
     CH2 = 0x12,
@@ -25,6 +22,10 @@ pub enum AdcReg {
     SETUPCON1 = 0x21,
     SETUPCON2 = 0x22,
     SETUPCON3 = 0x23,
+    FILTCON0 = 0x28,
+    FILTCON1 = 0x29,
+    FILTCON2 = 0x2a,
+    FILTCON3 = 0x2b,
     OFFSET0 = 0x30,
     OFFSET1 = 0x31,
     OFFSET2 = 0x32,
@@ -36,6 +37,18 @@ pub enum AdcReg {
 }
 
 // *Note*: Register bitfields are not exhaustive.
+
+#[allow(non_snake_case)]
+pub mod Comms {
+    pub mod Wen {
+        pub const ENABLED: u32 = 0 << 7;
+        pub const DISABLED: u32 = 1 << 7;
+    }
+    pub mod RW {
+        pub const WRITE: u32 = 0 << 6;
+        pub const READ: u32 = 1 << 6;
+    }
+}
 
 /// ADCMODE register settings.
 #[allow(non_snake_case)]
@@ -172,23 +185,23 @@ where
     pub fn reset(&mut self) {
         // 64 cycles high for ADC reset
         let mut buf = [0xFFu8; 8];
-        let _result = self.spi.transfer(&mut buf).unwrap();
+        self.spi.transfer(&mut buf).unwrap();
     }
 
     /// Read a ADC register of size in bytes. Max. size 4 bytes.
     pub fn read(&mut self, addr: AdcReg) -> u32 {
-        let size = Self::get_reg_width(&addr);
+        let size = Self::reg_width(&addr);
         let mut buf = [0u8; 8];
-        buf[7 - size] = addr as u8 | 0x40; // addr with read flag
+        buf[7 - size] = addr as u8 | Comms::RW::READ as u8; // addr with read flag
         self.spi.transfer(&mut buf[7 - size..]).unwrap();
         (u64::from_be_bytes(buf) & ((1 << (size * 8)) - 1)) as u32
     }
 
     /// Write a ADC register of size in bytes. Max. size 3 bytes.
     pub fn write(&mut self, addr: AdcReg, data: u32) {
-        let size = Self::get_reg_width(&addr);
+        let size = Self::reg_width(&addr);
         let mut buf = data.to_be_bytes();
-        buf[3 - size] = addr as _;
+        buf[3 - size] = addr as u8 | Comms::RW::WRITE as u8;
         self.spi.write(&buf[3 - size..]).unwrap();
     }
 
@@ -196,32 +209,17 @@ where
     /// The DATA_STAT bit has to be set in the IFMODE register.
     /// If DATA_STAT bit is not set, the content of status is undefined but data is still valid.
     pub fn read_data(&mut self) -> (u32, u8) {
-        let data_ch = self.read(AdcReg::DATA);
-        let ch = (data_ch & 0xff) as u8;
-        let data = data_ch >> 8;
-        (data, ch)
+        let res = self.read(AdcReg::DATA);
+        let status = res as u8;
+        let data = res >> 8;
+        (data, status)
     }
 
-    fn get_reg_width(reg: &AdcReg) -> usize {
+    fn reg_width(reg: &AdcReg) -> usize {
         match reg {
             AdcReg::STATUS => 1,
-            AdcReg::ADCMODE => 2,
-            AdcReg::IFMODE => 2,
+            AdcReg::REGCHECK => 3,
             AdcReg::DATA => 4, // If DATA_STAT bit is not set this is 3 bytes but a 4 byte read will also yield 3 valid bytes.
-            AdcReg::ID => 2,
-            AdcReg::GPIOCON => 2,
-            AdcReg::FILTCON0 => 2,
-            AdcReg::FILTCON1 => 2,
-            AdcReg::FILTCON2 => 2,
-            AdcReg::FILTCON3 => 2,
-            AdcReg::CH0 => 2,
-            AdcReg::CH1 => 2,
-            AdcReg::CH2 => 2,
-            AdcReg::CH3 => 2,
-            AdcReg::SETUPCON0 => 2,
-            AdcReg::SETUPCON1 => 2,
-            AdcReg::SETUPCON2 => 2,
-            AdcReg::SETUPCON3 => 2,
             AdcReg::OFFSET0 => 3,
             AdcReg::OFFSET1 => 3,
             AdcReg::OFFSET2 => 3,
@@ -230,6 +228,7 @@ where
             AdcReg::GAIN1 => 3,
             AdcReg::GAIN2 => 3,
             AdcReg::GAIN3 => 3,
+            _ => 2,
         }
     }
 }
