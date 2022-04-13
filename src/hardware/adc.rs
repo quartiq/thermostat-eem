@@ -244,4 +244,4 @@ impl Adc {
         assert_eq!(status & 0x3, *ch as u8 & 1); // check if correct ADC input channel
         (*ch, data)
     }
-
+}
