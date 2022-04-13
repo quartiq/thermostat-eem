@@ -232,7 +232,7 @@ impl Adc {
     }
 
     /// Handle adc interrupt.
-    /// This routine is called every time an ADC on Thermostat reports that it has data ready
+    /// This routine is called every time the currently selected ADC on Thermostat reports that it has data ready
     /// to be read out by pulling the dout line low. It then reads out the ADC data via SPI and
     /// uses the SCHEDULE to decide which ADC will have data ready next. It then deselects the
     /// current ADC and selects the next in line. Finally it checks weather the data is from the
