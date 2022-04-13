@@ -239,22 +239,14 @@ impl Adc {
     /// expected ADC channel.
     pub fn handle_interrupt(&mut self) -> (InputChannel, u32) {
         let (current_phy, ch) = &Self::SCHEDULE[self.current_position];
-
         let (data, status) = self.adcs.read_data();
-
         self.rdyn.clear_interrupt_pending_bit();
-
         set_cs!(self, current_phy, High);
-
         self.current_position = (self.current_position + 1) % Self::SCHEDULE.len();
-
         let (current_phy, _) = &Self::SCHEDULE[self.current_position];
-
         set_cs!(self, current_phy, Low);
-
-        assert_eq!(status & 0x3, *ch as u8 & 1); // check if correct input channel
-
-        (*ch, data) // data as °C
+        assert_eq!(status & 0x3, *ch as u8 & 1); // check if correct ADC input channel
+        (*ch, data)
     }
 
     /// Initiate the sampling sequence.
