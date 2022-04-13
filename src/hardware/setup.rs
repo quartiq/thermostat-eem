@@ -319,6 +319,8 @@ pub fn setup(
         },
     );
     // Enable interrupt after all ADC setup is done.
+    // *Note*: Race condition: If the first ADC already sampled more than once by this point 
+    // the interrupt readout sequence breaks.
     adc.rdyn.enable_interrupt(&mut exti);
 
     info!("Setup Ethernet");
