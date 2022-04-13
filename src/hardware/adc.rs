@@ -99,7 +99,7 @@ impl Adc {
     /// all start sampling at the same time. The schedule now first reads out the first channel
     /// of each ADC (corresponding to Thermostat channels 0,2,4,6), then the second channel of
     /// each ADC (Thermostat channels 1,3,5,7) and then starts over.
-    pub const SCHEDULE: [(AdcPhy, InputChannel); 8] = [
+    const SCHEDULE: [(AdcPhy, InputChannel); 8] = [
         (AdcPhy::Zero, InputChannel::Zero),
         (AdcPhy::One, InputChannel::Two),
         (AdcPhy::Two, InputChannel::Four),
