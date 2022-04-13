@@ -77,7 +77,7 @@ pub struct AdcPins {
 #[allow(clippy::complexity)]
 pub struct Adc {
     adcs: Adcs,
-    rdyn: PC11<Input<PullUp>>,
+    pub rdyn: PC11<Input<PullUp>>,
     sync: PB11<Output<PushPull>>,
     cs: (
         PE0<Output<PushPull>>,
@@ -112,6 +112,7 @@ impl Adc {
     /// Construct a new ADC driver for all Thermostat input channels.
     ///
     /// # Args
+    /// * `delay` - delay struct with DelayUs implementation
     /// * `clocks` - Reference to CoreClocks
     /// * `spi4_rec` - Peripheral Reset and Enable Control for SPI4
     /// * `spi4` - SPI4 peripheral
