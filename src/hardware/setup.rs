@@ -321,7 +321,6 @@ pub fn setup(
     // Enable interrupt after all ADC setup is done.
     adc.rdyn.enable_interrupt(&mut exti);
 
-
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
     log::info!("EUI48: {}", mac_addr);
