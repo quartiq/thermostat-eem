@@ -89,6 +89,16 @@ pub struct Adc {
 }
 
 impl Adc {
+    /// ADC data readout schedule.
+    /// There are 4 physical ADCs present on Thermostat-EEM. Each of them has up to
+    /// four individual input channels. To allow flexibility in the configuration of the
+    /// channels, this readout schedule defines the ordering of readout of the channels.
+    ///
+    /// *Note*: The schedule has to  correspond to the configuration of the individual ADCs.
+    /// For this specific schedule all the ADCs are configured the same and are synced so they
+    /// all start sampling at the same time. The schedule now first reads out the first channel
+    /// of each ADC (corresponding to Thermostat channels 0,2,4,6), then the second channel of
+    /// each ADC (Thermostat channels 1,3,5,7) and then starts over.
     const SCHEDULE: [(AdcPhy, InputChannel); 8] = [
         (AdcPhy::Zero, InputChannel::Zero),
         (AdcPhy::One, InputChannel::Two),
@@ -222,6 +232,11 @@ impl Adc {
     }
 
     /// Handle adc interrupt.
+    /// This routine is called every time an ADC on Thermostat reports that it has data ready
+    /// to be read out by pulling the dout line low. It then reads out the ADC data via SPI and
+    /// uses the SCHEDULE to decide which ADC will have data ready next. It then deselects the
+    /// current ADC and selects the next in line. Finally it checks weather the data is from the
+    /// expected ADC channel.
     pub fn handle_interrupt(&mut self) -> (InputChannel, u32) {
         let (current_phy, ch) = &Self::SCHEDULE[self.current_position];
 
