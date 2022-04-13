@@ -123,7 +123,7 @@ impl Adc {
         spi4: SPI4,
         mut pins: AdcPins,
     ) -> Self {
-        // set all CS high first
+        // deassert all CS first
         pins.cs.0.set_high().unwrap();
         pins.cs.1.set_high().unwrap();
         pins.cs.2.set_high().unwrap();
