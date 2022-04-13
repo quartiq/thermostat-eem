@@ -235,8 +235,9 @@ impl Adc {
     /// 
     /// This routine is called every time the currently selected ADC on Thermostat reports that it has data ready
     /// to be read out by pulling the dout line low. It then reads out the ADC data via SPI and
-    /// uses the SCHEDULE to decide which ADC will have data ready next. It then deselects the
-    /// current ADC and selects the next in line. Finally it checks weather the data is from the
+    /// uses the SCHEDULE to decide which ADC will have data ready next. It then clears the intrrupt pending flag
+    /// (which does not trigger an interrupt right away since the currently selected ADC does not have new data),
+    /// deselects the current ADC and selects the next in line. Finally it checks weather the data is from the
     /// expected ADC channel. The next ADC will then trigger the interrupt again once it has finished
     /// sampling (or when it is selected if it is done at this point) and the routine will start again. 
     /// Obviously at the beginning of the program the data readout has to be initiated by selecting one
