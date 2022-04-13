@@ -85,7 +85,7 @@ pub struct Adc {
         PE3<Output<PushPull>>,
         PE4<Output<PushPull>>,
     ),
-    pub current_position: usize, // Schedule position
+    pub schedule_index: usize, // Currently active index into SCHEDULE
 }
 
 impl Adc {
