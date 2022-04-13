@@ -19,6 +19,27 @@ use super::hal::{
     stm32::SPI4,
 };
 
+/// A type representing an ADC sample.
+#[derive(Copy, Clone)]
+pub struct AdcCode(pub u32);
+
+impl AdcCode {
+    const GAIN: u32 = 0x555555; // default ADC gain from datasheet
+    const R_INNER: f32 = 2.0 * 5100.0; // ratiometric resistor setup. 5.1k high and low side.
+    const ZEROK: f32 = 273.15; // 0°C in °K
+    const B: f32 = 3988.0; // NTC beta value
+    const T_N_INV: f32 = 1.0 / (25.0 + Self::ZEROK); // T_n = 25°C
+    const R_N: f32 = 10000.0; // TEC resistance at 25°C
+}
+
+impl From<AdcCode> for f32 {
+    /// Convert raw ADC codes to temperature value in °C using The Steinhart-Hart equation.
+    fn from(code: AdcCode) -> f32 {
+        // Todo: implement this
+        code.0 as f32
+    }
+}
+
 macro_rules! set_cs {
     ($self:ident, $phy:ident, $state:ident) => {
         match $phy {
