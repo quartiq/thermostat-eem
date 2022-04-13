@@ -99,7 +99,7 @@ impl Adc {
     /// all start sampling at the same time. The schedule now first reads out the first channel
     /// of each ADC (corresponding to Thermostat channels 0,2,4,6), then the second channel of
     /// each ADC (Thermostat channels 1,3,5,7) and then starts over.
-    const SCHEDULE: [(AdcPhy, InputChannel); 8] = [
+    pub const SCHEDULE: [(AdcPhy, InputChannel); 8] = [
         (AdcPhy::Zero, InputChannel::Zero),
         (AdcPhy::One, InputChannel::Two),
         (AdcPhy::Two, InputChannel::Four),
@@ -140,7 +140,7 @@ impl Adc {
             rdyn: pins.rdyn,
             sync: pins.sync,
             cs: pins.cs,
-            current_position: 0,
+            schedule_index: 0,
         };
 
         adc.cs.0.set_low().unwrap();
@@ -232,18 +232,22 @@ impl Adc {
     }
 
     /// Handle adc interrupt.
+    /// 
     /// This routine is called every time the currently selected ADC on Thermostat reports that it has data ready
     /// to be read out by pulling the dout line low. It then reads out the ADC data via SPI and
     /// uses the SCHEDULE to decide which ADC will have data ready next. It then deselects the
     /// current ADC and selects the next in line. Finally it checks weather the data is from the
-    /// expected ADC channel.
+    /// expected ADC channel. The next ADC will then trigger the interrupt again once it has finished
+    /// sampling (or when it is selected if it is done at this point) and the routine will start again. 
+    /// Obviously at the beginning of the program the data readout has to be initiated by selecting one
+    /// ADC manually, outside this routine.
     pub fn handle_interrupt(&mut self) -> (InputChannel, u32) {
-        let (current_phy, ch) = &Self::SCHEDULE[self.current_position];
+        let (current_phy, ch) = &Self::SCHEDULE[self.schedule_index];
         let (data, status) = self.adcs.read_data();
         self.rdyn.clear_interrupt_pending_bit();
         set_cs!(self, current_phy, High);
-        self.current_position = (self.current_position + 1) % Self::SCHEDULE.len();
-        let (current_phy, _) = &Self::SCHEDULE[self.current_position];
+        self.schedule_index = (self.schedule_index + 1) % Self::SCHEDULE.len();
+        let (current_phy, _) = &Self::SCHEDULE[self.schedule_index];
         set_cs!(self, current_phy, Low);
         assert_eq!(status & 0x3, *ch as u8 & 1); // check if correct ADC input channel
         (*ch, data)
@@ -252,7 +256,7 @@ impl Adc {
     /// Initiate the sampling sequence.
     pub fn initiate_sampling(&mut self) {
         // select first adc to initiate sampling sequence
-        let (first_phy, _) = &Self::SCHEDULE[self.current_position];
+        let (first_phy, _) = &Self::SCHEDULE[self.schedule_index];
         set_cs!(self, first_phy, Low);
     }
 }
