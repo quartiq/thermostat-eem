@@ -1,14 +1,17 @@
 // Thermostat ADC struct.
 
+use defmt::Format;
 use num_enum::TryFromPrimitive;
-use shared_bus_rtic::SharedBus;
 
 use super::ad7172;
 
 use super::hal::{
-    gpio::{gpioe::*, Alternate, Output, PushPull, AF5},
+    gpio::{
+        gpiob::*, gpioc::*, gpioe::*, Alternate, ExtiPin, Input, Output, PullUp, PushPull, AF5,
+    },
     hal::blocking::delay::DelayUs,
     hal::digital::v2::OutputPin,
+    hal::digital::v2::PinState::{High, Low},
     prelude::*,
     rcc::{rec, CoreClocks},
     spi,
@@ -16,7 +19,18 @@ use super::hal::{
     stm32::SPI4,
 };
 
-#[derive(Clone, Copy, TryFromPrimitive)]
+macro_rules! set_cs {
+    ($self:ident, $phy:ident, $state:ident) => {
+        match $phy {
+            AdcPhy::Zero => $self.cs.0.set_state($state).unwrap(),
+            AdcPhy::One => $self.cs.1.set_state($state).unwrap(),
+            AdcPhy::Two => $self.cs.2.set_state($state).unwrap(),
+            AdcPhy::Three => $self.cs.3.set_state($state).unwrap(),
+        };
+    };
+}
+
+#[derive(Clone, Copy, TryFromPrimitive, Debug, Format)]
 #[repr(usize)]
 pub enum InputChannel {
     Zero = 0,
@@ -29,94 +43,159 @@ pub enum InputChannel {
     Seven = 7,
 }
 
-type O = Output<PushPull>;
-type Adcs = (
-    ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE0<O>>,
-    ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE1<O>>,
-    ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE3<O>>,
-    ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, PE4<O>>,
-);
-type SpiPins = (
-    PE2<Alternate<AF5>>,
-    PE5<Alternate<AF5>>,
-    PE6<Alternate<AF5>>,
-);
-
-pub struct AdcPins {
-    pub cs: (PE0<O>, PE1<O>, PE3<O>, PE4<O>),
+pub enum AdcPhy {
+    Zero = 0,
+    One = 1,
+    Two = 2,
+    Three = 3,
 }
 
+type Adcs = ad7172::Ad7172<Spi<SPI4, Enabled>>;
+
+#[allow(clippy::complexity)]
+/// All pins for all ADCs.
+/// * `spi` - Spi clk, miso, mosi (in this order).
+/// * `cs` - The four chip select pins.
+/// * `rdyn` - ADC rdyn input (this is the same ad spi dout).
+/// * `sync` - ADC sync pin (shared for all adc phys).
+pub struct AdcPins {
+    pub spi: (
+        PE2<Alternate<AF5>>,
+        PE5<Alternate<AF5>>,
+        PE6<Alternate<AF5>>,
+    ),
+    pub cs: (
+        PE0<Output<PushPull>>,
+        PE1<Output<PushPull>>,
+        PE3<Output<PushPull>>,
+        PE4<Output<PushPull>>,
+    ),
+    pub rdyn: PC11<Input<PullUp>>,
+    pub sync: PB11<Output<PushPull>>,
+}
+
+#[allow(clippy::complexity)]
 pub struct Adc {
-    pub adcs: Adcs,
+    adcs: Adcs,
+    pub rdyn: PC11<Input<PullUp>>,
+    sync: PB11<Output<PushPull>>,
+    cs: (
+        PE0<Output<PushPull>>,
+        PE1<Output<PushPull>>,
+        PE3<Output<PushPull>>,
+        PE4<Output<PushPull>>,
+    ),
+    schedule_index: usize, // Currently active index into SCHEDULE
 }
 
 impl Adc {
+    /// ADC data readout schedule.
+    /// There are 4 physical ADCs present on Thermostat-EEM. Each of them has up to
+    /// four individual input channels. To allow flexibility in the configuration of the
+    /// channels, this readout schedule defines the ordering of readout of the channels.
+    ///
+    /// *Note*: The schedule has to  correspond to the configuration of the individual ADCs.
+    /// For this specific schedule all the ADCs are configured the same and are synced so they
+    /// all start sampling at the same time. The schedule now first reads out the first channel
+    /// of each ADC (corresponding to Thermostat channels 0,2,4,6), then the second channel of
+    /// each ADC (Thermostat channels 1,3,5,7) and then starts over.
+    pub const SCHEDULE: [(AdcPhy, InputChannel); 8] = [
+        (AdcPhy::Zero, InputChannel::Zero),
+        (AdcPhy::One, InputChannel::Two),
+        (AdcPhy::Two, InputChannel::Four),
+        (AdcPhy::Three, InputChannel::Six),
+        (AdcPhy::Zero, InputChannel::One),
+        (AdcPhy::One, InputChannel::Three),
+        (AdcPhy::Two, InputChannel::Five),
+        (AdcPhy::Three, InputChannel::Seven),
+    ];
     /// Construct a new ADC driver for all Thermostat input channels.
     ///
     /// # Args
+    /// * `delay` - delay struct with DelayUs implementation
     /// * `clocks` - Reference to CoreClocks
     /// * `spi4_rec` - Peripheral Reset and Enable Control for SPI4
     /// * `spi4` - SPI4 peripheral
-    /// * `sck` - Spi sck pin
-    /// * `miso` - Spi miso pin
-    /// * `mosi` - Spi mosi pin
-    /// * `pins` - ADC chip select pins.
+    /// * `pins` - All ADC pins
     pub fn new(
         delay: &mut impl DelayUs<u16>,
         clocks: &CoreClocks,
         spi4_rec: rec::Spi4,
         spi4: SPI4,
-        spi_pins: SpiPins,
-        mut pins: AdcPins,
+        pins: AdcPins,
     ) -> Self {
-        // set all CS high first
-        pins.cs.0.set_high().unwrap();
-        pins.cs.1.set_high().unwrap();
-        pins.cs.2.set_high().unwrap();
-        pins.cs.3.set_high().unwrap();
-
-        // SPI at 1 MHz. SPI MODE_0: idle low, capture on first transition
-        let spi: Spi<_, _, u8> = spi4.spi(spi_pins, spi::MODE_0, 12500.khz(), spi4_rec, clocks);
-
-        let bus_manager = shared_bus_rtic::new!(spi, Spi<SPI4, Enabled>);
+        // SPI MODE_3: idle high, capture on second transition
+        let spi: Spi<_, _, u8> = spi4.spi(pins.spi, spi::MODE_3, 12500.khz(), spi4_rec, clocks);
 
         let mut adc = Adc {
-            adcs: (
-                ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.0).unwrap(),
-                ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.1).unwrap(),
-                ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.2).unwrap(),
-                ad7172::Ad7172::new(delay, bus_manager.acquire(), pins.cs.3).unwrap(),
-            ),
+            adcs: ad7172::Ad7172::new(spi),
+            rdyn: pins.rdyn,
+            sync: pins.sync,
+            cs: pins.cs,
+            schedule_index: 0,
         };
 
-        Adc::setup_adc(&mut adc.adcs.0);
-        Adc::setup_adc(&mut adc.adcs.1);
-        Adc::setup_adc(&mut adc.adcs.2);
-        Adc::setup_adc(&mut adc.adcs.3);
-
+        adc.setup(delay);
         adc
     }
 
-    /// Setup an adc on Thermostat-EEM.
-    fn setup_adc<CS>(adc: &mut ad7172::Ad7172<SharedBus<Spi<SPI4, Enabled>>, CS>)
-    where
-        CS: OutputPin,
-        <CS>::Error: core::fmt::Debug,
-    {
-        // Setup ADCMODE register. Internal reference, internal clock, no delay, continuous conversion.
-        adc.write(
+    fn setup(&mut self, delay: &mut impl DelayUs<u16>) {
+        // deassert all CS first
+        self.cs.0.set_high().unwrap();
+        self.cs.1.set_high().unwrap();
+        self.cs.2.set_high().unwrap();
+        self.cs.3.set_high().unwrap();
+
+        // set sync low first for synchronization at rising edge
+        self.sync.set_low().unwrap();
+
+        self.cs.0.set_low().unwrap();
+        self.setup_adc(delay);
+        self.cs.0.set_high().unwrap();
+        self.cs.1.set_low().unwrap();
+        self.setup_adc(delay);
+        self.cs.1.set_high().unwrap();
+        self.cs.2.set_low().unwrap();
+        self.setup_adc(delay);
+        self.cs.2.set_high().unwrap();
+        self.cs.3.set_low().unwrap();
+        self.setup_adc(delay);
+        self.cs.3.set_high().unwrap();
+
+        // set sync high after initialization of all ADCs
+        self.sync.set_high().unwrap();
+
+        // set up sampling sequence by selection first ADC according to schedule
+        self.rdyn.clear_interrupt_pending_bit();
+        let (current_phy, _) = &Self::SCHEDULE[self.schedule_index];
+        set_cs!(self, current_phy, Low);
+    }
+
+    /// Setup an ADC on Thermostat-EEM.
+    fn setup_adc(&mut self, delay: &mut impl DelayUs<u16>) {
+        self.adcs.reset();
+
+        delay.delay_us(500u16);
+
+        let id = self.adcs.read(ad7172::AdcReg::ID);
+        // check that ID is 0x00DX, as per datasheet
+        if id & 0xfff0 != 0x00d0 {
+            // return Err(Error::AdcId);
+            // TODO return error insted of panicing here
+            panic!();
+        }
+
+        self.adcs.write(
             ad7172::AdcReg::ADCMODE,
             ad7172::Adcmode::RefEn::ENABLED
                 | ad7172::Adcmode::Mode::CONTINOUS_CONVERSION
                 | ad7172::Adcmode::Clocksel::EXTERNAL_CLOCK,
         );
 
-        // Setup IFMODE register. Only enable data stat to get channel info on conversions.
-        adc.write(ad7172::AdcReg::IFMODE, ad7172::Ifmode::DataStat::ENABLED);
+        self.adcs
+            .write(ad7172::AdcReg::IFMODE, ad7172::Ifmode::DataStat::ENABLED);
 
-        // enable first channel and configure Ain0, Ain1,
-        // set config 0 for first channel.
-        adc.write(
+        self.adcs.write(
             ad7172::AdcReg::CH0,
             ad7172::Channel::ChEn::ENABLED
                 | ad7172::Channel::SetupSel::SETUP_0
@@ -124,9 +203,7 @@ impl Adc {
                 | ad7172::Channel::Ainneg::AIN1,
         );
 
-        // enable second channel and configure Ain2, Ain3,
-        // set config 0 for second channel too.
-        adc.write(
+        self.adcs.write(
             ad7172::AdcReg::CH1,
             ad7172::Channel::ChEn::ENABLED
                 | ad7172::Channel::SetupSel::SETUP_0
@@ -134,8 +211,7 @@ impl Adc {
                 | ad7172::Channel::Ainneg::AIN3,
         );
 
-        // Setup firstconfiguration register
-        adc.write(
+        self.adcs.write(
             ad7172::AdcReg::SETUPCON0,
             ad7172::Setupcon::BiUnipolar::UNIPOLAR
                 | ad7172::Setupcon::Refbufn::ENABLED
@@ -145,10 +221,36 @@ impl Adc {
                 | ad7172::Setupcon::Refsel::EXTERNAL,
         );
 
-        // Setup first filter configuration register. 10Hz data rate. Sinc5Sinc1 Filter. No postfilter.
-        adc.write(
+        self.adcs.write(
             ad7172::AdcReg::FILTCON0,
-            ad7172::Filtcon::Order::SINC5SINC1 | ad7172::Filtcon::Odr::ODR_10,
+            ad7172::Filtcon::Order::SINC5SINC1 | ad7172::Filtcon::Odr::ODR_1_25,
         );
+
+        // Re-apply (also set after ADC reset) SYNC_EN flag in gpio register for standard synchronization
+        self.adcs
+            .write(ad7172::AdcReg::GPIOCON, ad7172::Gpiocon::SyncEn::ENABLED);
+    }
+
+    /// Handle adc interrupt.
+    ///
+    /// This routine is called every time the currently selected ADC on Thermostat reports that it has data ready
+    /// to be read out by pulling the dout line low. It then reads out the ADC data via SPI and
+    /// uses the SCHEDULE to decide which ADC will have data ready next. It then clears the intrrupt pending flag
+    /// (which does not trigger an interrupt right away since the currently selected ADC does not have new data),
+    /// deselects the current ADC and selects the next in line. Finally it checks weather the data is from the
+    /// expected ADC channel. The next ADC will then trigger the interrupt again once it has finished
+    /// sampling (or when it is selected if it is done at this point) and the routine will start again.
+    /// Obviously at the beginning of the program the data readout has to be initiated by selecting one
+    /// ADC manually, outside this routine.
+    pub fn handle_interrupt(&mut self) -> (InputChannel, u32) {
+        let (current_phy, ch) = &Self::SCHEDULE[self.schedule_index];
+        let (data, status) = self.adcs.read_data();
+        self.rdyn.clear_interrupt_pending_bit();
+        set_cs!(self, current_phy, High);
+        self.schedule_index = (self.schedule_index + 1) % Self::SCHEDULE.len();
+        let (current_phy, _) = &Self::SCHEDULE[self.schedule_index];
+        set_cs!(self, current_phy, Low);
+        assert_eq!(status & 0x3, *ch as u8 & 1); // check if correct ADC input channel
+        (*ch, data)
     }
 }

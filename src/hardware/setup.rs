@@ -5,7 +5,7 @@ use stm32h7xx_hal::hal::digital::v2::OutputPin;
 use super::hal::{
     self as hal,
     ethernet::{self, PHY},
-    gpio::GpioExt,
+    gpio::{Edge, ExtiPin, GpioExt},
     prelude::*,
 };
 use crate::hardware::SRC_MAC;
@@ -14,6 +14,7 @@ use super::{
     adc::{Adc, AdcPins},
     adc_internal::{AdcInternal, AdcInternalPins},
     dac::{Dac, DacPins},
+    delay,
     fan::{Fan, FanPins},
     gpio::{Gpio, GpioPins},
     pwm::{Pwm, PwmPins},
@@ -137,7 +138,7 @@ pub fn setup(
 
     info!("--- Starting hardware setup");
 
-    let mut delay = asm_delay::AsmDelay::new(asm_delay::bitrate::Hertz(ccdr.clocks.c_ck().0));
+    let mut delay = delay::AsmDelay::new(ccdr.clocks.c_ck().0);
 
     // Take GPIOs
     let gpioa = device.GPIOA.split(ccdr.peripheral.GPIOA);
@@ -288,28 +289,37 @@ pub fn setup(
 
     info!("Setup ADC");
 
-    let adc = Adc::new(
+    // enable MCO 2MHz clock output to ADCs
+    gpioa.pa8.into_alternate_af0();
+
+    let mut syscfg = device.SYSCFG;
+    let mut exti = device.EXTI;
+    let mut rdyn = gpioc.pc11.into_pull_up_input();
+    rdyn.make_interrupt_source(&mut syscfg);
+    rdyn.trigger_on_edge(&mut exti, Edge::Falling);
+    let mut adc = Adc::new(
         &mut delay,
         &ccdr.clocks,
         ccdr.peripheral.SPI4,
         device.SPI4,
-        (
-            gpioe.pe2.into_alternate_af5(),
-            gpioe.pe5.into_alternate_af5(),
-            gpioe.pe6.into_alternate_af5(),
-        ),
         AdcPins {
+            spi: (
+                gpioe.pe2.into_alternate_af5(),
+                gpioe.pe5.into_alternate_af5(),
+                gpioe.pe6.into_alternate_af5(),
+            ),
             cs: (
                 gpioe.pe0.into_push_pull_output(),
                 gpioe.pe1.into_push_pull_output(),
                 gpioe.pe3.into_push_pull_output(),
                 gpioe.pe4.into_push_pull_output(),
             ),
+            rdyn,
+            sync: gpiob.pb11.into_push_pull_output(),
         },
     );
-
-    // enable MCO 2MHz clock output to ADCs
-    gpioa.pa8.into_alternate_af0();
+    // Enable interrupt after all ADC setup is done.
+    adc.rdyn.enable_interrupt(&mut exti);
 
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
