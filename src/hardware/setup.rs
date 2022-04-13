@@ -6,6 +6,7 @@ use super::hal::{
     self as hal,
     ethernet::{self, PHY},
     gpio::{Edge, ExtiPin, GpioExt},
+    hal::digital::v2::PinState,
     prelude::*,
 };
 use crate::hardware::SRC_MAC;
@@ -322,7 +323,7 @@ pub fn setup(
 
     // enable interrupt and initiate sampling sequency by selection first adc.
     adc.rdyn.enable_interrupt(&mut exti);
-    adc.initiate_sampling();
+    adc.cs.0.set_state(PinState::Low).unwrap();
 
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);

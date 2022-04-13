@@ -245,10 +245,3 @@ impl Adc {
         (*ch, data)
     }
 
-    /// Initiate the sampling sequence.
-    pub fn initiate_sampling(&mut self) {
-        // select first adc to initiate sampling sequence
-        let (first_phy, _) = &Self::SCHEDULE[self.schedule_index];
-        set_cs!(self, first_phy, Low);
-    }
-}
