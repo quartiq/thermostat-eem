@@ -76,16 +76,16 @@ pub struct AdcPins {
 
 #[allow(clippy::complexity)]
 pub struct Adc {
-    pub adcs: Adcs,
-    pub rdyn: PC11<Input<PullUp>>,
-    pub sync: PB11<Output<PushPull>>,
-    pub cs: (
+    adcs: Adcs,
+    rdyn: PC11<Input<PullUp>>,
+    sync: PB11<Output<PushPull>>,
+    cs: (
         PE0<Output<PushPull>>,
         PE1<Output<PushPull>>,
         PE3<Output<PushPull>>,
         PE4<Output<PushPull>>,
     ),
-    pub schedule_index: usize, // Currently active index into SCHEDULE
+    schedule_index: usize, // Currently active index into SCHEDULE
 }
 
 impl Adc {
@@ -121,17 +121,8 @@ impl Adc {
         clocks: &CoreClocks,
         spi4_rec: rec::Spi4,
         spi4: SPI4,
-        mut pins: AdcPins,
+        pins: AdcPins,
     ) -> Self {
-        // deassert all CS first
-        pins.cs.0.set_high().unwrap();
-        pins.cs.1.set_high().unwrap();
-        pins.cs.2.set_high().unwrap();
-        pins.cs.3.set_high().unwrap();
-
-        // set sync low first for synchronization at rising edge
-        pins.sync.set_low().unwrap();
-
         // SPI MODE_3: idle high, capture on second transition
         let spi: Spi<_, _, u8> = spi4.spi(pins.spi, spi::MODE_3, 12500.khz(), spi4_rec, clocks);
 
@@ -143,23 +134,40 @@ impl Adc {
             schedule_index: 0,
         };
 
-        adc.cs.0.set_low().unwrap();
-        adc.setup_adc(delay);
-        adc.cs.0.set_high().unwrap();
-        adc.cs.1.set_low().unwrap();
-        adc.setup_adc(delay);
-        adc.cs.1.set_high().unwrap();
-        adc.cs.2.set_low().unwrap();
-        adc.setup_adc(delay);
-        adc.cs.2.set_high().unwrap();
-        adc.cs.3.set_low().unwrap();
-        adc.setup_adc(delay);
-        adc.cs.3.set_high().unwrap();
-
-        // set sync high after initialization of all phys
-        adc.sync.set_high().unwrap();
-
+        adc.setup(delay);
         adc
+    }
+
+    fn setup(&mut self, delay: &mut impl DelayUs<u16>) {
+        // deassert all CS first
+        self.cs.0.set_high().unwrap();
+        self.cs.1.set_high().unwrap();
+        self.cs.2.set_high().unwrap();
+        self.cs.3.set_high().unwrap();
+
+        // set sync low first for synchronization at rising edge
+        self.sync.set_low().unwrap();
+
+        self.cs.0.set_low().unwrap();
+        self.setup_adc(delay);
+        self.cs.0.set_high().unwrap();
+        self.cs.1.set_low().unwrap();
+        self.setup_adc(delay);
+        self.cs.1.set_high().unwrap();
+        self.cs.2.set_low().unwrap();
+        self.setup_adc(delay);
+        self.cs.2.set_high().unwrap();
+        self.cs.3.set_low().unwrap();
+        self.setup_adc(delay);
+        self.cs.3.set_high().unwrap();
+
+        // set sync high after initialization of all ADCs
+        self.sync.set_high().unwrap();
+
+        // set up sampling sequence by selection first ADC according to schedule
+        self.rdyn.clear_interrupt_pending_bit();
+        let (current_phy, _) = &Self::SCHEDULE[self.schedule_index];
+        set_cs!(self, current_phy, Low);
     }
 
     /// Setup an ADC on Thermostat-EEM.

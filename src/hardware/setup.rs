@@ -6,7 +6,6 @@ use super::hal::{
     self as hal,
     ethernet::{self, PHY},
     gpio::{Edge, ExtiPin, GpioExt},
-    hal::digital::v2::PinState,
     prelude::*,
 };
 use crate::hardware::SRC_MAC;
@@ -290,13 +289,17 @@ pub fn setup(
 
     info!("Setup ADC");
 
+    // enable MCO 2MHz clock output to ADCs
+    gpioa.pa8.into_alternate_af0();
+
     let mut syscfg = device.SYSCFG;
     let mut exti = device.EXTI;
     let mut rdyn = gpioc.pc11.into_pull_up_input();
     rdyn.make_interrupt_source(&mut syscfg);
     rdyn.trigger_on_edge(&mut exti, Edge::Falling);
+    rdyn.enable_interrupt(&mut exti);
 
-    let mut adc = Adc::new(
+    let adc = Adc::new(
         &mut delay,
         &ccdr.clocks,
         ccdr.peripheral.SPI4,
@@ -317,13 +320,6 @@ pub fn setup(
             sync: gpiob.pb11.into_push_pull_output(),
         },
     );
-
-    // enable MCO 2MHz clock output to ADCs
-    gpioa.pa8.into_alternate_af0();
-
-    // enable interrupt and initiate sampling sequency by selection first adc.
-    adc.rdyn.enable_interrupt(&mut exti);
-    adc.cs.0.set_state(PinState::Low).unwrap();
 
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
