@@ -13,7 +13,7 @@ use defmt_rtt as _; // global logger
 use panic_probe as _; // gloibal panic handler
 
 use hardware::{
-    adc::Adc,
+    adc::{Adc, AdcCode, InputChannel},
     adc_internal::AdcInternal,
     dac::Dac,
     gpio::{Gpio, Led, PoePower},
@@ -130,6 +130,7 @@ mod app {
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
+        temperatures: [f32; 8], // input temperatures in °C
     }
 
     #[local]
@@ -178,6 +179,7 @@ mod app {
             settings: Settings::default(),
             telemetry: Telemetry::default(),
             gpio: thermostat.gpio,
+            temperatures: [0.0; 8],
         };
 
         (shared, local, init::Monotonics(mono))
@@ -255,6 +257,21 @@ mod app {
         telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
     }
 
+    // Higher priority than telemetry but lower than adc data readout.
+    // 8 capacity to allow for max. 8 conversions to be queued.
+    #[task(priority = 2, shared=[temperatures], capacity = 8)]
+    fn convert_adc_code(
+        mut c: convert_adc_code::Context,
+        input_ch: InputChannel,
+        adc_code: AdcCode,
+    ) {
+        // convert ADC code to °C and store in temperatures array
+        c.shared.temperatures.lock(|temperatures| {
+            temperatures[input_ch as usize] = adc_code.into();
+            info!("tempertatures: {:?}", temperatures);
+        });
+    }
+
     #[task(priority = 1, shared=[network])]
     fn ethernet_link(mut c: ethernet_link::Context) {
         c.shared
@@ -268,11 +285,10 @@ mod app {
         unsafe { hal::ethernet::interrupt_handler() }
     }
 
-    #[task(binds = EXTI15_10, priority = 2, local=[adc])]
-    fn adc(c: adc::Context) {
+    #[task(priority = 3, binds = EXTI15_10, local=[adc])]
+    fn adc_readout(c: adc_readout::Context) {
         let adc = c.local.adc;
-        let isr_out = adc.handle_interrupt();
-        info!("isr_out: {:?}", isr_out);
-        // spawn iir (isr_out)
+        let (input_ch, adc_code) = adc.handle_interrupt();
+        convert_adc_code::spawn(input_ch, adc_code).unwrap();
     }
 }
