@@ -19,24 +19,40 @@ use super::hal::{
     stm32::SPI4,
 };
 
+use num_traits::float::Float;
+
 /// A type representing an ADC sample.
 #[derive(Copy, Clone)]
 pub struct AdcCode(pub u32);
 
 impl AdcCode {
-    const GAIN: u32 = 0x555555; // default ADC gain from datasheet
-    const R_INNER: f32 = 2.0 * 5100.0; // ratiometric resistor setup. 5.1k high and low side.
-    const ZEROK: f32 = 273.15; // 0°C in °K
-    const B: f32 = 3988.0; // NTC beta value
-    const T_N_INV: f32 = 1.0 / (25.0 + Self::ZEROK); // T_n = 25°C
-    const R_N: f32 = 10000.0; // TEC resistance at 25°C
+    const GAIN: f32 = 0x555555 as _; // default ADC gain from datasheet
+    const R_REF: f32 = 2.0 * 5000.0; // ratiometric resistor setup. 5.0K high and low side.
+    const ZERO_K: f32 = 273.15; // 0°C in °K
+    const B: f32 = 3988.0; // NTC beta value. TODO: This should probaply be changeable.
+    const T_N: f32 = 25.0; // Reference Temperature for B-parameter equation
+    const R_N: f32 = 10000.0; // TEC resistance at T_N
 }
 
 impl From<AdcCode> for f32 {
-    /// Convert raw ADC codes to temperature value in °C using The Steinhart-Hart equation.
+    /// Convert raw ADC codes to temperature value in °C using the AD7172 input voltage to code
+    /// relation, the ratiometric resistor setup and "B-parameter" equation (a simple form of the
+    /// Steinhart-Hart equation). This is a treadeoff between computation and absolute temperature
+    /// accuracy.
+    /// Conditions:
+    /// * Unipolar ADC input
+    /// * Unchanged ADC GAIN and OFFSET registers (default reset values)
+    /// * Resistor setup as on Thermostat-EEM
     fn from(code: AdcCode) -> f32 {
-        // Todo: implement this
-        code.0 as f32
+        // Inverted equation from datasheet p. 40 with V_Ref normalized to 1 as this cancels out in resistance.
+        let voltage =
+            (code.0 as f32) * ((0x400000 as f32) / (2.0 * (1 << 23) as f32 * AdcCode::GAIN * 0.75));
+        // Voltage divider normalized to V_Ref = 1, inverted to get to NTC resistance.
+        let resistance = (voltage * AdcCode::R_REF) / (1.0 - voltage);
+        // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
+        let temperature_kelvin_inv = 1.0 / (AdcCode::T_N + AdcCode::ZERO_K)
+            + (1.0 / AdcCode::B) * (resistance / AdcCode::R_N).ln();
+        (1.0 / temperature_kelvin_inv) - AdcCode::ZERO_K
     }
 }
 
