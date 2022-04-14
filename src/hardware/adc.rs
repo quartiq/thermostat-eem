@@ -51,13 +51,13 @@ impl From<AdcCode> for f32 {
     /// * Resistor setup as on Thermostat-EEM
     fn from(code: AdcCode) -> f32 {
         // Inverted equation from datasheet p. 40 with V_Ref normalized to 1 as this cancels out in resistance.
-        let voltage =
+        let relative_voltage =
             (code.0 as f32) * ((0x400000 as f32) / (2.0 * (1 << 23) as f32 * AdcCode::GAIN * 0.75));
         // Voltage divider normalized to V_Ref = 1, inverted to get to NTC resistance.
-        let resistance = (voltage * AdcCode::R_REF) / (1.0 - voltage);
+        let relative_resistance = (relative_voltage * AdcCode::R_REF) / (1.0 - relative_voltage);
         // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
         let temperature_kelvin_inv = 1.0 / (AdcCode::T_N + AdcCode::ZERO_C)
-            + (1.0 / AdcCode::B) * (resistance / AdcCode::R_N).ln();
+            + (1.0 / AdcCode::B) * (relative_resistance / AdcCode::R_N).ln();
         (1.0 / temperature_kelvin_inv) - AdcCode::ZERO_C
     }
 }
