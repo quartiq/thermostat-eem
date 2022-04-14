@@ -44,7 +44,9 @@ impl From<AdcCode> for f32 {
     /// Convert raw ADC codes to temperature value in °C using the AD7172 input voltage to code
     /// relation, the ratiometric resistor setup and "B-parameter" equation (a simple form of the
     /// Steinhart-Hart equation). This is a treadeoff between computation and absolute temperature
-    /// accuracy.
+    /// accuracy. f32 dataformat is adequate here since the 24 bit ADC samples have the same dynamic
+    /// range as the f32 24 bit mantissa. Also the calculation should not introduce significant
+    /// arthmetic error unless the input values are at the extremes.
     /// Valid under the following conditions:
     /// * Unipolar ADC input
     /// * Unchanged ADC GAIN and OFFSET registers (default reset values)
@@ -54,10 +56,11 @@ impl From<AdcCode> for f32 {
         let relative_voltage =
             (code.0 as f32) * ((0x400000 as f32) / (2.0 * (1 << 23) as f32 * AdcCode::GAIN * 0.75));
         // Voltage divider normalized to V_Ref = 1, inverted to get to NTC resistance.
-        let relative_resistance = (relative_voltage * AdcCode::R_REF) / (1.0 - relative_voltage);
+        let relative_resistance =
+            (relative_voltage) / (1.0 - relative_voltage) * (AdcCode::R_REF / AdcCode::R_N);
         // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
         let temperature_kelvin_inv = 1.0 / (AdcCode::T_N + AdcCode::ZERO_C)
-            + (1.0 / AdcCode::B) * (relative_resistance / AdcCode::R_N).ln();
+            + (1.0 / AdcCode::B) * (relative_resistance).ln();
         (1.0 / temperature_kelvin_inv) - AdcCode::ZERO_C
     }
 }
