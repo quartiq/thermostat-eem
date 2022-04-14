@@ -19,6 +19,52 @@ use super::hal::{
     stm32::SPI4,
 };
 
+use num_traits::float::Float;
+
+/// A type representing an ADC sample.
+#[derive(Copy, Clone, Debug, Format)]
+pub struct AdcCode(pub u32);
+impl AdcCode {
+    const GAIN: f32 = 0x555555 as _; // Default ADC gain from datasheet.
+    const R_REF: f32 = 2.0 * 5000.0; // Ratiometric resistor setup. 5.0K high and low side.
+    const ZERO_C: f32 = 273.15; // 0°C in °K
+    const B: f32 = 3988.0; // NTC beta value. TODO: This should probaply be changeable.
+    const T_N: f32 = 25.0; // Reference Temperature for B-parameter equation.
+    const R_N: f32 = 10000.0; // TEC resistance at T_N.
+}
+
+impl From<u32> for AdcCode {
+    /// Construct an ADC code from a provided binary (ADC-formatted) code.
+    fn from(value: u32) -> Self {
+        Self(value)
+    }
+}
+
+impl From<AdcCode> for f32 {
+    /// Convert raw ADC codes to temperature value in °C using the AD7172 input voltage to code
+    /// relation, the ratiometric resistor setup and "B-parameter" equation (a simple form of the
+    /// Steinhart-Hart equation). This is a treadeoff between computation and absolute temperature
+    /// accuracy. f32 dataformat is adequate here since the 24 bit ADC samples have the same dynamic
+    /// range as the f32 24 bit mantissa. Also the calculation should not introduce significant
+    /// arthmetic error unless the input values are at the extremes.
+    /// Valid under the following conditions:
+    /// * Unipolar ADC input
+    /// * Unchanged ADC GAIN and OFFSET registers (default reset values)
+    /// * Resistor setup as on Thermostat-EEM
+    fn from(code: AdcCode) -> f32 {
+        // Inverted equation from datasheet p. 40 with V_Ref normalized to 1 as this cancels out in resistance.
+        let relative_voltage =
+            (code.0 as f32) * ((0x400000 as f32) / (2.0 * (1 << 23) as f32 * AdcCode::GAIN * 0.75));
+        // Voltage divider normalized to V_Ref = 1, inverted to get to NTC resistance.
+        let relative_resistance =
+            (relative_voltage) / (1.0 - relative_voltage) * (AdcCode::R_REF / AdcCode::R_N);
+        // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
+        let temperature_kelvin_inv = 1.0 / (AdcCode::T_N + AdcCode::ZERO_C)
+            + (1.0 / AdcCode::B) * (relative_resistance).ln();
+        (1.0 / temperature_kelvin_inv) - AdcCode::ZERO_C
+    }
+}
+
 macro_rules! set_cs {
     ($self:ident, $phy:ident, $state:ident) => {
         match $phy {
@@ -99,7 +145,7 @@ impl Adc {
     /// all start sampling at the same time. The schedule now first reads out the first channel
     /// of each ADC (corresponding to Thermostat channels 0,2,4,6), then the second channel of
     /// each ADC (Thermostat channels 1,3,5,7) and then starts over.
-    pub const SCHEDULE: [(AdcPhy, InputChannel); 8] = [
+    const SCHEDULE: [(AdcPhy, InputChannel); 8] = [
         (AdcPhy::Zero, InputChannel::Zero),
         (AdcPhy::One, InputChannel::Two),
         (AdcPhy::Two, InputChannel::Four),
@@ -242,7 +288,7 @@ impl Adc {
     /// sampling (or when it is selected if it is done at this point) and the routine will start again.
     /// Obviously at the beginning of the program the data readout has to be initiated by selecting one
     /// ADC manually, outside this routine.
-    pub fn handle_interrupt(&mut self) -> (InputChannel, u32) {
+    pub fn handle_interrupt(&mut self) -> (InputChannel, AdcCode) {
         let (current_phy, ch) = &Self::SCHEDULE[self.schedule_index];
         let (data, status) = self.adcs.read_data();
         self.rdyn.clear_interrupt_pending_bit();
@@ -251,6 +297,6 @@ impl Adc {
         let (current_phy, _) = &Self::SCHEDULE[self.schedule_index];
         set_cs!(self, current_phy, Low);
         assert_eq!(status & 0x3, *ch as u8 & 1); // check if correct ADC input channel
-        (*ch, data)
+        (*ch, data.into())
     }
 }
