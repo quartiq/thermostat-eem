@@ -116,6 +116,7 @@ pub struct Telemetry {
     output_voltage: [f32; 4],
     poe: PoePower,
     overtemp: bool,
+    channel_temperature: [f32; 8],
 }
 
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
@@ -130,7 +131,7 @@ mod app {
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
-        temperatures: [f32; 8], // input temperatures in °C
+        channel_temperature: [f32; 8], // input channel temperature in °C
     }
 
     #[local]
@@ -179,7 +180,7 @@ mod app {
             settings: Settings::default(),
             telemetry: Telemetry::default(),
             gpio: thermostat.gpio,
-            temperatures: [0.0; 8],
+            channel_temperature: [0.0; 8],
         };
 
         (shared, local, init::Monotonics(mono))
@@ -228,7 +229,7 @@ mod app {
         }
     }
 
-    #[task(priority = 1, local=[adc_internal], shared=[network, settings, telemetry, gpio])]
+    #[task(priority = 1, local=[adc_internal], shared=[network, settings, telemetry, gpio, channel_temperature])]
     fn telemetry_task(mut c: telemetry_task::Context) {
         let mut telemetry: Telemetry = c.shared.telemetry.lock(|telemetry| *telemetry);
 
@@ -259,16 +260,19 @@ mod app {
 
     // Higher priority than telemetry but lower than adc data readout.
     // 8 capacity to allow for max. 8 conversions to be queued.
-    #[task(priority = 2, shared=[temperatures], capacity = 8)]
+    #[task(priority = 2, shared=[channel_temperature, telemetry], capacity = 8)]
     fn convert_adc_code(
         mut c: convert_adc_code::Context,
         input_ch: InputChannel,
         adc_code: AdcCode,
     ) {
-        // convert ADC code to °C and store in temperatures array
-        c.shared.temperatures.lock(|temperatures| {
-            temperatures[input_ch as usize] = adc_code.into();
-            info!("tempertatures: {:?}", temperatures);
+        // convert ADC code to °C and store in channel_temperature array and telemetry
+        c.shared.channel_temperature.lock(|channel_temperature| {
+            channel_temperature[input_ch as usize] = adc_code.into();
+            c.shared.telemetry.lock(|telemetry| {
+                telemetry.channel_temperature[input_ch as usize] =
+                    channel_temperature[input_ch as usize]
+            });
         });
     }
 
