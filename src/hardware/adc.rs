@@ -103,7 +103,7 @@ macro_rules! set_cs {
     };
 }
 
-#[derive(Clone, Copy, TryFromPrimitive, Debug, Format)]
+#[derive(Clone, Copy, TryFromPrimitive, Debug, Format, PartialEq)]
 #[repr(usize)]
 pub enum InputChannel {
     Zero = 0,

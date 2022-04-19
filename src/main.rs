@@ -254,8 +254,8 @@ mod app {
             .lock(|network| network.telemetry.publish(&telemetry));
 
         // TODO: validate telemetry period.
-        let telemetry_period = c.shared.settings.lock(|settings| settings.telemetry_period);
-        telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
+        // let telemetry_period = c.shared.settings.lock(|settings| settings.telemetry_period);
+        // telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
     }
 
     // Higher priority than telemetry but lower than adc data readout.
@@ -274,6 +274,10 @@ mod app {
                     channel_temperature[input_ch as usize] as f32
             });
         });
+
+        if input_ch == InputChannel::Seven {
+            telemetry_task::spawn().unwrap();
+        }
     }
 
     #[task(priority = 1, shared=[network])]
