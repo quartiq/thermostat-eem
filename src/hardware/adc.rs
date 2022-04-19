@@ -42,15 +42,17 @@ impl From<u32> for AdcCode {
 
 impl From<AdcCode> for f32 {
     /// Convert raw ADC codes to temperature value in °C using the AD7172 input voltage to code
-    /// relation, the ratiometric resistor setup and "B-parameter" equation (a simple form of the
+    /// relation, the ratiometric resistor setup and the "B-parameter" equation (a simple form of the
     /// Steinhart-Hart equation). This is a treadeoff between computation and absolute temperature
-    /// accuracy. f32 dataformat is adequate here since the 24 bit ADC samples have the same dynamic
-    /// range as the f32 24 bit mantissa. Also the calculation should not introduce significant
-    /// arthmetic error unless the input values are at the extremes.
+    /// accuracy. The f32 output dataformat leads to an output quantization of about 31 uK.
+    /// Additionally there is some error (in addition to the re-quantization) introduced during the
+    /// various computation steps. If the input data has less than about 5 bit RMS noise, f32 should be
+    /// avoided.
     /// Valid under the following conditions:
     /// * Unipolar ADC input
     /// * Unchanged ADC GAIN and OFFSET registers (default reset values)
     /// * Resistor setup as on Thermostat-EEM
+    /// * Imput values not close to minimum/maximum (~1000 codes difference)
     fn from(code: AdcCode) -> f32 {
         // Inverted equation from datasheet p. 40 with V_Ref normalized to 1 as this cancels out in resistance.
         let relative_voltage =
@@ -62,6 +64,31 @@ impl From<AdcCode> for f32 {
         let temperature_kelvin_inv = 1.0 / (AdcCode::T_N + AdcCode::ZERO_C)
             + (1.0 / AdcCode::B) * (relative_resistance).ln();
         (1.0 / temperature_kelvin_inv) - AdcCode::ZERO_C
+    }
+}
+
+impl From<AdcCode> for f64 {
+    /// Convert raw ADC codes to temperature value in °C using the AD7172 input voltage to code
+    /// relation, the ratiometric resistor setup and the "B-parameter" equation (a simple form of the
+    /// Steinhart-Hart equation). This is a treadeoff between computation and absolute temperature
+    /// accuracy. The f64 dataformat should not limit the dynamic range or produce significant arithmetic
+    /// errors.
+    /// Valid under the following conditions:
+    /// * Unipolar ADC input
+    /// * Unchanged ADC GAIN and OFFSET registers (default reset values)
+    /// * Resistor setup as on Thermostat-EEM
+    /// * Imput values not close to minimum/maximum (~1000 codes difference)
+    fn from(code: AdcCode) -> f64 {
+        // Inverted equation from datasheet p. 40 with V_Ref normalized to 1 as this cancels out in resistance.
+        let relative_voltage = (code.0 as f64)
+            * ((0x400000 as f64) / (2.0 * (1 << 23) as f64 * AdcCode::GAIN as f64 * 0.75));
+        // Voltage divider normalized to V_Ref = 1, inverted to get to NTC resistance.
+        let relative_resistance = (relative_voltage) / (1.0 - relative_voltage)
+            * (AdcCode::R_REF as f64 / AdcCode::R_N as f64);
+        // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
+        let temperature_kelvin_inv = 1.0 / (AdcCode::T_N as f64 + AdcCode::ZERO_C as f64)
+            + (1.0 / AdcCode::B as f64) * (relative_resistance).ln();
+        (1.0 / temperature_kelvin_inv) - AdcCode::ZERO_C as f64
     }
 }
 

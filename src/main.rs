@@ -131,7 +131,7 @@ mod app {
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
-        channel_temperature: [f32; 8], // input channel temperature in °C
+        channel_temperature: [f64; 8], // input channel temperature in °C
     }
 
     #[local]
@@ -271,7 +271,7 @@ mod app {
             channel_temperature[input_ch as usize] = adc_code.into();
             c.shared.telemetry.lock(|telemetry| {
                 telemetry.channel_temperature[input_ch as usize] =
-                    channel_temperature[input_ch as usize]
+                    channel_temperature[input_ch as usize] as f32
             });
         });
     }
