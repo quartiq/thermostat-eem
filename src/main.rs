@@ -8,12 +8,13 @@
 pub mod hardware;
 pub mod net;
 
-use defmt::{info, Format};
 use defmt_rtt as _; // global logger
 use panic_probe as _; // gloibal panic handler
 
+use defmt::{info, Format};
+use enum_iterator::IntoEnumIterator;
 use hardware::{
-    adc::{Adc, AdcCode, InputChannel},
+    adc::{Adc, AdcCode, Events, InputChannel, StateMachine},
     adc_internal::AdcInternal,
     dac::Dac,
     gpio::{Gpio, Led, PoePower},
@@ -136,7 +137,7 @@ mod app {
 
     #[local]
     struct Local {
-        adc: Adc,
+        adc: StateMachine<Adc>,
         dac: Dac,
         pwm: Pwm,
         adc_internal: AdcInternal,
@@ -152,6 +153,9 @@ mod app {
         // setup Thermostat hardware
         let thermostat = hardware::setup::setup(c.device, clock);
 
+        let mut sm_adc = StateMachine::new(thermostat.adc);
+        sm_adc.process_event(Events::Start).unwrap();
+
         let network = NetworkUsers::new(
             thermostat.net.stack,
             thermostat.net.phy,
@@ -164,12 +168,14 @@ mod app {
                 .unwrap(),
         );
 
+        let settings = Settings::default();
+
         ethernet_link::spawn().unwrap();
-        settings_update::spawn().unwrap();
+        settings_update::spawn(settings).unwrap();
         telemetry_task::spawn().unwrap();
 
         let local = Local {
-            adc: thermostat.adc,
+            adc: sm_adc,
             dac: thermostat.dac,
             pwm: thermostat.pwm,
             adc_internal: thermostat.adc_internal,
@@ -177,7 +183,7 @@ mod app {
 
         let shared = Shared {
             network,
-            settings: Settings::default(),
+            settings,
             telemetry: Telemetry::default(),
             gpio: thermostat.gpio,
             channel_temperature: [0.0; 8],
@@ -189,20 +195,19 @@ mod app {
     #[idle(shared=[network])]
     fn idle(mut c: idle::Context) -> ! {
         loop {
-            match c.shared.network.lock(|net| net.update()) {
-                NetworkState::SettingsChanged => settings_update::spawn().unwrap(),
+            c.shared.network.lock(|net| match net.update() {
+                NetworkState::SettingsChanged => {
+                    settings_update::spawn(*net.miniconf.settings()).unwrap()
+                }
                 NetworkState::Updated => {}
                 NetworkState::NoChange => {}
-            }
+            })
         }
     }
 
-    #[task(priority = 1, local=[dac, pwm], shared=[settings, network, gpio])]
-    fn settings_update(mut c: settings_update::Context) {
-        let settings = c
-            .shared
-            .network
-            .lock(|network| *network.miniconf.settings());
+    #[task(priority = 1, local=[dac, pwm], shared=[settings, gpio], capacity=1)]
+    fn settings_update(mut c: settings_update::Context, settings: Settings) {
+        // Verify settings and make them available
         c.shared.settings.lock(|current| *current = settings);
 
         // led is proxy for real settings and telemetry later
@@ -213,8 +218,8 @@ mod app {
         // update DAC state
         let dac = c.local.dac;
         let pwm = c.local.pwm;
-        for (i, s) in settings.output_settings.iter().enumerate() {
-            let ch = OutputChannel::try_from(i).unwrap();
+        for ch in OutputChannel::into_enum_iter() {
+            let s = settings.output_settings[ch as usize];
             // TODO: implement what happens if user chooses invalid value
             pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
             pwm.set_limit(Limit::PositiveCurrent(ch), s.current_limit_positive)
@@ -225,7 +230,7 @@ mod app {
             c.shared
                 .gpio
                 .lock(|gpio| gpio.set_shutdown(ch, s.shutdown.into()));
-            info!("DAC channel no {:?}: {:?}", i, s);
+            info!("DAC channel {:?}: {:?}", ch, s);
         }
     }
 
@@ -238,11 +243,11 @@ mod app {
         telemetry.p5v_voltage = adc_int.read_p5v_voltage();
         telemetry.p12v_voltage = adc_int.read_p12v_voltage();
         telemetry.p12v_current = adc_int.read_p12v_current();
-        for i in 0..4 {
-            let ch = OutputChannel::try_from(i).unwrap();
-            telemetry.output_vref[i] = adc_int.read_output_vref(ch);
-            telemetry.output_voltage[i] = adc_int.read_output_voltage(ch);
-            telemetry.output_current[i] = adc_int.read_output_current(ch);
+        for ch in OutputChannel::into_enum_iter() {
+            let idx = ch as usize;
+            telemetry.output_vref[idx] = adc_int.read_output_vref(ch);
+            telemetry.output_voltage[idx] = adc_int.read_output_voltage(ch);
+            telemetry.output_current[idx] = adc_int.read_output_current(ch);
         }
         c.shared.gpio.lock(|gpio| {
             telemetry.overtemp = gpio.overtemp();
@@ -261,18 +266,12 @@ mod app {
     // Higher priority than telemetry but lower than adc data readout.
     // 8 capacity to allow for max. 8 conversions to be queued.
     #[task(priority = 2, shared=[channel_temperature, telemetry], capacity = 8)]
-    fn convert_adc_code(
-        mut c: convert_adc_code::Context,
-        input_ch: InputChannel,
-        adc_code: AdcCode,
-    ) {
+    fn convert_adc_code(c: convert_adc_code::Context, input_ch: InputChannel, adc_code: AdcCode) {
+        let idx = input_ch as usize;
         // convert ADC code to °C and store in channel_temperature array and telemetry
-        c.shared.channel_temperature.lock(|channel_temperature| {
-            channel_temperature[input_ch as usize] = adc_code.into();
-            c.shared.telemetry.lock(|telemetry| {
-                telemetry.channel_temperature[input_ch as usize] =
-                    channel_temperature[input_ch as usize] as f32
-            });
+        (c.shared.channel_temperature, c.shared.telemetry).lock(|temp, tele| {
+            temp[idx] = adc_code.into();
+            tele.channel_temperature[idx] = temp[idx] as f32;
         });
     }
 
@@ -291,8 +290,7 @@ mod app {
 
     #[task(priority = 3, binds = EXTI15_10, local=[adc])]
     fn adc_readout(c: adc_readout::Context) {
-        let adc = c.local.adc;
-        let (input_ch, adc_code) = adc.handle_interrupt();
+        let (input_ch, adc_code) = c.local.adc.handle_interrupt();
         convert_adc_code::spawn(input_ch, adc_code).unwrap();
     }
 }
