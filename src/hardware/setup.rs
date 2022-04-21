@@ -138,6 +138,7 @@ pub fn setup(
 
     info!("--- Starting hardware setup");
 
+
     let mut delay = delay::AsmDelay::new(ccdr.clocks.c_ck().0);
 
     // Take GPIOs

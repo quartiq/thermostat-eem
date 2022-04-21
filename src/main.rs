@@ -143,11 +143,15 @@ mod app {
     }
 
     #[init]
-    fn init(c: init::Context) -> (Shared, Local, init::Monotonics) {
+    fn init(mut c: init::Context) -> (Shared, Local, init::Monotonics) {
         // Initialize monotonic
         let systick = c.core.SYST;
         let mono = Systick::new(systick, 400_000_000);
         let clock = SystemTimer::new(|| monotonics::now().ticks());
+
+        // enable core cycle counter for debugging
+        c.core.DCB.enable_trace();
+        c.core.DWT.enable_cycle_counter();
 
         // setup Thermostat hardware
         let thermostat = hardware::setup::setup(c.device, clock);
@@ -266,9 +270,12 @@ mod app {
         input_ch: InputChannel,
         adc_code: AdcCode,
     ) {
+        let mut cyc = 0;
         // convert ADC code to °C and store in channel_temperature array and telemetry
         c.shared.channel_temperature.lock(|channel_temperature| {
+            cyc = cortex_m::peripheral::DWT::cycle_count();
             channel_temperature[input_ch as usize] = adc_code.into();
+            cyc = cortex_m::peripheral::DWT::cycle_count() - cyc;
             c.shared.telemetry.lock(|telemetry| {
                 telemetry.channel_temperature[input_ch as usize] =
                     channel_temperature[input_ch as usize] as f32
@@ -277,6 +284,7 @@ mod app {
 
         if input_ch == InputChannel::Seven {
             telemetry_task::spawn().unwrap();
+            info!("cycles: {:?}", cyc); 
         }
     }
 
