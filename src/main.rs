@@ -284,7 +284,7 @@ mod app {
 
         if input_ch == InputChannel::Seven {
             telemetry_task::spawn().unwrap();
-            info!("cycles: {:?}", cyc); 
+            info!("cycles: {:?}", cyc);
         }
     }
 
