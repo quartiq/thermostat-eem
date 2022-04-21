@@ -31,14 +31,8 @@ impl AdcCode {
     const R_REF: f32 = 2.0 * 5000.0; // Ratiometric resistor setup. 5.0K high and low side.
     const ZERO_C: f32 = 273.15; // 0°C in °K
     const B: f32 = 3988.0; // NTC beta value. TODO: This should probaply be changeable.
-    const T_N: f32 = 25.0 + AdcCode::ZERO_C; // Reference Temperature for B-parameter equation.
+    const T_N: f32 = 25.0; // Reference Temperature for B-parameter equation.
     const R_N: f32 = 10000.0; // TEC resistance at T_N.
-
-    // ADC relative full scale per LSB
-    // Inverted equation from datasheet p. 40 with V_Ref normalized to 1 as this cancels out in resistance.
-    const FS_PER_LSB: f32 = 0x400000 as f32 / (2.0 * (1 << 23) as f32 * AdcCode::GAIN * 0.75);
-    // Relative resistance
-    const R_REF_N_1: f32 = AdcCode::R_REF / AdcCode::R_N - 1.0;
 }
 
 impl From<u32> for AdcCode {
@@ -62,25 +56,41 @@ impl From<AdcCode> for f32 {
     /// * Resistor setup as on Thermostat-EEM
     /// * Imput values not close to minimum/maximum (~1000 codes difference)
     fn from(code: AdcCode) -> f32 {
-        let u = code.0 as f32 * AdcCode::FS_PER_LSB;
+        // Inverted equation from datasheet p. 40 with V_Ref normalized to 1 as this cancels out in resistance.
+        let relative_voltage =
+            (code.0 as f32) * ((0x400000 as f32) / (2.0 * (1 << 23) as f32 * AdcCode::GAIN * 0.75));
         // Voltage divider normalized to V_Ref = 1, inverted to get to NTC resistance.
-        let r = 1.0 / u - 2.0;
+        let relative_resistance =
+            (relative_voltage) / (1.0 - relative_voltage) * (AdcCode::R_REF / AdcCode::R_N);
         // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
-        let t = (1.0 / AdcCode::T_N + AdcCode::R_REF_N_1.ln_1p() / AdcCode::B)
-            - 1.0 / AdcCode::B * r.ln_1p();
-        1.0 / t - AdcCode::ZERO_C
+        let temperature_kelvin_inv = 1.0 / (AdcCode::T_N + AdcCode::ZERO_C)
+            + (1.0 / AdcCode::B) * (relative_resistance).ln();
+        (1.0 / temperature_kelvin_inv) - AdcCode::ZERO_C
     }
 }
 
 impl From<AdcCode> for f64 {
-    /// Like `From<AdcCode> for f32` but for `f64` and correspondingly higher dynamic rande.
+    /// Convert raw ADC codes to temperature value in °C using the AD7172 input voltage to code
+    /// relation, the ratiometric resistor setup and the "B-parameter" equation (a simple form of the
+    /// Steinhart-Hart equation). This is a treadeoff between computation and absolute temperature
+    /// accuracy. The f64 dataformat should not limit the dynamic range or produce significant arithmetic
+    /// errors.
+    /// Valid under the following conditions:
+    /// * Unipolar ADC input
+    /// * Unchanged ADC GAIN and OFFSET registers (default reset values)
+    /// * Resistor setup as on Thermostat-EEM
+    /// * Imput values not close to minimum/maximum (~1000 codes difference)
     fn from(code: AdcCode) -> f64 {
-        let u = code.0 as f64 * AdcCode::FS_PER_LSB as f64;
-        let r = 1.0 / u - 2.0;
+        // Inverted equation from datasheet p. 40 with V_Ref normalized to 1 as this cancels out in resistance.
+        let relative_voltage = (code.0 as f64)
+            * ((0x400000 as f64) / (2.0 * (1 << 23) as f64 * AdcCode::GAIN as f64 * 0.75));
+        // Voltage divider normalized to V_Ref = 1, inverted to get to NTC resistance.
+        let relative_resistance = (relative_voltage) / (1.0 - relative_voltage)
+            * (AdcCode::R_REF as f64 / AdcCode::R_N as f64);
         // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
-        let t = (1.0 / AdcCode::T_N + AdcCode::R_REF_N_1.ln_1p() / AdcCode::B) as f64
-            - (1.0 / AdcCode::B) as f64 * r.ln_1p();
-        1.0 / t - AdcCode::ZERO_C as f64
+        let temperature_kelvin_inv = 1.0 / (AdcCode::T_N as f64 + AdcCode::ZERO_C as f64)
+            + (1.0 / AdcCode::B as f64) * (relative_resistance).ln();
+        (1.0 / temperature_kelvin_inv) - AdcCode::ZERO_C as f64
     }
 }
 
