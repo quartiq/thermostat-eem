@@ -137,7 +137,7 @@ mod app {
 
     #[local]
     struct Local {
-        adc: StateMachine<Adc>,
+        adc_sm: StateMachine<Adc>,
         dac: Dac,
         pwm: Pwm,
         adc_internal: AdcInternal,
@@ -147,14 +147,12 @@ mod app {
     fn init(c: init::Context) -> (Shared, Local, init::Monotonics) {
         // Initialize monotonic
         let systick = c.core.SYST;
-        let mono = Systick::new(systick, 400_000_000);
         let clock = SystemTimer::new(|| monotonics::now().ticks());
 
         // setup Thermostat hardware
-        let thermostat = hardware::setup::setup(c.device, clock);
+        let mut thermostat = hardware::setup::setup(c.device, clock);
 
-        let mut sm_adc = StateMachine::new(thermostat.adc);
-        sm_adc.process_event(Events::Start).unwrap();
+        let mono = Systick::new(systick, thermostat.clocks.sysclk().0);
 
         let network = NetworkUsers::new(
             thermostat.net.stack,
@@ -173,9 +171,10 @@ mod app {
         ethernet_link::spawn().unwrap();
         settings_update::spawn(settings).unwrap();
         telemetry_task::spawn().unwrap();
+        thermostat.adc_sm.process_event(Events::Start).unwrap();
 
         let local = Local {
-            adc: sm_adc,
+            adc_sm: thermostat.adc_sm,
             dac: thermostat.dac,
             pwm: thermostat.pwm,
             adc_internal: thermostat.adc_internal,
@@ -288,9 +287,9 @@ mod app {
         unsafe { hal::ethernet::interrupt_handler() }
     }
 
-    #[task(priority = 3, binds = EXTI15_10, local=[adc])]
+    #[task(priority = 3, binds = EXTI15_10, local=[adc_sm])]
     fn adc_readout(c: adc_readout::Context) {
-        let (input_ch, adc_code) = c.local.adc.handle_interrupt();
+        let (input_ch, adc_code) = c.local.adc_sm.handle_interrupt();
         convert_adc_code::spawn(input_ch, adc_code).unwrap();
     }
 }

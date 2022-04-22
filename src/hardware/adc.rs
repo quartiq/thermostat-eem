@@ -8,17 +8,12 @@ use smlang::statemachine;
 use super::ad7172::{self, AdcChannel};
 
 use super::hal::{
-    gpio::{
-        gpiob::*, gpioc::*, gpioe::*, Alternate, ExtiPin, Input, Output, PullUp, PushPull, AF5,
-    },
+    self,
+    gpio::{self, gpiob, gpioc, gpioe, ExtiPin},
     hal::blocking::delay::DelayUs,
-    hal::digital::v2::OutputPin,
-    hal::digital::v2::PinState::{self, High, Low},
+    hal::digital::v2::{OutputPin, PinState},
     prelude::*,
-    rcc::{rec, CoreClocks},
-    spi,
-    spi::{Enabled, Spi},
-    stm32::SPI4,
+    rcc, spi, stm32,
 };
 
 use num_traits::float::Float;
@@ -136,8 +131,6 @@ impl AdcPhy {
     }
 }
 
-type Adcs = ad7172::Ad7172<Spi<SPI4, Enabled>>;
-
 #[allow(clippy::complexity)]
 /// All pins for all ADCs.
 /// * `spi` - Spi clk, miso, mosi (in this order).
@@ -146,31 +139,31 @@ type Adcs = ad7172::Ad7172<Spi<SPI4, Enabled>>;
 /// * `sync` - ADC sync pin (shared for all adc phys).
 pub struct AdcPins {
     pub spi: (
-        PE2<Alternate<AF5>>,
-        PE5<Alternate<AF5>>,
-        PE6<Alternate<AF5>>,
+        gpioe::PE2<gpio::Alternate<gpio::AF5>>,
+        gpioe::PE5<gpio::Alternate<gpio::AF5>>,
+        gpioe::PE6<gpio::Alternate<gpio::AF5>>,
     ),
     pub cs: (
-        PE0<Output<PushPull>>,
-        PE1<Output<PushPull>>,
-        PE3<Output<PushPull>>,
-        PE4<Output<PushPull>>,
+        gpioe::PE0<gpio::Output<gpio::PushPull>>,
+        gpioe::PE1<gpio::Output<gpio::PushPull>>,
+        gpioe::PE3<gpio::Output<gpio::PushPull>>,
+        gpioe::PE4<gpio::Output<gpio::PushPull>>,
     ),
-    pub rdyn: PC11<Input<PullUp>>,
-    pub sync: PB11<Output<PushPull>>,
+    pub rdyn: gpioc::PC11<gpio::Input<gpio::PullUp>>,
+    pub sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
 
 #[allow(clippy::complexity)]
 pub struct Adc {
-    adcs: Adcs,
-    pub rdyn: PC11<Input<PullUp>>,
-    sync: PB11<Output<PushPull>>,
+    adcs: ad7172::Ad7172<hal::spi::Spi<hal::stm32::SPI4, hal::spi::Enabled>>,
     cs: (
-        PE0<Output<PushPull>>,
-        PE1<Output<PushPull>>,
-        PE3<Output<PushPull>>,
-        PE4<Output<PushPull>>,
+        gpioe::PE0<gpio::Output<gpio::PushPull>>,
+        gpioe::PE1<gpio::Output<gpio::PushPull>>,
+        gpioe::PE3<gpio::Output<gpio::PushPull>>,
+        gpioe::PE4<gpio::Output<gpio::PushPull>>,
     ),
+    rdyn: gpioc::PC11<gpio::Input<gpio::PullUp>>,
+    sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
 
 impl Adc {
@@ -184,19 +177,20 @@ impl Adc {
     /// * `pins` - All ADC pins
     pub fn new(
         delay: &mut impl DelayUs<u16>,
-        clocks: &CoreClocks,
-        spi4_rec: rec::Spi4,
-        spi4: SPI4,
+        clocks: &rcc::CoreClocks,
+        spi4_rec: rcc::rec::Spi4,
+        spi4: stm32::SPI4,
         pins: AdcPins,
     ) -> Self {
         // SPI MODE_3: idle high, capture on second transition
-        let spi: Spi<_, _, u8> = spi4.spi(pins.spi, spi::MODE_3, 12500.khz(), spi4_rec, clocks);
+        let spi: spi::Spi<_, _, u8> =
+            spi4.spi(pins.spi, spi::MODE_3, 12500.khz(), spi4_rec, clocks);
 
         let mut adc = Adc {
             adcs: ad7172::Ad7172::new(spi),
+            cs: pins.cs,
             rdyn: pins.rdyn,
             sync: pins.sync,
-            cs: pins.cs,
         };
 
         adc.setup(delay);
@@ -205,10 +199,10 @@ impl Adc {
 
     fn setup(&mut self, delay: &mut impl DelayUs<u16>) {
         // deassert all CS first
-        self.set_cs(AdcPhy::Zero, High);
-        self.set_cs(AdcPhy::One, High);
-        self.set_cs(AdcPhy::Two, High);
-        self.set_cs(AdcPhy::Three, High);
+        self.set_cs(AdcPhy::Zero, PinState::High);
+        self.set_cs(AdcPhy::One, PinState::High);
+        self.set_cs(AdcPhy::Two, PinState::High);
+        self.set_cs(AdcPhy::Three, PinState::High);
 
         // set sync low first for synchronization at rising edge
         self.sync.set_low().unwrap();
@@ -238,9 +232,9 @@ impl Adc {
     where
         F: FnOnce(&mut Self) -> R,
     {
-        self.set_cs(phy, Low);
+        self.set_cs(phy, PinState::Low);
         let res = func(self);
-        self.set_cs(phy, High);
+        self.set_cs(phy, PinState::High);
         res
     }
 
@@ -319,12 +313,11 @@ statemachine! {
 }
 
 impl StateMachineContext for Adc {
-    /// Obviously at the beginning of the program the data readout has to be initiated by selecting one
-    /// ADC manually, outside this routine.
+    /// The data readout has to be initiated by selecting the first ADC.
     fn start(&mut self) -> AdcPhy {
         // set up sampling sequence by selection first ADC according to schedule
         self.rdyn.clear_interrupt_pending_bit();
-        self.set_cs(AdcPhy::Zero, Low);
+        self.set_cs(AdcPhy::Zero, PinState::Low);
         AdcPhy::Zero
     }
 
@@ -336,14 +329,15 @@ impl StateMachineContext for Adc {
     /// sampling (or when it is selected if it is done at this point) and the routine will start again.
     fn next(&mut self, phy: &AdcPhy, ch: &AdcChannel) -> AdcPhy {
         self.rdyn.clear_interrupt_pending_bit();
-        self.set_cs(*phy, High);
+        self.set_cs(*phy, PinState::High);
         let next = phy.next(ch);
-        self.set_cs(next, Low);
+        self.set_cs(next, PinState::Low);
         next
     }
 
     fn stop(&mut self, phy: &AdcPhy) {
-        self.set_cs(*phy, High);
+        self.rdyn.clear_interrupt_pending_bit();
+        self.set_cs(*phy, PinState::High);
     }
 }
 
@@ -360,7 +354,7 @@ impl StateMachine<Adc> {
             let input_ch = InputChannel::try_from((phy, adc_ch)).unwrap();
             (input_ch, code)
         } else {
-            panic!("Unexpected State");
+            panic!("Unexpected State")
         }
     }
 }
