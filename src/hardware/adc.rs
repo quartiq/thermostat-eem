@@ -75,7 +75,7 @@ impl From<AdcCode> for f64 {
             relative_voltage / (1.0 - relative_voltage) * AdcCode::R_REF_N as f64;
         let temperature_kelvin_inv =
             1.0 / AdcCode::T_N as f64 + 1.0 / AdcCode::B as f64 * relative_resistance.ln();
-        (1.0 / temperature_kelvin_inv) - AdcCode::ZERO_C as f64
+        1.0 / temperature_kelvin_inv - AdcCode::ZERO_C as f64
     }
 }
 
