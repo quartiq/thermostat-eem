@@ -328,16 +328,16 @@ impl StateMachineContext for Adc {
     /// again once it has finished
     /// sampling (or when it is selected if it is done at this point) and the routine will start again.
     fn next(&mut self, phy: &AdcPhy, ch: &AdcChannel) -> AdcPhy {
-        self.rdyn.clear_interrupt_pending_bit();
         self.set_cs(*phy, PinState::High);
+        self.rdyn.clear_interrupt_pending_bit();
         let next = phy.next(ch);
         self.set_cs(next, PinState::Low);
         next
     }
 
     fn stop(&mut self, phy: &AdcPhy) {
-        self.rdyn.clear_interrupt_pending_bit();
         self.set_cs(*phy, PinState::High);
+        self.rdyn.clear_interrupt_pending_bit();
     }
 }
 
