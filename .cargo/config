@@ -6,6 +6,7 @@ rustflags = [
     "-C", "link-arg=--nmagic",
     "-C", "target-cpu=cortex-m7",
     "-C", "link-arg=-Tdefmt.x",
+    "-C", "target-feature=+fp-armv8d16",
 ]
 
 [build]
