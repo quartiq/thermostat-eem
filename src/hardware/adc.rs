@@ -322,7 +322,7 @@ impl StateMachineContext for Adc {
     }
 
     /// Uses the schedule implemented in `AdcPhy::next()` to decide which ADC will have data ready next.
-    /// It then clears the interupt pending flag
+    /// It clears the interupt pending flag
     /// (which does not trigger an interrupt right away since the currently selected ADC does not have new data),
     /// deselects the current ADC and selects the next in line. The next ADC will then trigger the interrupt
     /// again once it has finished
