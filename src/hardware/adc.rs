@@ -315,7 +315,7 @@ statemachine! {
 impl StateMachineContext for Adc {
     /// The data readout has to be initiated by selecting the first ADC.
     fn start(&mut self) -> AdcPhy {
-        // set up sampling sequence by selection first ADC according to schedule
+        // set up sampling sequence by selecting the first ADC according to schedule
         self.rdyn.clear_interrupt_pending_bit();
         self.set_cs(AdcPhy::Zero, PinState::Low);
         AdcPhy::Zero
