@@ -8,7 +8,7 @@ use smlang::statemachine;
 use super::ad7172::{self, AdcChannel};
 
 use super::hal::{
-    self,
+    self, device,
     gpio::{self, gpiob, gpioc, gpioe, ExtiPin},
     hal::blocking::delay::DelayUs,
     hal::digital::v2::{OutputPin, PinState},
@@ -342,6 +342,15 @@ impl StateMachineContext for Adc {
 }
 
 impl StateMachine<Adc> {
+    /// Set up the RDY pin, start generating interrupts, and start the state machine.
+    pub fn start(&mut self, exti: &mut device::EXTI, syscfg: &mut device::SYSCFG) {
+        let adc = self.context_mut();
+        adc.rdyn.make_interrupt_source(syscfg);
+        adc.rdyn.trigger_on_edge(exti, gpio::Edge::Falling);
+        adc.rdyn.enable_interrupt(exti);
+        self.process_event(Events::Start).unwrap();
+    }
+
     /// Handle ADC RDY interrupt.
     ///
     /// This routine is called every time the currently selected ADC on Thermostat reports that it has data ready
