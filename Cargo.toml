@@ -27,6 +27,8 @@ defmt-rtt = "0.3.0"
 num-traits = { version = "0.2", default-features = false, features = ["libm"] }
 shared-bus-rtic = { version = "0.2", features = ["cortex-m"] }
 byteorder = { version = "1", default-features = false }
+smlang = "0.5.1"
+enum-iterator = "0.7.0"
 
 [profile.dev]
 opt-level = 3

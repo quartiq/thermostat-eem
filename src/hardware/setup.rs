@@ -5,13 +5,13 @@ use stm32h7xx_hal::hal::digital::v2::OutputPin;
 use super::hal::{
     self as hal,
     ethernet::{self, PHY},
-    gpio::{Edge, ExtiPin, GpioExt},
+    gpio::GpioExt,
     prelude::*,
 };
 use crate::hardware::SRC_MAC;
 
 use super::{
-    adc::{Adc, AdcPins},
+    adc::{Adc, AdcPins, StateMachine},
     adc_internal::{AdcInternal, AdcInternalPins},
     dac::{Dac, DacPins},
     delay,
@@ -96,13 +96,14 @@ pub struct NetworkDevices {
 
 /// The available hardware interfaces on Thermostat.
 pub struct ThermostatDevices {
+    pub clocks: hal::rcc::CoreClocks,
     pub net: NetworkDevices,
     pub dac: Dac,
     pub pwm: Pwm,
     pub gpio: Gpio,
     pub fan: Fan,
     pub adc_internal: AdcInternal,
-    pub adc: Adc,
+    pub adc_sm: StateMachine<Adc>,
 }
 
 #[link_section = ".sram3.eth"]
@@ -111,7 +112,7 @@ static mut DES_RING: ethernet::DesRing<{ super::TX_DESRING_CNT }, { super::RX_DE
     ethernet::DesRing::new();
 
 pub fn setup(
-    device: stm32h7xx_hal::stm32::Peripherals,
+    mut device: stm32h7xx_hal::stm32::Peripherals,
     clock: system_timer::SystemTimer,
 ) -> ThermostatDevices {
     let pwr = device.PWR.constrain();
@@ -292,12 +293,7 @@ pub fn setup(
     // enable MCO 2MHz clock output to ADCs
     gpioa.pa8.into_alternate_af0();
 
-    let mut syscfg = device.SYSCFG;
-    let mut exti = device.EXTI;
-    let mut rdyn = gpioc.pc11.into_pull_up_input();
-    rdyn.make_interrupt_source(&mut syscfg);
-    rdyn.trigger_on_edge(&mut exti, Edge::Falling);
-    let mut adc = Adc::new(
+    let mut adc_sm = StateMachine::new(Adc::new(
         &mut delay,
         &ccdr.clocks,
         ccdr.peripheral.SPI4,
@@ -314,14 +310,11 @@ pub fn setup(
                 gpioe.pe3.into_push_pull_output(),
                 gpioe.pe4.into_push_pull_output(),
             ),
-            rdyn,
+            rdyn: gpioc.pc11.into_pull_up_input(),
             sync: gpiob.pb11.into_push_pull_output(),
         },
-    );
-    // Enable interrupt after all ADC setup is done.
-    // *Note*: Race condition: If the first ADC already sampled more than once by this point
-    // the interrupt readout sequence breaks.
-    adc.rdyn.enable_interrupt(&mut exti);
+    ));
+    adc_sm.start(&mut device.EXTI, &mut device.SYSCFG);
 
     info!("Setup Ethernet");
     let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
@@ -481,12 +474,13 @@ pub fn setup(
     info!("--- Hardware setup done");
 
     ThermostatDevices {
+        clocks: ccdr.clocks,
         net,
         dac,
         pwm,
         gpio,
         fan,
         adc_internal,
-        adc,
+        adc_sm,
     }
 }

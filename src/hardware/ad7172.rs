@@ -1,6 +1,8 @@
 // (AD7172 https://www.analog.com/media/en/technical-documentation/data-sheets/AD7172-2.pdf)
 
 use core::fmt::Debug;
+use defmt::Format;
+use num_enum::TryFromPrimitive;
 
 use super::hal::hal::blocking::spi::{Transfer, Write};
 
@@ -47,6 +49,28 @@ pub mod Comms {
     pub mod RW {
         pub const WRITE: u32 = 0 << 6;
         pub const READ: u32 = 1 << 6;
+    }
+}
+
+#[derive(Clone, Copy, TryFromPrimitive, Debug, Format)]
+#[repr(usize)]
+pub enum AdcChannel {
+    Zero = 0,
+    One = 1,
+    Two = 2,
+    Three = 3,
+}
+
+pub struct Status(u8);
+impl Status {
+    pub fn channel(&self) -> AdcChannel {
+        AdcChannel::try_from(self.0 as usize & 0x3).unwrap()
+    }
+}
+
+impl From<u8> for Status {
+    fn from(x: u8) -> Self {
+        Self(x)
     }
 }
 
