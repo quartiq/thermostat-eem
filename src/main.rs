@@ -14,7 +14,7 @@ use panic_probe as _; // gloibal panic handler
 use defmt::{info, Format};
 use enum_iterator::IntoEnumIterator;
 use hardware::{
-    adc::{Adc, AdcCode, Events, InputChannel, StateMachine},
+    adc::{Adc, AdcCode, InputChannel, StateMachine},
     adc_internal::AdcInternal,
     dac::Dac,
     gpio::{Gpio, Led, PoePower},
@@ -150,7 +150,7 @@ mod app {
         let clock = SystemTimer::new(|| monotonics::now().ticks());
 
         // setup Thermostat hardware
-        let mut thermostat = hardware::setup::setup(c.device, clock);
+        let thermostat = hardware::setup::setup(c.device, clock);
 
         let mono = Systick::new(systick, thermostat.clocks.sysclk().0);
 
@@ -171,7 +171,6 @@ mod app {
         ethernet_link::spawn().unwrap();
         settings_update::spawn(settings).unwrap();
         telemetry_task::spawn().unwrap();
-        thermostat.adc_sm.process_event(Events::Start).unwrap();
 
         let local = Local {
             adc_sm: thermostat.adc_sm,
