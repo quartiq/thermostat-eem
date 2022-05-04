@@ -1,7 +1,7 @@
 use num_enum::TryFromPrimitive;
 
 use super::hal::{
-    gpio::{gpiod::*, gpioe::*, gpiof::*, gpiog::*, Floating, Input, Output, PushPull},
+    gpio::{gpiod::*, gpioe::*, gpiof::*, gpiog::*, Input, Output, PushPull},
     hal::digital::v2::{InputPin, OutputPin, PinState},
 };
 use crate::net::serde::Serialize;
@@ -12,10 +12,10 @@ use super::OutputChannel;
 #[allow(clippy::type_complexity)]
 pub struct GpioPins {
     pub hwrev: (
-        PD8<Input<Floating>>,
-        PD9<Input<Floating>>,
-        PD10<Input<Floating>>,
-        PD11<Input<Floating>>,
+        PD8<Input>,
+        PD9<Input>,
+        PD10<Input>,
+        PD11<Input>,
     ),
     // Front panel LEDs
     pub led: (
@@ -34,11 +34,11 @@ pub struct GpioPins {
         PG6<Output<PushPull>>,
         PG7<Output<PushPull>>,
     ),
-    pub poe_pwr: PF2<Input<Floating>>,
-    pub at_event: PE7<Input<Floating>>,
+    pub poe_pwr: PF2<Input>,
+    pub at_event: PE7<Input>,
     pub eem_pwr: PD0<Output<PushPull>>,
     pub tec_freq: PD2<Output<PushPull>>,
-    pub overtemp: PG12<Input<Floating>>,
+    pub overtemp: PG12<Input>,
 }
 
 #[derive(Copy, Clone, Debug)]

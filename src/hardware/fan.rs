@@ -1,5 +1,5 @@
 use super::hal::{
-    gpio::{gpiob::*, gpioc::*, Alternate, AF1, AF3},
+    gpio::{gpiob::*, gpioc::*, Alternate},
     hal::PwmPin,
     prelude::*,
     pwm::Pwm,
@@ -11,8 +11,8 @@ use super::hal::{
 };
 
 pub struct FanPins {
-    pub tacho: PB10<Alternate<AF1>>,
-    pub pwm: PC7<Alternate<AF3>>,
+    pub tacho: PB10<Alternate::<1>>,
+    pub pwm: PC7<Alternate::<3>>,
 }
 
 pub enum Error {

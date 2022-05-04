@@ -15,7 +15,7 @@
 ///! TEC driver datasheet: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
 ///!
 use super::hal::{
-    gpio::{gpioc::*, gpiog::*, Alternate, Output, PushPull, AF6},
+    gpio::{gpioc::*, gpiog::*, Alternate, Output, PushPull},
     hal::{blocking::spi::Write, digital::v2::OutputPin},
     prelude::*,
     rcc::{rec, CoreClocks},
@@ -73,8 +73,8 @@ impl Dac {
         clocks: &CoreClocks,
         spi3_rec: rec::Spi3,
         spi3: SPI3,
-        sck: PC10<Alternate<AF6>>,
-        mosi: PC12<Alternate<AF6>>,
+        sck: PC10<Alternate<6>>,
+        mosi: PC12<Alternate<6>>,
         pins: DacPins,
     ) -> Self {
         let spi = spi3.spi((sck, NoMiso, mosi), MODE_1, SPI_CLOCK, spi3_rec, clocks);

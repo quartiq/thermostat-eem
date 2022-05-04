@@ -43,22 +43,22 @@ pub enum Error {
 #[allow(clippy::type_complexity)]
 pub struct PwmPins {
     pub voltage: (
-        PE9<Alternate<AF1>>,
-        PE11<Alternate<AF1>>,
-        PE13<Alternate<AF1>>,
-        PE14<Alternate<AF1>>,
+        PE9<Alternate<1>>,
+        PE11<Alternate<1>>,
+        PE13<Alternate<1>>,
+        PE14<Alternate<1>>,
     ),
     pub negative_current: (
-        PC6<Alternate<AF2>>,
-        PB5<Alternate<AF2>>,
-        PC8<Alternate<AF2>>,
-        PC9<Alternate<AF2>>,
+        PC6<Alternate<2>>,
+        PB5<Alternate<2>>,
+        PC8<Alternate<2>>,
+        PC9<Alternate<2>>,
     ),
     pub positive_current: (
-        PD12<Alternate<AF2>>,
-        PD13<Alternate<AF2>>,
-        PD14<Alternate<AF2>>,
-        PD15<Alternate<AF2>>,
+        PD12<Alternate<2>>,
+        PD13<Alternate<2>>,
+        PD14<Alternate<2>>,
+        PD15<Alternate<2>>,
     ),
 }
 
