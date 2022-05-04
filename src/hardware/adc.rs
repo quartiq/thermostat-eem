@@ -9,7 +9,7 @@ use super::ad7172::{self, AdcChannel};
 
 use super::hal::{
     self, device,
-    gpio::{self, gpiob, gpioc, gpioe, ExtiPin},
+    gpio::{self, gpiob, gpioc, gpioe, ExtiPin, Pull},
     hal::blocking::delay::DelayUs,
     hal::digital::v2::{OutputPin, PinState},
     prelude::*,
@@ -139,9 +139,9 @@ impl AdcPhy {
 /// * `sync` - ADC sync pin (shared for all adc phys).
 pub struct AdcPins {
     pub spi: (
-        gpioe::PE2<gpio::Alternate<gpio::AF5>>,
-        gpioe::PE5<gpio::Alternate<gpio::AF5>>,
-        gpioe::PE6<gpio::Alternate<gpio::AF5>>,
+        gpioe::PE2<gpio::Alternate<5>>,
+        gpioe::PE5<gpio::Alternate<5>>,
+        gpioe::PE6<gpio::Alternate<5>>,
     ),
     pub cs: (
         gpioe::PE0<gpio::Output<gpio::PushPull>>,
@@ -149,7 +149,7 @@ pub struct AdcPins {
         gpioe::PE3<gpio::Output<gpio::PushPull>>,
         gpioe::PE4<gpio::Output<gpio::PushPull>>,
     ),
-    pub rdyn: gpioc::PC11<gpio::Input<gpio::PullUp>>,
+    pub rdyn: gpioc::PC11<gpio::Input>,
     pub sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
 
@@ -162,7 +162,7 @@ pub struct Adc {
         gpioe::PE3<gpio::Output<gpio::PushPull>>,
         gpioe::PE4<gpio::Output<gpio::PushPull>>,
     ),
-    rdyn: gpioc::PC11<gpio::Input<gpio::PullUp>>,
+    rdyn: gpioc::PC11<gpio::Input>,
     sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
 
@@ -182,6 +182,7 @@ impl Adc {
         spi4: stm32::SPI4,
         pins: AdcPins,
     ) -> Self {
+        pins.rdyn.internal_resistor(Pull::Up);
         // SPI MODE_3: idle high, capture on second transition
         let spi: spi::Spi<_, _, u8> =
             spi4.spi(pins.spi, spi::MODE_3, 12500.khz(), spi4_rec, clocks);
