@@ -9,7 +9,7 @@ cortex-m = { version = "0.7" }
 cortex-m-rt = { version = "0.7", features = ["device"] }
 # use specific hash allowing PD12 to be used on TIM4 via AF2
 # stm32h7xx-hal = {git = "https://github.com/stm32-rs/stm32h7xx-hal", rev = "0d984a2", features = ["stm32h743v", "rt", "ethernet"]}
-stm32h7xx-hal =  { version = "0.12", features = ["stm32h743v", "rt", "ethernet"]}
+stm32h7xx-hal =  { version = "0.12.1", features = ["stm32h743v", "rt", "ethernet"]}
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
 panic-probe = { version = "0.3.0", features = ["print-defmt"] }
 asm-delay = "0.9.0"

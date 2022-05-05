@@ -16,7 +16,7 @@
 ///!
 use super::hal::{
     gpio::{gpioc::*, gpiog::*, Alternate, Output, PushPull},
-    hal::{blocking::spi::Write},
+    hal::blocking::spi::Write,
     prelude::*,
     rcc::{rec, CoreClocks},
     spi::{Enabled, NoMiso, Spi, MODE_1},
@@ -77,7 +77,13 @@ impl Dac {
         mosi: PC12<Alternate<6>>,
         pins: DacPins,
     ) -> Self {
-        let spi = spi3.spi((sck, NoMiso, mosi), MODE_1, SPI_CLOCK.convert(), spi3_rec, clocks);
+        let spi = spi3.spi(
+            (sck, NoMiso, mosi),
+            MODE_1,
+            SPI_CLOCK.convert(),
+            spi3_rec,
+            clocks,
+        );
 
         let mut dac = Dac { spi, pins };
 
