@@ -1,7 +1,7 @@
 use num_enum::TryFromPrimitive;
 
 use super::hal::{
-    gpio::{gpiod::*, gpioe::*, gpiof::*, gpiog::*, Input, Output, PushPull},
+    gpio::{gpiod::*, gpioe::*, gpiof::*, gpiog::*, ErasedPin, Input, Output, PushPull},
     hal::digital::v2::PinState,
 };
 use crate::net::serde::Serialize;
@@ -11,24 +11,10 @@ use super::OutputChannel;
 
 #[allow(clippy::type_complexity)]
 pub struct GpioPins {
-    pub hwrev: (PD8<Input>, PD9<Input>, PD10<Input>, PD11<Input>),
+    pub hwrev: [ErasedPin<Input>; 4],
     // Front panel LEDs
-    pub led: (
-        PG9<Output<PushPull>>,
-        PG10<Output<PushPull>>,
-        PE8<Output<PushPull>>,
-        PE10<Output<PushPull>>,
-        PE12<Output<PushPull>>,
-        PG15<Output<PushPull>>,
-        PE15<Output<PushPull>>,
-        PG8<Output<PushPull>>,
-    ),
-    pub shdn: (
-        PG4<Output<PushPull>>,
-        PG5<Output<PushPull>>,
-        PG6<Output<PushPull>>,
-        PG7<Output<PushPull>>,
-    ),
+    pub led: [ErasedPin<Output>; 8],
+    pub shdn: [ErasedPin<Output>; 4],
     pub poe_pwr: PF2<Input>,
     pub at_event: PE7<Input>,
     pub eem_pwr: PD0<Output<PushPull>>,
@@ -142,34 +128,20 @@ impl Gpio {
     /// * `ch` - Thermostat output channel
     /// * `shutdown` - TEC driver shutdown. True to set shutdown mode, false to enable the driver.
     pub fn set_shutdown(&mut self, ch: OutputChannel, shutdown: State) {
-        let s = !PinState::from(shutdown);
-        match ch {
-            OutputChannel::Zero => self.pins.shdn.0.set_state(s),
-            OutputChannel::One => self.pins.shdn.1.set_state(s),
-            OutputChannel::Two => self.pins.shdn.2.set_state(s),
-            OutputChannel::Three => self.pins.shdn.3.set_state(s),
-        }
+        self.pins.shdn[ch as usize].set_state(!PinState::from(shutdown));
     }
 
     pub fn set_led(&mut self, led: Led, state: State) {
-        let s = PinState::from(state);
-        match led {
-            Led::Led0 => self.pins.led.0.set_state(s),
-            Led::Led1 => self.pins.led.1.set_state(s),
-            Led::Led2 => self.pins.led.2.set_state(s),
-            Led::Led3 => self.pins.led.3.set_state(s),
-            Led::Led4 => self.pins.led.4.set_state(s),
-            Led::Led5 => self.pins.led.5.set_state(s),
-            Led::Led6 => self.pins.led.6.set_state(s),
-            Led::Led7 => self.pins.led.7.set_state(s),
-        }
+        self.pins.led[led as usize].set_state(PinState::from(state));
     }
 
     pub fn hwrev(&self) -> u8 {
-        self.pins.hwrev.0.is_high() as u8
-            | (self.pins.hwrev.1.is_high() as u8) << 1
-            | (self.pins.hwrev.2.is_high() as u8) << 2
-            | (self.pins.hwrev.3.is_high() as u8) << 3
+        self.pins
+            .hwrev
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (p.is_high() as u8) << i)
+            .sum()
     }
 
     pub fn poe(&self) -> PoePower {

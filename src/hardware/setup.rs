@@ -151,28 +151,28 @@ pub fn setup(
 
     info!("Setup GPIO");
     let gpio_pins = GpioPins {
-        hwrev: (
-            gpiod.pd8.into_floating_input(),
-            gpiod.pd9.into_floating_input(),
-            gpiod.pd10.into_floating_input(),
-            gpiod.pd11.into_floating_input(),
-        ),
-        led: (
-            gpiog.pg9.into_push_pull_output(),
-            gpiog.pg10.into_push_pull_output(),
-            gpioe.pe8.into_push_pull_output(),
-            gpioe.pe10.into_push_pull_output(),
-            gpioe.pe12.into_push_pull_output(),
-            gpiog.pg15.into_push_pull_output(),
-            gpioe.pe15.into_push_pull_output(),
-            gpiog.pg8.into_push_pull_output(),
-        ),
-        shdn: (
-            gpiog.pg4.into_push_pull_output(),
-            gpiog.pg5.into_push_pull_output(),
-            gpiog.pg6.into_push_pull_output(),
-            gpiog.pg7.into_push_pull_output(),
-        ),
+        hwrev: [
+            gpiod.pd8.into_floating_input().erase(),
+            gpiod.pd9.into_floating_input().erase(),
+            gpiod.pd10.into_floating_input().erase(),
+            gpiod.pd11.into_floating_input().erase(),
+        ],
+        led: [
+            gpiog.pg9.into_push_pull_output().erase(),
+            gpiog.pg10.into_push_pull_output().erase(),
+            gpioe.pe8.into_push_pull_output().erase(),
+            gpioe.pe10.into_push_pull_output().erase(),
+            gpioe.pe12.into_push_pull_output().erase(),
+            gpiog.pg15.into_push_pull_output().erase(),
+            gpioe.pe15.into_push_pull_output().erase(),
+            gpiog.pg8.into_push_pull_output().erase(),
+        ],
+        shdn: [
+            gpiog.pg4.into_push_pull_output().erase(),
+            gpiog.pg5.into_push_pull_output().erase(),
+            gpiog.pg6.into_push_pull_output().erase(),
+            gpiog.pg7.into_push_pull_output().erase(),
+        ],
         poe_pwr: gpiof.pf2.into_floating_input(),
         at_event: gpioe.pe7.into_floating_input(),
         eem_pwr: gpiod.pd0.into_push_pull_output(),
