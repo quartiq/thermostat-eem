@@ -2,7 +2,7 @@ use num_enum::TryFromPrimitive;
 
 use super::hal::{
     gpio::{gpiod::*, gpioe::*, gpiof::*, gpiog::*, Input, Output, PushPull},
-    hal::digital::v2::{InputPin, OutputPin, PinState},
+    hal::digital::v2::PinState,
 };
 use crate::net::serde::Serialize;
 use defmt::Format;

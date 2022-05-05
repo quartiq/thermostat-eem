@@ -1,11 +1,10 @@
 use crate::hardware::system_timer;
 use smoltcp_nal::smoltcp;
-use stm32h7xx_hal::hal::digital::v2::OutputPin;
 
 use super::hal::{
     self as hal,
     ethernet::{self, PHY},
-    gpio::GpioExt,
+    gpio::{GpioExt, Speed},
     prelude::*,
 };
 use crate::hardware::SRC_MAC;
@@ -139,7 +138,7 @@ pub fn setup(
 
     info!("--- Starting hardware setup");
 
-    let mut delay = delay::AsmDelay::new(ccdr.clocks.c_ck().0);
+    let mut delay = delay::AsmDelay::new(ccdr.clocks.c_ck().to_Hz());
 
     // Take GPIOs
     let gpioa = device.GPIOA.split(ccdr.peripheral.GPIOA);
@@ -191,30 +190,30 @@ pub fn setup(
         (ccdr.peripheral.TIM2, ccdr.peripheral.TIM8),
         (device.TIM2, device.TIM8),
         FanPins {
-            tacho: gpiob.pb10.into_alternate_af1(),
-            pwm: gpioc.pc7.into_alternate_af3(),
+            tacho: gpiob.pb10.into_alternate(),
+            pwm: gpioc.pc7.into_alternate(),
         },
     );
 
     info!("Setup TEC limit PWM");
     let pwm_pins = PwmPins {
         voltage: (
-            gpioe.pe9.into_alternate_af1(),
-            gpioe.pe11.into_alternate_af1(),
-            gpioe.pe13.into_alternate_af1(),
-            gpioe.pe14.into_alternate_af1(),
+            gpioe.pe9.into_alternate(),
+            gpioe.pe11.into_alternate(),
+            gpioe.pe13.into_alternate(),
+            gpioe.pe14.into_alternate(),
         ),
         negative_current: (
-            gpioc.pc6.into_alternate_af2(),
-            gpiob.pb5.into_alternate_af2(),
-            gpioc.pc8.into_alternate_af2(),
-            gpioc.pc9.into_alternate_af2(),
+            gpioc.pc6.into_alternate(),
+            gpiob.pb5.into_alternate(),
+            gpioc.pc8.into_alternate(),
+            gpioc.pc9.into_alternate(),
         ),
         positive_current: (
-            gpiod.pd12.into_alternate_af2(),
-            gpiod.pd13.into_alternate_af2(),
-            gpiod.pd14.into_alternate_af2(),
-            gpiod.pd15.into_alternate_af2(),
+            gpiod.pd12.into_alternate(),
+            gpiod.pd13.into_alternate(),
+            gpiod.pd14.into_alternate(),
+            gpiod.pd15.into_alternate(),
         ),
     };
 
@@ -234,8 +233,8 @@ pub fn setup(
         &ccdr.clocks,
         ccdr.peripheral.SPI3,
         device.SPI3,
-        gpioc.pc10.into_alternate_af6(),
-        gpioc.pc12.into_alternate_af6(),
+        gpioc.pc10.into_alternate(),
+        gpioc.pc12.into_alternate(),
         DacPins {
             sync: (
                 gpiog.pg3.into_push_pull_output(),
@@ -291,7 +290,7 @@ pub fn setup(
     info!("Setup ADC");
 
     // enable MCO 2MHz clock output to ADCs
-    gpioa.pa8.into_alternate_af0();
+    gpioa.pa8.into_alternate::<0>();
 
     let mut adc_sm = StateMachine::new(Adc::new(
         &mut delay,
@@ -300,9 +299,9 @@ pub fn setup(
         device.SPI4,
         AdcPins {
             spi: (
-                gpioe.pe2.into_alternate_af5(),
-                gpioe.pe5.into_alternate_af5(),
-                gpioe.pe6.into_alternate_af5(),
+                gpioe.pe2.into_alternate(),
+                gpioe.pe5.into_alternate(),
+                gpioe.pe6.into_alternate(),
             ),
             cs: (
                 gpioe.pe0.into_push_pull_output(),
@@ -329,69 +328,34 @@ pub fn setup(
             delay.delay_us(200u8);
             eth_phy_nrst.set_high();
 
-            let rmii_ref_clk = gpioa
-                .pa1
-                .into_alternate_af11()
-                .set_speed(hal::gpio::Speed::VeryHigh);
-            let rmii_mdio = gpioa
-                .pa2
-                .into_alternate_af11()
-                .set_speed(hal::gpio::Speed::VeryHigh);
-            let rmii_mdc = gpioc
-                .pc1
-                .into_alternate_af11()
-                .set_speed(hal::gpio::Speed::VeryHigh);
-            let rmii_crs_dv = gpioa
-                .pa7
-                .into_alternate_af11()
-                .set_speed(hal::gpio::Speed::VeryHigh);
-            let rmii_rxd0 = gpioc
-                .pc4
-                .into_alternate_af11()
-                .set_speed(hal::gpio::Speed::VeryHigh);
-            let rmii_rxd1 = gpioc
-                .pc5
-                .into_alternate_af11()
-                .set_speed(hal::gpio::Speed::VeryHigh);
-            let rmii_tx_en = gpiog
-                .pg11
-                .into_alternate_af11()
-                .set_speed(hal::gpio::Speed::VeryHigh);
-            let rmii_txd0 = gpiog
-                .pg13
-                .into_alternate_af11()
-                .set_speed(hal::gpio::Speed::VeryHigh);
-            let rmii_txd1 = gpiob
-                .pb13
-                .into_alternate_af11()
-                .set_speed(hal::gpio::Speed::VeryHigh);
+            eth_phy_nrst.set_high();
 
-            (
-                rmii_ref_clk,
-                rmii_mdio,
-                rmii_mdc,
-                rmii_crs_dv,
-                rmii_rxd0,
-                rmii_rxd1,
-                rmii_tx_en,
-                rmii_txd0,
-                rmii_txd1,
-            )
+            let ref_clk = gpioa.pa1.into_alternate().speed(Speed::VeryHigh);
+            let mdio = gpioa.pa2.into_alternate().speed(Speed::VeryHigh);
+            let mdc = gpioc.pc1.into_alternate().speed(Speed::VeryHigh);
+            let crs_dv = gpioa.pa7.into_alternate().speed(Speed::VeryHigh);
+            let rxd0 = gpioc.pc4.into_alternate().speed(Speed::VeryHigh);
+            let rxd1 = gpioc.pc5.into_alternate().speed(Speed::VeryHigh);
+            let tx_en = gpiog.pg11.into_alternate().speed(Speed::VeryHigh);
+            let txd0 = gpiog.pg13.into_alternate().speed(Speed::VeryHigh);
+            let txd1 = gpiob.pb13.into_alternate().speed(Speed::VeryHigh);
+
+            (ref_clk, mdio, mdc, crs_dv, rxd0, rxd1, tx_en, txd0, txd1)
         };
 
         // Configure the ethernet controller
-        // let (eth_dma, eth_mac) = ethernet::new(
-        //     device.ETHERNET_MAC,
-        //     device.ETHERNET_MTL,
-        //     device.ETHERNET_DMA,
-        //     ethernet_pins,
-        //     // Note(unsafe): We only call this function once to take ownership of the
-        //     // descriptor ring.
-        //     unsafe { &mut DES_RING },
-        //     mac_addr,
-        //     ccdr.peripheral.ETH1MAC,
-        //     &ccdr.clocks,
-        // );
+        let (eth_dma, eth_mac) = ethernet::new(
+            device.ETHERNET_MAC,
+            device.ETHERNET_MTL,
+            device.ETHERNET_DMA,
+            ethernet_pins,
+            // Note(unsafe): We only call this function once to take ownership of the
+            // descriptor ring.
+            unsafe { &mut DES_RING },
+            mac_addr,
+            ccdr.peripheral.ETH1MAC,
+            &ccdr.clocks,
+        );
 
         // Reset and initialize the ethernet phy.
         let mut lan8742a = ethernet::phy::LAN8742A::new(eth_mac.set_phy_addr(0));

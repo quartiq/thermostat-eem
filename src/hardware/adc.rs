@@ -9,9 +9,9 @@ use super::ad7172::{self, AdcChannel};
 
 use super::hal::{
     self, device,
-    gpio::{self, gpiob, gpioc, gpioe, ExtiPin, Pull},
+    gpio::{self, gpiob, gpioc, gpioe, ExtiPin},
     hal::blocking::delay::DelayUs,
-    hal::digital::v2::{OutputPin, PinState},
+    hal::digital::v2::PinState,
     prelude::*,
     rcc, spi, stm32,
 };
@@ -182,7 +182,7 @@ impl Adc {
         spi4: stm32::SPI4,
         pins: AdcPins,
     ) -> Self {
-        pins.rdyn.internal_resistor(Pull::Up);
+        let rdyn_pullup = pins.rdyn.internal_pull_up(true);
         // SPI MODE_3: idle high, capture on second transition
         let spi: spi::Spi<_, _, u8> =
             spi4.spi(pins.spi, spi::MODE_3, 12500.kHz(), spi4_rec, clocks);
@@ -190,7 +190,7 @@ impl Adc {
         let mut adc = Adc {
             adcs: ad7172::Ad7172::new(spi),
             cs: pins.cs,
-            rdyn: pins.rdyn,
+            rdyn: rdyn_pullup,
             sync: pins.sync,
         };
 

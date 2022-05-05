@@ -6,7 +6,7 @@
 use super::{
     dac::{R_SENSE, VREF_TEC},
     hal::{
-        gpio::{gpiob::*, gpioc::*, gpiod::*, gpioe::*, Alternate, AF1, AF2},
+        gpio::{gpiob::*, gpioc::*, gpiod::*, gpioe::*, Alternate},
         hal::PwmPin,
         prelude::*,
         pwm::{ActiveHigh, ComplementaryDisabled, ComplementaryImpossible, C1, C2, C3, C4},
@@ -88,11 +88,15 @@ impl Pwm {
         pins: PwmPins,
     ) -> Pwm {
         // PWM freqency. 20kHz is ~80dB down with the installed second order 160Hz lowpass.
-        const F_PWM: KiloHertz = KiloHertz(20);
+        const F_PWM: KiloHertz = KiloHertz::kHz(20);
 
-        let mut voltage = tim.0.pwm(pins.voltage, F_PWM, tim_rec.0, clocks);
-        let mut negative_current = tim.1.pwm(pins.negative_current, F_PWM, tim_rec.1, clocks);
-        let mut positive_current = tim.2.pwm(pins.positive_current, F_PWM, tim_rec.2, clocks);
+        let mut voltage = tim.0.pwm(pins.voltage, F_PWM.convert(), tim_rec.0, clocks);
+        let mut negative_current =
+            tim.1
+                .pwm(pins.negative_current, F_PWM.convert(), tim_rec.1, clocks);
+        let mut positive_current =
+            tim.2
+                .pwm(pins.positive_current, F_PWM.convert(), tim_rec.2, clocks);
         fn init_pwm_pin<P: PwmPin<Duty = u16>>(pin: &mut P) {
             pin.set_duty(0);
             pin.enable();

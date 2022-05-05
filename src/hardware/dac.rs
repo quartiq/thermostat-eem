@@ -16,7 +16,7 @@
 ///!
 use super::hal::{
     gpio::{gpioc::*, gpiog::*, Alternate, Output, PushPull},
-    hal::{blocking::spi::Write, digital::v2::OutputPin},
+    hal::{blocking::spi::Write},
     prelude::*,
     rcc::{rec, CoreClocks},
     spi::{Enabled, NoMiso, Spi, MODE_1},
@@ -27,7 +27,7 @@ use super::hal::{
 use super::OutputChannel;
 
 // Note: 30MHz clock valid according to DAC datasheet. This lead to spurious RxFIFO overruns on the STM side when probing the spi clock with a scope probe.
-const SPI_CLOCK: MegaHertz = MegaHertz(8);
+const SPI_CLOCK: MegaHertz = MegaHertz::MHz(8);
 
 // DAC and PWM shared constants
 pub const R_SENSE: f32 = 0.05; // TEC current sense resistor
@@ -77,7 +77,7 @@ impl Dac {
         mosi: PC12<Alternate<6>>,
         pins: DacPins,
     ) -> Self {
-        let spi = spi3.spi((sck, NoMiso, mosi), MODE_1, SPI_CLOCK, spi3_rec, clocks);
+        let spi = spi3.spi((sck, NoMiso, mosi), MODE_1, SPI_CLOCK.convert(), spi3_rec, clocks);
 
         let mut dac = Dac { spi, pins };
 
