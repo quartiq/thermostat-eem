@@ -152,7 +152,7 @@ mod app {
         // setup Thermostat hardware
         let thermostat = hardware::setup::setup(c.device, clock);
 
-        let mono = Systick::new(systick, thermostat.clocks.sysclk().0);
+        let mono = Systick::new(systick, thermostat.clocks.sysclk().to_Hz());
 
         let network = NetworkUsers::new(
             thermostat.net.stack,

@@ -15,8 +15,8 @@
 ///! TEC driver datasheet: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
 ///!
 use super::hal::{
-    gpio::{gpioc::*, gpiog::*, Alternate, Output, PushPull, AF6},
-    hal::{blocking::spi::Write, digital::v2::OutputPin},
+    gpio::{gpioc::*, gpiog::*, Alternate, Output, PushPull},
+    hal::blocking::spi::Write,
     prelude::*,
     rcc::{rec, CoreClocks},
     spi::{Enabled, NoMiso, Spi, MODE_1},
@@ -27,7 +27,7 @@ use super::hal::{
 use super::OutputChannel;
 
 // Note: 30MHz clock valid according to DAC datasheet. This lead to spurious RxFIFO overruns on the STM side when probing the spi clock with a scope probe.
-const SPI_CLOCK: MegaHertz = MegaHertz(8);
+const SPI_CLOCK: MegaHertz = MegaHertz::MHz(8);
 
 // DAC and PWM shared constants
 pub const R_SENSE: f32 = 0.05; // TEC current sense resistor
@@ -73,18 +73,24 @@ impl Dac {
         clocks: &CoreClocks,
         spi3_rec: rec::Spi3,
         spi3: SPI3,
-        sck: PC10<Alternate<AF6>>,
-        mosi: PC12<Alternate<AF6>>,
+        sck: PC10<Alternate<6>>,
+        mosi: PC12<Alternate<6>>,
         pins: DacPins,
     ) -> Self {
-        let spi = spi3.spi((sck, NoMiso, mosi), MODE_1, SPI_CLOCK, spi3_rec, clocks);
+        let spi = spi3.spi(
+            (sck, NoMiso, mosi),
+            MODE_1,
+            SPI_CLOCK.convert(),
+            spi3_rec,
+            clocks,
+        );
 
         let mut dac = Dac { spi, pins };
 
-        dac.pins.sync.0.set_high().unwrap();
-        dac.pins.sync.1.set_high().unwrap();
-        dac.pins.sync.2.set_high().unwrap();
-        dac.pins.sync.3.set_high().unwrap();
+        dac.pins.sync.0.set_high();
+        dac.pins.sync.1.set_high();
+        dac.pins.sync.2.set_high();
+        dac.pins.sync.3.set_high();
 
         // default to zero current
         for i in 0..4 {
@@ -116,25 +122,25 @@ impl Dac {
 
         match ch {
             OutputChannel::Zero => {
-                self.pins.sync.0.set_low().unwrap();
+                self.pins.sync.0.set_low();
                 // 24 bit write. 4 MSB are zero and 2 LSB are ignored for a 18 bit DAC output.
                 self.spi.write(buf).unwrap();
-                self.pins.sync.0.set_high().unwrap();
+                self.pins.sync.0.set_high();
             }
             OutputChannel::One => {
-                self.pins.sync.1.set_low().unwrap();
+                self.pins.sync.1.set_low();
                 self.spi.write(buf).unwrap();
-                self.pins.sync.1.set_high().unwrap();
+                self.pins.sync.1.set_high();
             }
             OutputChannel::Two => {
-                self.pins.sync.2.set_low().unwrap();
+                self.pins.sync.2.set_low();
                 self.spi.write(buf).unwrap();
-                self.pins.sync.2.set_high().unwrap();
+                self.pins.sync.2.set_high();
             }
             OutputChannel::Three => {
-                self.pins.sync.3.set_low().unwrap();
+                self.pins.sync.3.set_low();
                 self.spi.write(buf).unwrap();
-                self.pins.sync.3.set_high().unwrap();
+                self.pins.sync.3.set_high();
             }
         }
         Ok(())

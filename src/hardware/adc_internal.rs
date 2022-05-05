@@ -84,7 +84,7 @@ impl AdcInternal {
         .unwrap();
         const SCALE: f32 = -V_REF * 20.0 / 5.0; // Differential voltage sense gain
         const OFFSET: f32 = -VREF_TEC / V_REF; // Differential voltage sense offset
-        (code as f32 / self.adc1.max_sample() as f32 + OFFSET) * SCALE
+        (code as f32 / self.adc1.slope() as f32 + OFFSET) * SCALE
     }
 
     pub fn read_output_current(&mut self, ch: OutputChannel) -> f32 {
@@ -98,7 +98,7 @@ impl AdcInternal {
         .unwrap();
         const SCALE: f32 = V_REF / R_SENSE / 8.0; // MAX1968 ITEC scale
         const OFFSET: f32 = -VREF_TEC / V_REF; // MAX1968 ITEC offset
-        (code as f32 / self.adc1.max_sample() as f32 + OFFSET) * SCALE
+        (code as f32 / self.adc1.slope() as f32 + OFFSET) * SCALE
     }
 
     pub fn read_output_vref(&mut self, ch: OutputChannel) -> f32 {
@@ -111,7 +111,7 @@ impl AdcInternal {
         }
         .unwrap();
         const SCALE: f32 = V_REF;
-        code as f32 / self.adc3.max_sample() as f32 * SCALE
+        code as f32 / self.adc3.slope() as f32 * SCALE
     }
 
     pub fn read_supply(&mut self, ch: Supply) -> f32 {
@@ -127,27 +127,27 @@ impl AdcInternal {
     pub fn read_p3v3_voltage(&mut self) -> f32 {
         const DIV: f32 = 6.8 / (1.6 + 6.8); // Resistor divider 3V3 rail
         let code: u32 = self.adc3.read(&mut self.pins.p3v3_voltage).unwrap();
-        code as f32 / self.adc3.max_sample() as f32 * (V_REF / DIV)
+        code as f32 / self.adc3.slope() as f32 * (V_REF / DIV)
     }
 
     /// reads the 5V rail voltage in volt
     pub fn read_p5v_voltage(&mut self) -> f32 {
         const DIV: f32 = 6.8 / (10.0 + 6.8); // Resistor divider 5V rail
         let code: u32 = self.adc1.read(&mut self.pins.p5v_voltage).unwrap();
-        code as f32 / self.adc1.max_sample() as f32 * (V_REF / DIV)
+        code as f32 / self.adc1.slope() as f32 * (V_REF / DIV)
     }
 
     /// reads the 12V rail voltage in volt
     pub fn read_p12v_voltage(&mut self) -> f32 {
         const DIV: f32 = 1.6 / (1.6 + 6.8); // Resistor divider 12V rail
         let code: u32 = self.adc1.read(&mut self.pins.p12v_voltage).unwrap();
-        code as f32 / self.adc1.max_sample() as f32 * (V_REF / DIV)
+        code as f32 / self.adc1.slope() as f32 * (V_REF / DIV)
     }
 
     /// reads the 12V rail current in ampere
     pub fn read_p12v_current(&mut self) -> f32 {
         const GAIN: f32 = 0.005 * (10000.0 / 100.0); // 12V current measurement resistor configuration for LT6106
         let code: u32 = self.adc3.read(&mut self.pins.p12v_current).unwrap();
-        code as f32 / self.adc3.max_sample() as f32 * (V_REF / GAIN)
+        code as f32 / self.adc3.slope() as f32 * (V_REF / GAIN)
     }
 }

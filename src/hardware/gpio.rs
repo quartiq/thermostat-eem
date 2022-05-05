@@ -1,8 +1,8 @@
 use num_enum::TryFromPrimitive;
 
 use super::hal::{
-    gpio::{gpiod::*, gpioe::*, gpiof::*, gpiog::*, Floating, Input, Output, PushPull},
-    hal::digital::v2::{InputPin, OutputPin, PinState},
+    gpio::{gpiod::*, gpioe::*, gpiof::*, gpiog::*, Input, Output, PushPull},
+    hal::digital::v2::PinState,
 };
 use crate::net::serde::Serialize;
 use defmt::Format;
@@ -11,12 +11,7 @@ use super::OutputChannel;
 
 #[allow(clippy::type_complexity)]
 pub struct GpioPins {
-    pub hwrev: (
-        PD8<Input<Floating>>,
-        PD9<Input<Floating>>,
-        PD10<Input<Floating>>,
-        PD11<Input<Floating>>,
-    ),
+    pub hwrev: (PD8<Input>, PD9<Input>, PD10<Input>, PD11<Input>),
     // Front panel LEDs
     pub led: (
         PG9<Output<PushPull>>,
@@ -34,11 +29,11 @@ pub struct GpioPins {
         PG6<Output<PushPull>>,
         PG7<Output<PushPull>>,
     ),
-    pub poe_pwr: PF2<Input<Floating>>,
-    pub at_event: PE7<Input<Floating>>,
+    pub poe_pwr: PF2<Input>,
+    pub at_event: PE7<Input>,
     pub eem_pwr: PD0<Output<PushPull>>,
     pub tec_freq: PD2<Output<PushPull>>,
-    pub overtemp: PG12<Input<Floating>>,
+    pub overtemp: PG12<Input>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -154,7 +149,6 @@ impl Gpio {
             OutputChannel::Two => self.pins.shdn.2.set_state(s),
             OutputChannel::Three => self.pins.shdn.3.set_state(s),
         }
-        .unwrap()
     }
 
     pub fn set_led(&mut self, led: Led, state: State) {
@@ -169,21 +163,17 @@ impl Gpio {
             Led::Led6 => self.pins.led.6.set_state(s),
             Led::Led7 => self.pins.led.7.set_state(s),
         }
-        .unwrap()
     }
 
     pub fn hwrev(&self) -> u8 {
-        self.pins.hwrev.0.is_high().unwrap() as u8
-            | (self.pins.hwrev.1.is_high().unwrap() as u8) << 1
-            | (self.pins.hwrev.2.is_high().unwrap() as u8) << 2
-            | (self.pins.hwrev.3.is_high().unwrap() as u8) << 3
+        self.pins.hwrev.0.is_high() as u8
+            | (self.pins.hwrev.1.is_high() as u8) << 1
+            | (self.pins.hwrev.2.is_high() as u8) << 2
+            | (self.pins.hwrev.3.is_high() as u8) << 3
     }
 
     pub fn poe(&self) -> PoePower {
-        match (
-            self.pins.poe_pwr.is_high().unwrap(),
-            self.pins.at_event.is_high().unwrap(),
-        ) {
+        match (self.pins.poe_pwr.is_high(), self.pins.at_event.is_high()) {
             (false, _) => PoePower::Absent,
             (true, false) => PoePower::Low,
             (true, true) => PoePower::High,
@@ -191,14 +181,14 @@ impl Gpio {
     }
 
     pub fn set_eem_pwr(&mut self, enabled: bool) {
-        self.pins.eem_pwr.set_state(enabled.into()).unwrap();
+        self.pins.eem_pwr.set_state(enabled.into());
     }
 
     pub fn set_tec_frequency(&mut self, frequency: TecFrequency) {
-        self.pins.tec_freq.set_state(frequency.into()).unwrap();
+        self.pins.tec_freq.set_state(frequency.into());
     }
 
     pub fn overtemp(&self) -> bool {
-        self.pins.overtemp.is_low().unwrap()
+        self.pins.overtemp.is_low()
     }
 }

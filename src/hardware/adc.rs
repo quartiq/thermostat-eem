@@ -11,7 +11,7 @@ use super::hal::{
     self, device,
     gpio::{self, gpiob, gpioc, gpioe, ExtiPin},
     hal::blocking::delay::DelayUs,
-    hal::digital::v2::{OutputPin, PinState},
+    hal::digital::v2::PinState,
     prelude::*,
     rcc, spi, stm32,
 };
@@ -139,9 +139,9 @@ impl AdcPhy {
 /// * `sync` - ADC sync pin (shared for all adc phys).
 pub struct AdcPins {
     pub spi: (
-        gpioe::PE2<gpio::Alternate<gpio::AF5>>,
-        gpioe::PE5<gpio::Alternate<gpio::AF5>>,
-        gpioe::PE6<gpio::Alternate<gpio::AF5>>,
+        gpioe::PE2<gpio::Alternate<5>>,
+        gpioe::PE5<gpio::Alternate<5>>,
+        gpioe::PE6<gpio::Alternate<5>>,
     ),
     pub cs: (
         gpioe::PE0<gpio::Output<gpio::PushPull>>,
@@ -149,7 +149,7 @@ pub struct AdcPins {
         gpioe::PE3<gpio::Output<gpio::PushPull>>,
         gpioe::PE4<gpio::Output<gpio::PushPull>>,
     ),
-    pub rdyn: gpioc::PC11<gpio::Input<gpio::PullUp>>,
+    pub rdyn: gpioc::PC11<gpio::Input>,
     pub sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
 
@@ -162,7 +162,7 @@ pub struct Adc {
         gpioe::PE3<gpio::Output<gpio::PushPull>>,
         gpioe::PE4<gpio::Output<gpio::PushPull>>,
     ),
-    rdyn: gpioc::PC11<gpio::Input<gpio::PullUp>>,
+    rdyn: gpioc::PC11<gpio::Input>,
     sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
 
@@ -182,14 +182,15 @@ impl Adc {
         spi4: stm32::SPI4,
         pins: AdcPins,
     ) -> Self {
+        let rdyn_pullup = pins.rdyn.internal_pull_up(true);
         // SPI MODE_3: idle high, capture on second transition
         let spi: spi::Spi<_, _, u8> =
-            spi4.spi(pins.spi, spi::MODE_3, 12500.khz(), spi4_rec, clocks);
+            spi4.spi(pins.spi, spi::MODE_3, 12500.kHz(), spi4_rec, clocks);
 
         let mut adc = Adc {
             adcs: ad7172::Ad7172::new(spi),
             cs: pins.cs,
-            rdyn: pins.rdyn,
+            rdyn: rdyn_pullup,
             sync: pins.sync,
         };
 
@@ -205,14 +206,14 @@ impl Adc {
         self.set_cs(AdcPhy::Three, PinState::High);
 
         // set sync low first for synchronization at rising edge
-        self.sync.set_low().unwrap();
+        self.sync.set_low();
 
         for phy in AdcPhy::into_enum_iter() {
             self.selected(phy, |adc| adc.setup_adc(delay));
         }
 
         // set sync high after initialization of all ADCs
-        self.sync.set_high().unwrap();
+        self.sync.set_high();
     }
 
     /// Set the chip-select line of an `AdcPhy` to a `PinState`.
@@ -222,8 +223,7 @@ impl Adc {
             AdcPhy::One => self.cs.1.set_state(state),
             AdcPhy::Two => self.cs.2.set_state(state),
             AdcPhy::Three => self.cs.3.set_state(state),
-        }
-        .unwrap();
+        };
     }
 
     /// Call a closure while the given `AdcPhy` is selected (while its chip

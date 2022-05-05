@@ -1,5 +1,5 @@
 use super::hal::{
-    gpio::{gpiob::*, gpioc::*, Alternate, AF1, AF3},
+    gpio::{gpiob::*, gpioc::*, Alternate},
     hal::PwmPin,
     prelude::*,
     pwm::Pwm,
@@ -11,8 +11,8 @@ use super::hal::{
 };
 
 pub struct FanPins {
-    pub tacho: PB10<Alternate<AF1>>,
-    pub pwm: PC7<Alternate<AF3>>,
+    pub tacho: PB10<Alternate<1>>,
+    pub pwm: PC7<Alternate<3>>,
 }
 
 pub enum Error {
@@ -31,8 +31,8 @@ impl Fan {
         tim: (TIM2, TIM8),
         pins: FanPins,
     ) -> Fan {
-        const F_PWM: KiloHertz = KiloHertz(20);
-        let mut pwm = tim.1.pwm(pins.pwm, F_PWM, tim_rec.1, clocks);
+        const F_PWM: KiloHertz = KiloHertz::kHz(20);
+        let mut pwm = tim.1.pwm(pins.pwm, F_PWM.convert(), tim_rec.1, clocks);
         pwm.set_duty(0);
         pwm.enable();
 
