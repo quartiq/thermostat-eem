@@ -6,6 +6,7 @@
 #![no_main]
 
 pub mod hardware;
+pub mod iir;
 pub mod net;
 
 use defmt_rtt as _; // global logger
@@ -141,6 +142,7 @@ mod app {
         dac: Dac,
         pwm: Pwm,
         adc_internal: AdcInternal,
+        iir: [iir::Iir; 4],
     }
 
     #[init]
@@ -177,6 +179,7 @@ mod app {
             dac: thermostat.dac,
             pwm: thermostat.pwm,
             adc_internal: thermostat.adc_internal,
+            iir: [iir::Iir::new(1.0, 0.0, 0.0, [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]); 4],
         };
 
         let shared = Shared {

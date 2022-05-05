@@ -405,6 +405,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "idsp"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f927d7401864366355cf291c4407d5ea321cbcc40362623b06a00e41d2217be"
+dependencies = [
+ "miniconf",
+ "num-complex 0.4.1",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -518,7 +530,7 @@ version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b7a8e9be5e039e2ff869df49155f1c06bd01ade2117ec783e56ab0932b67a8f"
 dependencies = [
- "num-complex",
+ "num-complex 0.3.1",
  "num-integer",
  "num-iter",
  "num-rational",
@@ -532,6 +544,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "747d632c0c558b87dbabbe6a82f3b4ae03720d0646ac5b7b4dae89394be5f2c5"
 dependencies = [
  "num-traits",
+]
+
+[[package]]
+name = "num-complex"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97fbc387afefefd5e9e39493299f3069e14a140dd34dc19b4c1c1a8fddb6a790"
+dependencies = [
+ "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -951,6 +973,7 @@ dependencies = [
  "embedded-time",
  "enum-iterator 0.7.0",
  "heapless",
+ "idsp",
  "log",
  "miniconf",
  "minimq",

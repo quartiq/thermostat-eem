@@ -28,6 +28,7 @@ shared-bus-rtic = { version = "0.2", features = ["cortex-m"] }
 byteorder = { version = "1", default-features = false }
 smlang = "0.5.1"
 enum-iterator = "0.7.0"
+idsp = "0.7.1"
 
 [profile.dev]
 opt-level = 3
