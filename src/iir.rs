@@ -11,9 +11,8 @@ pub struct Iir {
 }
 
 impl Iir {
-    /// idsp https://docs.rs/idsp/latest/idsp/ implementation with input
-    /// weights to route and weigh the 8 input channels into the 4 IIRs.
-    /// IIR outputs directly drive the respective TEC output if enabled.
+    /// idsp https://docs.rs/idsp/latest/idsp/ f64 implementation with input
+    /// weights to route and weigh 8 input channels into one IIR.
     pub fn new(gain: f64, y_min: f64, y_max: f64, weights: [f64; 8]) -> Self {
         Iir {
             iir: iir::IIR::new(gain, y_min, y_max),

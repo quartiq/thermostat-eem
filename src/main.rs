@@ -134,6 +134,7 @@ mod app {
         telemetry: Telemetry,
         gpio: Gpio,
         channel_temperature: [f64; 8], // input channel temperature in °C
+        iir: [iir::Iir; 4],
     }
 
     #[local]
@@ -142,7 +143,6 @@ mod app {
         dac: Dac,
         pwm: Pwm,
         adc_internal: AdcInternal,
-        iir: [iir::Iir; 4],
     }
 
     #[init]
@@ -179,7 +179,6 @@ mod app {
             dac: thermostat.dac,
             pwm: thermostat.pwm,
             adc_internal: thermostat.adc_internal,
-            iir: [iir::Iir::new(1.0, 0.0, 0.0, [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]); 4],
         };
 
         let shared = Shared {
@@ -188,6 +187,8 @@ mod app {
             telemetry: Telemetry::default(),
             gpio: thermostat.gpio,
             channel_temperature: [0.0; 8],
+            // TODO: this init will get overwritten by the first settings update. Make this more compact here.
+            iir: [iir::Iir::new(1.0, 0.0, 0.0, [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]); 4],
         };
 
         (shared, local, init::Monotonics(mono))
