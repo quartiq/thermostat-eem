@@ -81,10 +81,10 @@ impl Dac {
 
         let mut dac = Dac { spi, pins };
 
-        dac.pins.sync.0.set_high().unwrap();
-        dac.pins.sync.1.set_high().unwrap();
-        dac.pins.sync.2.set_high().unwrap();
-        dac.pins.sync.3.set_high().unwrap();
+        dac.pins.sync.0.set_high();
+        dac.pins.sync.1.set_high();
+        dac.pins.sync.2.set_high();
+        dac.pins.sync.3.set_high();
 
         // default to zero current
         for i in 0..4 {
@@ -116,25 +116,25 @@ impl Dac {
 
         match ch {
             OutputChannel::Zero => {
-                self.pins.sync.0.set_low().unwrap();
+                self.pins.sync.0.set_low();
                 // 24 bit write. 4 MSB are zero and 2 LSB are ignored for a 18 bit DAC output.
                 self.spi.write(buf).unwrap();
-                self.pins.sync.0.set_high().unwrap();
+                self.pins.sync.0.set_high();
             }
             OutputChannel::One => {
-                self.pins.sync.1.set_low().unwrap();
+                self.pins.sync.1.set_low();
                 self.spi.write(buf).unwrap();
-                self.pins.sync.1.set_high().unwrap();
+                self.pins.sync.1.set_high();
             }
             OutputChannel::Two => {
-                self.pins.sync.2.set_low().unwrap();
+                self.pins.sync.2.set_low();
                 self.spi.write(buf).unwrap();
-                self.pins.sync.2.set_high().unwrap();
+                self.pins.sync.2.set_high();
             }
             OutputChannel::Three => {
-                self.pins.sync.3.set_low().unwrap();
+                self.pins.sync.3.set_low();
                 self.spi.write(buf).unwrap();
-                self.pins.sync.3.set_high().unwrap();
+                self.pins.sync.3.set_high();
             }
         }
         Ok(())

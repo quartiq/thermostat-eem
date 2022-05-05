@@ -185,7 +185,7 @@ impl Adc {
         pins.rdyn.internal_resistor(Pull::Up);
         // SPI MODE_3: idle high, capture on second transition
         let spi: spi::Spi<_, _, u8> =
-            spi4.spi(pins.spi, spi::MODE_3, 12500.khz(), spi4_rec, clocks);
+            spi4.spi(pins.spi, spi::MODE_3, 12500.kHz(), spi4_rec, clocks);
 
         let mut adc = Adc {
             adcs: ad7172::Ad7172::new(spi),
@@ -206,14 +206,14 @@ impl Adc {
         self.set_cs(AdcPhy::Three, PinState::High);
 
         // set sync low first for synchronization at rising edge
-        self.sync.set_low().unwrap();
+        self.sync.set_low();
 
         for phy in AdcPhy::into_enum_iter() {
             self.selected(phy, |adc| adc.setup_adc(delay));
         }
 
         // set sync high after initialization of all ADCs
-        self.sync.set_high().unwrap();
+        self.sync.set_high();
     }
 
     /// Set the chip-select line of an `AdcPhy` to a `PinState`.
@@ -223,8 +223,7 @@ impl Adc {
             AdcPhy::One => self.cs.1.set_state(state),
             AdcPhy::Two => self.cs.2.set_state(state),
             AdcPhy::Three => self.cs.3.set_state(state),
-        }
-        .unwrap();
+        };
     }
 
     /// Call a closure while the given `AdcPhy` is selected (while its chip

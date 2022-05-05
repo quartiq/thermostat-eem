@@ -128,13 +128,13 @@ pub fn setup(
 
     let rcc = device.RCC.constrain();
     let ccdr = rcc
-        .use_hse(8.mhz())
-        .sysclk(400.mhz())
-        .hclk(200.mhz())
-        .per_ck(100.mhz())
-        .pll2_p_ck(100.mhz())
-        .pll2_q_ck(100.mhz())
-        .mco1_from_hse(2.mhz())
+        .use_hse(8.MHz())
+        .sysclk(400.MHz())
+        .hclk(200.MHz())
+        .per_ck(100.MHz())
+        .pll2_p_ck(100.MHz())
+        .pll2_q_ck(100.MHz())
+        .mco1_from_hse(2.MHz())
         .freeze(vos, &device.SYSCFG);
 
     info!("--- Starting hardware setup");
@@ -325,9 +325,9 @@ pub fn setup(
         let ethernet_pins = {
             // Reset the PHY before configuring pins.
             let mut eth_phy_nrst = gpiog.pg14.into_push_pull_output();
-            eth_phy_nrst.set_low().unwrap();
+            eth_phy_nrst.set_low();
             delay.delay_us(200u8);
-            eth_phy_nrst.set_high().unwrap();
+            eth_phy_nrst.set_high();
 
             let rmii_ref_clk = gpioa
                 .pa1

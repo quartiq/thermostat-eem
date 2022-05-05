@@ -11,12 +11,7 @@ use super::OutputChannel;
 
 #[allow(clippy::type_complexity)]
 pub struct GpioPins {
-    pub hwrev: (
-        PD8<Input>,
-        PD9<Input>,
-        PD10<Input>,
-        PD11<Input>,
-    ),
+    pub hwrev: (PD8<Input>, PD9<Input>, PD10<Input>, PD11<Input>),
     // Front panel LEDs
     pub led: (
         PG9<Output<PushPull>>,
@@ -154,7 +149,6 @@ impl Gpio {
             OutputChannel::Two => self.pins.shdn.2.set_state(s),
             OutputChannel::Three => self.pins.shdn.3.set_state(s),
         }
-        .unwrap()
     }
 
     pub fn set_led(&mut self, led: Led, state: State) {
@@ -169,21 +163,17 @@ impl Gpio {
             Led::Led6 => self.pins.led.6.set_state(s),
             Led::Led7 => self.pins.led.7.set_state(s),
         }
-        .unwrap()
     }
 
     pub fn hwrev(&self) -> u8 {
-        self.pins.hwrev.0.is_high().unwrap() as u8
-            | (self.pins.hwrev.1.is_high().unwrap() as u8) << 1
-            | (self.pins.hwrev.2.is_high().unwrap() as u8) << 2
-            | (self.pins.hwrev.3.is_high().unwrap() as u8) << 3
+        self.pins.hwrev.0.is_high() as u8
+            | (self.pins.hwrev.1.is_high() as u8) << 1
+            | (self.pins.hwrev.2.is_high() as u8) << 2
+            | (self.pins.hwrev.3.is_high() as u8) << 3
     }
 
     pub fn poe(&self) -> PoePower {
-        match (
-            self.pins.poe_pwr.is_high().unwrap(),
-            self.pins.at_event.is_high().unwrap(),
-        ) {
+        match (self.pins.poe_pwr.is_high(), self.pins.at_event.is_high()) {
             (false, _) => PoePower::Absent,
             (true, false) => PoePower::Low,
             (true, true) => PoePower::High,
@@ -191,14 +181,14 @@ impl Gpio {
     }
 
     pub fn set_eem_pwr(&mut self, enabled: bool) {
-        self.pins.eem_pwr.set_state(enabled.into()).unwrap();
+        self.pins.eem_pwr.set_state(enabled.into());
     }
 
     pub fn set_tec_frequency(&mut self, frequency: TecFrequency) {
-        self.pins.tec_freq.set_state(frequency.into()).unwrap();
+        self.pins.tec_freq.set_state(frequency.into());
     }
 
     pub fn overtemp(&self) -> bool {
-        self.pins.overtemp.is_low().unwrap()
+        self.pins.overtemp.is_low()
     }
 }
