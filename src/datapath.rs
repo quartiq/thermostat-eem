@@ -2,10 +2,22 @@
 //!
 
 use idsp::iir;
+use miniconf::MiniconfAtomic;
+use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, MiniconfAtomic)]
 pub struct Datapath {
+    /// IIR filter parameters.
+    ///
+    /// # Value
+    /// See [iir::IIR#miniconf]
     iir: iir::IIR<f64>,
+
+    /// Thermostat input channel weights. Each input temperature is multiplied by its weight
+    /// and the accumulated output is fed into the IIR.
+    ///
+    /// # Value
+    /// [f64; 8]
     weights: [f64; 8],
 }
 

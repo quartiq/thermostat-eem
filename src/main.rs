@@ -12,7 +12,7 @@ pub mod net;
 use defmt_rtt as _; // global logger
 use panic_probe as _; // global panic handler
 
-use defmt::{info, Format};
+use defmt::info;
 use enum_iterator::IntoEnumIterator;
 use hardware::{
     adc::{Adc, AdcCode, InputChannel, StateMachine},
@@ -28,7 +28,7 @@ use idsp::iir;
 use net::{miniconf::Miniconf, serde::Serialize, NetworkState, NetworkUsers};
 use systick_monotonic::*;
 
-#[derive(Copy, Clone, Debug, Miniconf, Format)]
+#[derive(Copy, Clone, Debug, Miniconf)]
 pub struct OutputSettings {
     /// En-/Disables the TEC driver.
     ///
@@ -59,6 +59,14 @@ pub struct OutputSettings {
     /// # Value
     /// -3.0 to a bit less than 3.0
     pub current: f32,
+
+    /// Datapath settings. Each output channal has one associated datapath
+    /// consisting of input weights to route and weigh all 8 input temperatures
+    /// into an IIR.
+    ///
+    /// # Value
+    /// See [datapath::Datapath]
+    pub datapath: datapath::Datapath,
 }
 
 #[derive(Clone, Copy, Debug, Miniconf)]
@@ -102,6 +110,13 @@ impl Default for Settings {
                 current_limit_positive: 0.5,
                 voltage_limit: 0.5,
                 current: 0.0,
+                // TODO sensible defaults.
+                datapath: datapath::Datapath::new(
+                    1.,
+                    -100.,
+                    100.,
+                    [0., 1., 0., 0., 0., 0., 0., 0.],
+                ),
             }; 4],
             led: false,
         }
@@ -135,7 +150,6 @@ mod app {
         telemetry: Telemetry,
         gpio: Gpio,
         channel_temperatures: [f64; 8], // input channel temperature in °C
-        datapath: [datapath::Datapath; 4],
     }
 
     #[local]
@@ -190,13 +204,6 @@ mod app {
             telemetry: Telemetry::default(),
             gpio: thermostat.gpio,
             channel_temperatures: [0.0; 8],
-            // TODO: this init will get overwritten by the first settings update. Make this more compact here.
-            datapath: [datapath::Datapath::new(
-                1.0,
-                -1000.0,
-                1000.0,
-                [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-            ); 4],
         };
 
         (shared, local, init::Monotonics(mono))
@@ -240,7 +247,6 @@ mod app {
             c.shared
                 .gpio
                 .lock(|gpio| gpio.set_shutdown(ch, s.shutdown.into()));
-            info!("DAC channel {:?}: {:?}", ch, s);
         }
     }
 
@@ -273,12 +279,16 @@ mod app {
         telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
     }
 
-    #[task(priority = 2, shared=[channel_temperatures, datapath], local=[iir_state], capacity = 4)]
-    fn process(c: process::Context, output_ch: OutputChannel) {
+    #[task(priority = 2, shared=[channel_temperatures, settings], local=[iir_state], capacity = 4)]
+    fn process_datapath(c: process_datapath::Context, output_ch: OutputChannel) {
         let idx = output_ch as usize;
-        let output_current = (c.shared.datapath, c.shared.channel_temperatures).lock(
-            |datapath, channel_temperatures| {
-                datapath[idx].update(channel_temperatures, &mut c.local.iir_state[idx], false)
+        let output_current = (c.shared.settings, c.shared.channel_temperatures).lock(
+            |settings, channel_temperatures| {
+                settings.output_settings[idx].datapath.update(
+                    channel_temperatures,
+                    &mut c.local.iir_state[idx],
+                    false,
+                )
             },
         );
         info!("output_current: {:?}", output_current);
@@ -296,10 +306,10 @@ mod app {
         });
         // start processing when the last adc channel has been read out
         if input_ch == InputChannel::Seven {
-            process::spawn(OutputChannel::Zero).unwrap();
-            process::spawn(OutputChannel::One).unwrap();
-            process::spawn(OutputChannel::Two).unwrap();
-            process::spawn(OutputChannel::Three).unwrap();
+            process_datapath::spawn(OutputChannel::Zero).unwrap();
+            process_datapath::spawn(OutputChannel::One).unwrap();
+            process_datapath::spawn(OutputChannel::Two).unwrap();
+            process_datapath::spawn(OutputChannel::Three).unwrap();
         }
     }
 
