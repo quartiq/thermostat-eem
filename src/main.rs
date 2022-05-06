@@ -193,8 +193,8 @@ mod app {
             // TODO: this init will get overwritten by the first settings update. Make this more compact here.
             datapath: [datapath::Datapath::new(
                 1.0,
-                0.0,
-                0.0,
+                1000.0,
+                1000.0,
                 [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             ); 4],
         };
@@ -278,7 +278,7 @@ mod app {
         let idx = output_ch as usize;
         let output_current = (c.shared.datapath, c.shared.channel_temperatures).lock(
             |datapath, channel_temperatures| {
-                datapath[idx].update(channel_temperatures, &mut c.local.iir_state[idx], false);
+                datapath[idx].update(channel_temperatures, &mut c.local.iir_state[idx], false)
             },
         );
         info!("output_current: {:?}", output_current);
