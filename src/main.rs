@@ -193,9 +193,9 @@ mod app {
             // TODO: this init will get overwritten by the first settings update. Make this more compact here.
             datapath: [datapath::Datapath::new(
                 1.0,
+                -1000.0,
                 1000.0,
-                1000.0,
-                [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             ); 4],
         };
 

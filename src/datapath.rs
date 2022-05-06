@@ -26,12 +26,12 @@ impl Datapath {
         iir_state: &mut iir::Vec5<f64>,
         hold: bool,
     ) -> f64 {
-        let weighted_input = channel_temperatures
+        let weighted_temperature = channel_temperatures
             .iter()
             .zip(self.weights.iter())
             .fold(0.0, |acc, (temperature, weight)| {
                 acc + *temperature * *weight
             });
-        self.iir.update(iir_state, weighted_input, hold)
+        self.iir.update(iir_state, weighted_temperature, hold)
     }
 }
