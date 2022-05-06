@@ -79,7 +79,7 @@ impl From<AdcCode> for f64 {
     }
 }
 
-#[derive(Clone, Copy, TryFromPrimitive, Debug, Format)]
+#[derive(Clone, Copy, TryFromPrimitive, Debug, Format, PartialEq)]
 #[repr(usize)]
 pub enum InputChannel {
     Zero = 0,
