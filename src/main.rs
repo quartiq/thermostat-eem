@@ -17,7 +17,7 @@ use enum_iterator::IntoEnumIterator;
 use hardware::{
     adc::{Adc, AdcCode, InputChannel, StateMachine},
     adc_internal::AdcInternal,
-    dac::Dac,
+    dac::{Dac, DacCode},
     gpio::{Gpio, Led, PoePower},
     hal,
     pwm::{Limit, Pwm},
@@ -112,7 +112,7 @@ impl Default for Settings {
                 current: 0.0,
                 // TODO sensible defaults.
                 output_channel: output_channel::OutputChannel::new(
-                    1.,
+                    0.1,
                     -100.,
                     100.,
                     [0., 1., 0., 0., 0., 0., 0., 0.],
@@ -150,12 +150,12 @@ mod app {
         telemetry: Telemetry,
         gpio: Gpio,
         channel_temperatures: [f64; 8], // input channel temperature in °C
+        dac: Dac,
     }
 
     #[local]
     struct Local {
         adc_sm: StateMachine<Adc>,
-        dac: Dac,
         pwm: Pwm,
         adc_internal: AdcInternal,
         iir_state: [iir::Vec5<f64>; 4],
@@ -192,13 +192,13 @@ mod app {
 
         let local = Local {
             adc_sm: thermostat.adc_sm,
-            dac: thermostat.dac,
             pwm: thermostat.pwm,
             adc_internal: thermostat.adc_internal,
             iir_state: [[0.; 5]; 4],
         };
 
         let shared = Shared {
+            dac: thermostat.dac,
             network,
             settings,
             telemetry: Telemetry::default(),
@@ -222,18 +222,18 @@ mod app {
         }
     }
 
-    #[task(priority = 1, local=[dac, pwm], shared=[settings, gpio], capacity=1)]
+    #[task(priority = 1, local=[pwm], shared=[dac, settings, gpio], capacity=1)]
     fn settings_update(mut c: settings_update::Context, settings: Settings) {
         // Verify settings and make them available
-        c.shared.settings.lock(|current| *current = settings);
+        c.shared
+            .settings
+            .lock(|current_settings| *current_settings = settings);
 
         // led is proxy for real settings and telemetry later
         c.shared
             .gpio
             .lock(|gpio| gpio.set_led(Led::Led0, settings.led.into()));
 
-        // update DAC state
-        let dac = c.local.dac;
         let pwm = c.local.pwm;
         for ch in OutputChannelIdx::into_enum_iter() {
             let s = settings.output_settings[ch as usize];
@@ -243,7 +243,9 @@ mod app {
                 .unwrap();
             pwm.set_limit(Limit::NegativeCurrent(ch), s.current_limit_negative)
                 .unwrap();
-            dac.set(ch, s.current.try_into().unwrap()).unwrap();
+            c.shared
+                .dac
+                .lock(|dac| dac.set(ch, s.current.try_into().unwrap()));
             c.shared
                 .gpio
                 .lock(|gpio| gpio.set_shutdown(ch, s.shutdown.into()));
@@ -279,8 +281,18 @@ mod app {
         telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
     }
 
+    #[task(priority = 2, shared=[dac], capacity = 4)]
+    fn convert_current_and_set_dac(
+        mut c: convert_current_and_set_dac::Context,
+        output_ch: OutputChannelIdx,
+        current: f32,
+    ) {
+        let dac_code = DacCode::try_from(current).unwrap();
+        c.shared.dac.lock(|dac| dac.set(output_ch, dac_code));
+    }
+
     #[task(priority = 2, shared=[channel_temperatures, settings], local=[iir_state], capacity = 4)]
-    fn process_datapath(c: process_datapath::Context, output_ch: OutputChannelIdx) {
+    fn process_output_channel(c: process_output_channel::Context, output_ch: OutputChannelIdx) {
         let idx = output_ch as usize;
         let output_current = (c.shared.settings, c.shared.channel_temperatures).lock(
             |settings, channel_temperatures| {
@@ -292,6 +304,7 @@ mod app {
             },
         );
         info!("output_current: {:?}", output_current);
+        convert_current_and_set_dac::spawn(output_ch, output_current).unwrap();
     }
 
     // Higher priority than telemetry but lower than adc data readout.
@@ -306,10 +319,10 @@ mod app {
         });
         // start processing when the last adc channel has been read out
         if input_ch == InputChannel::Seven {
-            process_datapath::spawn(OutputChannelIdx::Zero).unwrap();
-            process_datapath::spawn(OutputChannelIdx::One).unwrap();
-            process_datapath::spawn(OutputChannelIdx::Two).unwrap();
-            process_datapath::spawn(OutputChannelIdx::Three).unwrap();
+            process_output_channel::spawn(OutputChannelIdx::Zero).unwrap();
+            process_output_channel::spawn(OutputChannelIdx::One).unwrap();
+            process_output_channel::spawn(OutputChannelIdx::Two).unwrap();
+            process_output_channel::spawn(OutputChannelIdx::Three).unwrap();
         }
     }
 

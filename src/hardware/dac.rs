@@ -122,7 +122,7 @@ impl Dac {
         // default to zero current
         for i in 0..4 {
             let ch = OutputChannelIdx::try_from(i).unwrap();
-            dac.set(ch, (0.0).try_into().unwrap()).unwrap();
+            dac.set(ch, (0.0).try_into().unwrap());
         }
         dac
     }
@@ -131,8 +131,8 @@ impl Dac {
     ///
     /// # Args
     /// * `ch` - Thermostat output channel
-    /// * `dac_code` - Set current in Ampere
-    pub fn set(&mut self, ch: OutputChannelIdx, dac_code: DacCode) -> Result<(), Error> {
+    /// * `dac_code` - dac output code to transfer
+    pub fn set(&mut self, ch: OutputChannelIdx, dac_code: DacCode) {
         let buf = &(dac_code.0).to_be_bytes()[1..];
 
         match ch {
@@ -158,6 +158,5 @@ impl Dac {
                 self.pins.sync.3.set_high();
             }
         }
-        Ok(())
     }
 }
