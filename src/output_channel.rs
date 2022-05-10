@@ -6,7 +6,7 @@ use miniconf::MiniconfAtomic;
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, MiniconfAtomic)]
-pub struct Datapath {
+pub struct OutputChannel {
     /// IIR filter parameters.
     ///
     /// # Value
@@ -21,11 +21,11 @@ pub struct Datapath {
     weights: [f64; 8],
 }
 
-impl Datapath {
+impl OutputChannel {
     /// idsp https://docs.rs/idsp/latest/idsp/ f64 implementation with input
     /// weights to route and weigh 8 input channels into one IIR.
     pub fn new(gain: f64, y_min: f64, y_max: f64, weights: [f64; 8]) -> Self {
-        Datapath {
+        OutputChannel {
             iir: iir::IIR::new(gain, y_min, y_max),
             weights,
         }

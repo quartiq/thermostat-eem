@@ -7,7 +7,7 @@ use super::hal::{
 use crate::net::serde::Serialize;
 use defmt::Format;
 
-use super::OutputChannel;
+use super::OutputChannelIdx;
 
 #[allow(clippy::type_complexity)]
 pub struct GpioPins {
@@ -111,7 +111,7 @@ impl Gpio {
     pub fn new(pins: GpioPins) -> Self {
         let mut gpio = Gpio { pins };
         for i in 0..4 {
-            let ch = OutputChannel::try_from(i).unwrap();
+            let ch = OutputChannelIdx::try_from(i).unwrap();
             gpio.set_shutdown(ch, State::Assert);
         }
         for i in 0..8 {
@@ -127,7 +127,7 @@ impl Gpio {
     /// # Args
     /// * `ch` - Thermostat output channel
     /// * `shutdown` - TEC driver shutdown. True to set shutdown mode, false to enable the driver.
-    pub fn set_shutdown(&mut self, ch: OutputChannel, shutdown: State) {
+    pub fn set_shutdown(&mut self, ch: OutputChannelIdx, shutdown: State) {
         self.pins.shdn[ch as usize].set_state(!PinState::from(shutdown));
     }
 

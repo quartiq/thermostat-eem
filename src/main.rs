@@ -5,9 +5,9 @@
 #![no_std]
 #![no_main]
 
-pub mod datapath;
 pub mod hardware;
 pub mod net;
+pub mod output_channel;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _; // global panic handler
@@ -22,7 +22,7 @@ use hardware::{
     hal,
     pwm::{Limit, Pwm},
     system_timer::SystemTimer,
-    OutputChannel,
+    OutputChannelIdx,
 };
 use idsp::iir;
 use net::{miniconf::Miniconf, serde::Serialize, NetworkState, NetworkUsers};
@@ -60,13 +60,13 @@ pub struct OutputSettings {
     /// -3.0 to a bit less than 3.0
     pub current: f32,
 
-    /// Datapath settings. Each output channal has one associated datapath
+    /// Output channel settings. Each output channel has one associated datapath
     /// consisting of input weights to route and weigh all 8 input temperatures
     /// into an IIR.
     ///
     /// # Value
-    /// See [datapath::Datapath]
-    pub datapath: datapath::Datapath,
+    /// See [output_channel::OutputChannel]
+    pub output_channel: output_channel::OutputChannel,
 }
 
 #[derive(Clone, Copy, Debug, Miniconf)]
@@ -111,7 +111,7 @@ impl Default for Settings {
                 voltage_limit: 0.5,
                 current: 0.0,
                 // TODO sensible defaults.
-                datapath: datapath::Datapath::new(
+                output_channel: output_channel::OutputChannel::new(
                     1.,
                     -100.,
                     100.,
@@ -235,7 +235,7 @@ mod app {
         // update DAC state
         let dac = c.local.dac;
         let pwm = c.local.pwm;
-        for ch in OutputChannel::into_enum_iter() {
+        for ch in OutputChannelIdx::into_enum_iter() {
             let s = settings.output_settings[ch as usize];
             // TODO: implement what happens if user chooses invalid value
             pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
@@ -259,7 +259,7 @@ mod app {
         telemetry.p5v_voltage = adc_int.read_p5v_voltage();
         telemetry.p12v_voltage = adc_int.read_p12v_voltage();
         telemetry.p12v_current = adc_int.read_p12v_current();
-        for ch in OutputChannel::into_enum_iter() {
+        for ch in OutputChannelIdx::into_enum_iter() {
             let idx = ch as usize;
             telemetry.output_vref[idx] = adc_int.read_output_vref(ch);
             telemetry.output_voltage[idx] = adc_int.read_output_voltage(ch);
@@ -280,11 +280,11 @@ mod app {
     }
 
     #[task(priority = 2, shared=[channel_temperatures, settings], local=[iir_state], capacity = 4)]
-    fn process_datapath(c: process_datapath::Context, output_ch: OutputChannel) {
+    fn process_datapath(c: process_datapath::Context, output_ch: OutputChannelIdx) {
         let idx = output_ch as usize;
         let output_current = (c.shared.settings, c.shared.channel_temperatures).lock(
             |settings, channel_temperatures| {
-                settings.output_settings[idx].datapath.update(
+                settings.output_settings[idx].output_channel.update(
                     channel_temperatures,
                     &mut c.local.iir_state[idx],
                     false,
@@ -306,10 +306,10 @@ mod app {
         });
         // start processing when the last adc channel has been read out
         if input_ch == InputChannel::Seven {
-            process_datapath::spawn(OutputChannel::Zero).unwrap();
-            process_datapath::spawn(OutputChannel::One).unwrap();
-            process_datapath::spawn(OutputChannel::Two).unwrap();
-            process_datapath::spawn(OutputChannel::Three).unwrap();
+            process_datapath::spawn(OutputChannelIdx::Zero).unwrap();
+            process_datapath::spawn(OutputChannelIdx::One).unwrap();
+            process_datapath::spawn(OutputChannelIdx::Two).unwrap();
+            process_datapath::spawn(OutputChannelIdx::Three).unwrap();
         }
     }
 
