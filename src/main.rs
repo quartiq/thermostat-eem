@@ -5,9 +5,9 @@
 #![no_std]
 #![no_main]
 
-pub mod output_channel;
 pub mod hardware;
 pub mod net;
+pub mod output_channel;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _; // global panic handler
@@ -237,13 +237,13 @@ mod app {
         let pwm = c.local.pwm;
         for ch in OutputChannelIdx::into_enum_iter() {
             let s = settings.output_settings[ch as usize];
-            // TODO: implement what happens if user chooses invalid value
+            // TODO: implement what happens if user chooses invalid value. currently just panick.
             pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
             pwm.set_limit(Limit::PositiveCurrent(ch), s.current_limit_positive)
                 .unwrap();
             pwm.set_limit(Limit::NegativeCurrent(ch), s.current_limit_negative)
                 .unwrap();
-            dac.set_current(ch, s.current).unwrap();
+            dac.set(ch, s.current.try_into().unwrap()).unwrap();
             c.shared
                 .gpio
                 .lock(|gpio| gpio.set_shutdown(ch, s.shutdown.into()));
