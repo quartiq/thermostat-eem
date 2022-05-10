@@ -5,9 +5,9 @@
 #![no_std]
 #![no_main]
 
+pub mod output_channel;
 pub mod hardware;
 pub mod net;
-pub mod output_channel;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _; // global panic handler

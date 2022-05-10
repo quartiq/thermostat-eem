@@ -17,14 +17,14 @@ pub struct OutputChannel {
     /// and the accumulated output is fed into the IIR.
     ///
     /// # Value
-    /// [f64; 8]
-    weights: [f64; 8],
+    /// [f32; 8]
+    weights: [f32; 8],
 }
 
 impl OutputChannel {
     /// idsp https://docs.rs/idsp/latest/idsp/ f64 implementation with input
     /// weights to route and weigh 8 input channels into one IIR.
-    pub fn new(gain: f64, y_min: f64, y_max: f64, weights: [f64; 8]) -> Self {
+    pub fn new(gain: f64, y_min: f64, y_max: f64, weights: [f32; 8]) -> Self {
         OutputChannel {
             iir: iir::IIR::new(gain, y_min, y_max),
             weights,
@@ -37,13 +37,12 @@ impl OutputChannel {
         channel_temperatures: &[f64; 8],
         iir_state: &mut iir::Vec5<f64>,
         hold: bool,
-    ) -> f64 {
+    ) -> f32 {
         let weighted_temperature = channel_temperatures
             .iter()
             .zip(self.weights.iter())
-            .fold(0.0, |acc, (temperature, weight)| {
-                acc + *temperature * *weight
-            });
-        self.iir.update(iir_state, weighted_temperature, hold)
+            .map(|(temperature, weight)| *temperature * *weight as f64)
+            .sum();
+        self.iir.update(iir_state, weighted_temperature, hold) as f32
     }
 }
