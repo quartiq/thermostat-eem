@@ -36,29 +36,11 @@ pub struct OutputSettings {
     /// true to shut the driver down, false to enable the driver.
     pub shutdown: bool,
 
-    /// TEC positive current limit in ampere.
-    ///
-    /// # Value
-    /// 0.0 to 3.0
-    pub current_limit_positive: f32,
-
-    /// TEC negative current limit in ampere.
-    ///
-    /// # Value
-    /// -3.0 to 0.0
-    pub current_limit_negative: f32,
-
     /// Maximum absolute (positive and negative) TEC voltage in volt.
     ///
     /// # Value
-    /// 0.0 to 5.0
+    /// 0.0 to 4.3
     pub voltage_limit: f32,
-
-    /// TEC current in ampere.
-    ///
-    /// # Value
-    /// -3.0 to a bit less than 3.0
-    pub current: f32,
 
     /// Output channel settings. Each output channel has one associated datapath
     /// consisting of input weights to route and weigh all 8 input temperatures
@@ -83,12 +65,12 @@ pub struct Settings {
     /// Array of settings for the Thermostat output channels.
     ///
     /// # Path
-    /// `output_settings/<n>`
+    /// `output_channel/<n>`
     /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
     ///
     /// # Value
-    /// Any positive non-zero value. Will be rounded to milliseconds.
-    output_settings: [OutputSettings; 4],
+    /// See [output_channel::OutputChannel]
+    output_channel: [output_channel::OutputChannel; 4],
 
     /// LED0 state.
     ///
@@ -104,19 +86,13 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
-            output_settings: [OutputSettings {
-                shutdown: true,
-                current_limit_negative: -0.5,
-                current_limit_positive: 0.5,
-                voltage_limit: 0.5,
-                current: 0.0,
-                // TODO sensible defaults.
-                output_channel: output_channel::OutputChannel::new(
+            output_channel: [{
+                output_channel::OutputChannel::new(
                     0.1,
                     -100.,
                     100.,
                     [0., 1., 0., 0., 0., 0., 0., 0.],
-                ),
+                )
             }; 4],
             led: false,
         }
@@ -233,19 +209,21 @@ mod app {
         c.shared
             .gpio
             .lock(|gpio| gpio.set_led(Led::Led0, settings.led.into()));
-
         let pwm = c.local.pwm;
         for ch in OutputChannelIdx::into_enum_iter() {
-            let s = settings.output_settings[ch as usize];
-            // TODO: implement what happens if user chooses invalid value. currently just panick.
+            let s = settings.output_channel[ch as usize];
+
+            // set current_limit_positive to absolute 5% higher than iir y_max and clamp output to valid range.
+            let current_limit_positive = (s.iir.y_max as f32 + 0.05 * 3.0).clamp(0.0, 3.0);
+            // set current_limit_negative to absolute 5% lower than iir y_min and clamp output to valid range.
+            let current_limit_negative = (s.iir.y_min as f32 - 0.05 * 3.0).clamp(-3.0, 0.0);
+
+            // TODO: implement what happens if user chooses invalid voltage limit. currently just panick.
             pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
-            pwm.set_limit(Limit::PositiveCurrent(ch), s.current_limit_positive)
+            pwm.set_limit(Limit::PositiveCurrent(ch), current_limit_positive)
                 .unwrap();
-            pwm.set_limit(Limit::NegativeCurrent(ch), s.current_limit_negative)
+            pwm.set_limit(Limit::NegativeCurrent(ch), current_limit_negative)
                 .unwrap();
-            c.shared
-                .dac
-                .lock(|dac| dac.set(ch, s.current.try_into().unwrap()));
             c.shared
                 .gpio
                 .lock(|gpio| gpio.set_shutdown(ch, s.shutdown.into()));
@@ -296,7 +274,7 @@ mod app {
         let idx = output_ch as usize;
         let output_current = (c.shared.settings, c.shared.channel_temperatures).lock(
             |settings, channel_temperatures| {
-                settings.output_settings[idx].output_channel.update(
+                settings.output_channel[idx].update(
                     channel_temperatures,
                     &mut c.local.iir_state[idx],
                     false,
