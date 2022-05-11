@@ -12,7 +12,6 @@ pub mod output_channel;
 use defmt_rtt as _; // global logger
 use panic_probe as _; // global panic handler
 
-use defmt::info;
 use enum_iterator::IntoEnumIterator;
 use hardware::{
     adc::{Adc, AdcCode, InputChannel, StateMachine},
@@ -88,6 +87,7 @@ pub struct Telemetry {
     poe: PoePower,
     overtemp: bool,
     channel_temperatures: [f32; 8],
+    iir_output: [f32; 4],
 }
 
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
@@ -256,8 +256,8 @@ mod app {
         c.shared.dac.lock(|dac| dac.set(output_ch, dac_code));
     }
 
-    #[task(priority = 2, shared=[channel_temperatures, settings], local=[iir_state], capacity = 4)]
-    fn process_output_channel(c: process_output_channel::Context, output_ch: OutputChannelIdx) {
+    #[task(priority = 2, shared=[channel_temperatures, settings, telemetry], local=[iir_state], capacity = 4)]
+    fn process_output_channel(mut c: process_output_channel::Context, output_ch: OutputChannelIdx) {
         let idx = output_ch as usize;
         let output_current = (c.shared.settings, c.shared.channel_temperatures).lock(
             |settings, channel_temperatures| {
@@ -268,7 +268,9 @@ mod app {
                 )
             },
         );
-        info!("output_current: {:?}", output_current);
+        c.shared
+            .telemetry
+            .lock(|tele| tele.iir_output[idx] = output_current);
         convert_current_and_set_dac::spawn(output_ch, output_current).unwrap();
     }
 

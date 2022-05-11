@@ -146,7 +146,6 @@ impl Pwm {
 
         fn set_pwm_channel<P: PwmPin<Duty = u16>>(channel: &mut P, duty: f32) -> Result<(), Error> {
             let value = (duty * Pwm::MAX_DUTY as f32) as i32;
-            defmt::info!("duty: {:?}", duty);
             if !(0..=Pwm::MAX_DUTY as _).contains(&value) {
                 return Err(Error::Bounds);
             }
