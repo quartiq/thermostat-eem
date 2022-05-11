@@ -179,8 +179,8 @@ mod app {
     fn settings_update(mut c: settings_update::Context, mut settings: Settings) {
         // Limit y_min and y_max values here. Will be incorporated into miniconf response later.
         settings.output_channel.iter_mut().for_each(|ch| {
-            ch.iir.y_max = ch.iir.y_max.clamp(0.0, DacCode::MAX_CURRENT as f64);
-            ch.iir.y_min = ch.iir.y_min.clamp(-3.0, 0.0);
+            ch.iir.y_max = ch.iir.y_max.clamp(-DacCode::MAX_CURRENT as _, DacCode::MAX_CURRENT as _);
+            ch.iir.y_min = ch.iir.y_min.clamp(-DacCode::MAX_CURRENT as _, DacCode::MAX_CURRENT as _);
         });
         // Verify settings and make them available
         c.shared.settings.lock(|current_settings| {
