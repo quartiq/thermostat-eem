@@ -43,11 +43,12 @@ pub enum Error {
 
 /// A type representing a DAC sample.
 #[derive(Copy, Clone, Debug, Format)]
-pub struct DacCode(pub u32);
+pub struct DacCode(u32);
 impl DacCode {
     // DAC constants
     const MAX_DAC_WORD: i32 = 1 << 20; // maximum DAC dataword (exclusive) plus 2 bit due to interface alignment
     const VREF_DAC: f32 = 3.0; // DAC reference voltage
+    pub const MAX_CURRENT: f32 = 3.0 - (6.0 / (1 << 18) as f32); // 3.0 A minus one DAC LSB in eqivalent Ampere.
 }
 
 impl TryFrom<f32> for DacCode {
@@ -63,6 +64,12 @@ impl TryFrom<f32> for DacCode {
         };
 
         Ok(Self(dac_code as u32))
+    }
+}
+
+impl From<DacCode> for u32 {
+    fn from(code: DacCode) -> u32 {
+        code.0
     }
 }
 

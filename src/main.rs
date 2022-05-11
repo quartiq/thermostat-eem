@@ -65,7 +65,7 @@ impl Default for Settings {
             telemetry_period: 1.0,
             output_channel: [{
                 output_channel::OutputChannel::new(
-                    0.1,
+                    1.,
                     -100.,
                     100.,
                     [0., 1., 0., 0., 0., 0., 0., 0.],
@@ -176,15 +176,15 @@ mod app {
     }
 
     #[task(priority = 1, local=[pwm], shared=[dac, settings, gpio], capacity=1)]
-    fn settings_update(mut c: settings_update::Context, settings: Settings) {
+    fn settings_update(mut c: settings_update::Context, mut settings: Settings) {
+        // Limit y_min and y_max values here. Will be incorporated into miniconf response later.
+        settings.output_channel.iter_mut().for_each(|ch| {
+            ch.iir.y_max = ch.iir.y_max.clamp(0.0, DacCode::MAX_CURRENT as f64);
+            ch.iir.y_min = ch.iir.y_min.clamp(-3.0, 0.0);
+        });
         // Verify settings and make them available
         c.shared.settings.lock(|current_settings| {
             *current_settings = settings;
-            // Limit y_min and y_max values here. Will be incorporated into miniconf response later.
-            current_settings.output_channel.iter_mut().for_each(|ch| {
-                ch.iir.y_max = ch.iir.y_max.clamp(0.0, 2.9999);
-                ch.iir.y_min = ch.iir.y_min.clamp(-3.0, 0.0);
-            });
         });
 
         // led is proxy for real settings and telemetry later

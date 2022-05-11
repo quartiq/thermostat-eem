@@ -20,7 +20,7 @@ use num_traits::float::Float;
 
 /// A type representing an ADC sample.
 #[derive(Copy, Clone, Debug, Format)]
-pub struct AdcCode(pub u32);
+pub struct AdcCode(u32);
 impl AdcCode {
     const GAIN: f32 = 0x555555 as _; // Default ADC gain from datasheet.
     const R_REF: f32 = 2.0 * 5000.0; // Ratiometric resistor setup. 5.0K high and low side.
@@ -40,6 +40,12 @@ impl From<u32> for AdcCode {
     /// Construct an ADC code from a provided binary (ADC-formatted) code.
     fn from(value: u32) -> Self {
         Self(value)
+    }
+}
+
+impl From<AdcCode> for u32 {
+    fn from(code: AdcCode) -> u32 {
+        code.0
     }
 }
 
