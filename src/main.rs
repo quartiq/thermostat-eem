@@ -63,12 +63,7 @@ impl Default for Settings {
         Self {
             telemetry_period: 1.0,
             output_channel: [{
-                output_channel::OutputChannel::new(
-                    1.,
-                    -100.,
-                    100.,
-                    [0., 1., 0., 0., 0., 0., 0., 0.],
-                )
+                output_channel::OutputChannel::new(0., -0., 0., [0., 0., 0., 0., 0., 0., 0., 0.])
             }; 4],
             led: false,
         }
