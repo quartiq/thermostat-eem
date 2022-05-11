@@ -74,6 +74,13 @@ pub struct Pwm {
 }
 
 impl Pwm {
+    // PWM constants
+    const MAX_DUTY: u32 = 10000; // Maximum duty cycle valid for all channels.
+    const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
+    pub const MAX_CURRENT_LIMIT: f32 = ((Pwm::MAX_DUTY as f32 - 1.0) / Pwm::MAX_DUTY as f32)
+        * (Pwm::V_PWM * 0.15)
+        / (VREF_TEC * R_SENSE);
+
     /// Construct a new PWM driver for all Thermostat output channel limits.
     ///
     /// # Args
@@ -127,25 +134,22 @@ impl Pwm {
     /// * `ch` - Thermostat output channel
     /// * `limit` - TEC limit type
     pub fn set_limit(&mut self, lim: Limit, val: f32) -> Result<(), Error> {
-        // PWM constants
-        const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
-
         /// Convert maximum current to relative pulsewidth for the (analog voltage)
         /// max output current inputs of the TEC driver.
         pub fn current_limit_to_duty_cycle(i: f32) -> f32 {
-            i * ((VREF_TEC * R_SENSE) / (V_PWM * 0.15))
+            i * ((VREF_TEC * R_SENSE) / (Pwm::V_PWM * 0.15))
         }
 
         /// Convert maximum voltage to relative pulsewidth for the (analog voltage)
         /// max output voltage of the TEC driver.
         pub fn voltage_limit_to_duty_cycle(v: f32) -> f32 {
-            v * (1.0 / 4.0 / V_PWM)
+            v * (1.0 / 4.0 / Pwm::V_PWM)
         }
 
         fn set_pwm_channel<P: PwmPin<Duty = u16>>(channel: &mut P, duty: f32) -> Result<(), Error> {
-            let max = channel.get_max_duty();
-            let value = (duty * max as f32) as i32;
-            if !(0..max as _).contains(&value) {
+            let value = (duty * Pwm::MAX_DUTY as f32) as i32;
+            defmt::info!("duty: {:?}", duty);
+            if !(0..Pwm::MAX_DUTY as _).contains(&value) {
                 return Err(Error::Bounds);
             }
             channel.set_duty(value as u16);
