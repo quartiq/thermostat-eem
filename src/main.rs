@@ -28,29 +28,6 @@ use idsp::iir;
 use net::{miniconf::Miniconf, serde::Serialize, NetworkState, NetworkUsers};
 use systick_monotonic::*;
 
-#[derive(Copy, Clone, Debug, Miniconf)]
-pub struct OutputSettings {
-    /// En-/Disables the TEC driver.
-    ///
-    /// # Value
-    /// true to shut the driver down, false to enable the driver.
-    pub shutdown: bool,
-
-    /// Maximum absolute (positive and negative) TEC voltage in volt.
-    ///
-    /// # Value
-    /// 0.0 to 4.3
-    pub voltage_limit: f32,
-
-    /// Output channel settings. Each output channel has one associated datapath
-    /// consisting of input weights to route and weigh all 8 input temperatures
-    /// into an IIR.
-    ///
-    /// # Value
-    /// See [output_channel::OutputChannel]
-    pub output_channel: output_channel::OutputChannel,
-}
-
 #[derive(Clone, Copy, Debug, Miniconf)]
 pub struct Settings {
     /// Specifies the telemetry output period in seconds.
@@ -201,9 +178,14 @@ mod app {
     #[task(priority = 1, local=[pwm], shared=[dac, settings, gpio], capacity=1)]
     fn settings_update(mut c: settings_update::Context, settings: Settings) {
         // Verify settings and make them available
-        c.shared
-            .settings
-            .lock(|current_settings| *current_settings = settings);
+        c.shared.settings.lock(|current_settings| {
+            *current_settings = settings;
+            // Limit y_min and y_max values here. Will be incorporated into miniconf response later.
+            current_settings.output_channel.iter_mut().for_each(|ch| {
+                ch.iir.y_max = ch.iir.y_max.clamp(0.0, 2.9999);
+                ch.iir.y_min = ch.iir.y_min.clamp(-3.0, 0.0);
+            });
+        });
 
         // led is proxy for real settings and telemetry later
         c.shared
