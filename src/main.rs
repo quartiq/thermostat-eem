@@ -194,12 +194,9 @@ mod app {
         let pwm = c.local.pwm;
         for ch in OutputChannelIdx::into_enum_iter() {
             let s = settings.output_channel[ch as usize];
-
-            // set current_limit_positive to absolute 5% higher than iir y_max and clamp output to valid range.
+            // set current limits to 5% higher/lower than iir y_max/y_min and clamp output to valid range.
             let current_limit_positive = (s.iir.y_max as f32 + 0.05 * 3.0).clamp(0.0, 3.0);
-            // set current_limit_negative to absolute 5% lower than iir y_min and clamp output to valid range.
             let current_limit_negative = (s.iir.y_min as f32 - 0.05 * 3.0).clamp(-3.0, 0.0);
-
             // TODO: implement what happens if user chooses invalid voltage limit. currently just panick.
             pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
             pwm.set_limit(Limit::PositiveCurrent(ch), current_limit_positive)
