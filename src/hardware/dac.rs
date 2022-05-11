@@ -1,3 +1,5 @@
+use defmt::Format;
+
 ///! Thermostat DAC driver
 ///!
 ///! This file contains the driver for the 4 Thermostat DAC output channels.
@@ -24,7 +26,7 @@ use super::hal::{
     time::MegaHertz,
 };
 
-use super::OutputChannel;
+use super::OutputChannelIdx;
 
 // Note: 30MHz clock valid according to DAC datasheet. This lead to spurious RxFIFO overruns on the STM side when probing the spi clock with a scope probe.
 const SPI_CLOCK: MegaHertz = MegaHertz::MHz(8);
@@ -37,6 +39,41 @@ pub const VREF_TEC: f32 = 1.5; // TEC driver reference voltage
 #[derive(Debug)]
 pub enum Error {
     Bounds,
+}
+
+/// A type representing a DAC sample.
+#[derive(Copy, Clone, Debug, Format)]
+pub struct DacCode(u32);
+impl DacCode {
+    // DAC constants
+    const MAX_DAC_WORD: i32 = 1 << 20; // maximum DAC dataword (exclusive) plus 2 bit due to interface alignment
+    const VREF_DAC: f32 = 3.0; // DAC reference voltage
+    pub const MAX_CURRENT: f32 = ((((DacCode::MAX_DAC_WORD - 1) as f32 * DacCode::VREF_DAC)
+        / DacCode::MAX_DAC_WORD as f32)
+        - VREF_TEC)
+        / (10.0 * R_SENSE);
+}
+
+impl TryFrom<f32> for DacCode {
+    type Error = Error;
+    /// Convert an f32 representing a current int the corresponding DAC output code.
+    fn try_from(current: f32) -> Result<DacCode, Error> {
+        // Current to DAC word conversion
+        let ctli_voltage = (current * 10.0 * R_SENSE) + VREF_TEC;
+        let dac_code = (ctli_voltage * (DacCode::MAX_DAC_WORD as f32 / DacCode::VREF_DAC)) as i32;
+
+        if !(0..DacCode::MAX_DAC_WORD).contains(&dac_code) {
+            return Err(Error::Bounds);
+        };
+
+        Ok(Self(dac_code as u32))
+    }
+}
+
+impl From<DacCode> for u32 {
+    fn from(code: DacCode) -> u32 {
+        code.0
+    }
 }
 
 /// DAC gpio pins.
@@ -94,55 +131,42 @@ impl Dac {
 
         // default to zero current
         for i in 0..4 {
-            let ch = OutputChannel::try_from(i).unwrap();
-            dac.set_current(ch, 0.0).unwrap();
+            let ch = OutputChannelIdx::try_from(i).unwrap();
+            dac.set(ch, (0.0).try_into().unwrap());
         }
         dac
     }
 
-    /// Set the DAC output to current on a channel.
+    /// Set the DAC output to on a channel.
     ///
     /// # Args
     /// * `ch` - Thermostat output channel
-    /// * `current` - Set current in Ampere
-    pub fn set_current(&mut self, ch: OutputChannel, current: f32) -> Result<(), Error> {
-        // DAC constants
-        const MAX_DAC_WORD: i32 = 1 << 20; // maximum DAC dataword (exclusive) plus 2 bit due to interface alignment
-        const VREF_DAC: f32 = 3.0; // DAC reference voltage
-
-        // Current to DAC word conversion
-        let ctli_voltage = (current * 10.0 * R_SENSE) + VREF_TEC;
-        let dac_code = (ctli_voltage * (MAX_DAC_WORD as f32 / VREF_DAC)) as i32;
-
-        if !(0..MAX_DAC_WORD).contains(&dac_code) {
-            return Err(Error::Bounds);
-        };
-
-        let buf = &(dac_code as u32).to_be_bytes()[1..];
+    /// * `dac_code` - dac output code to transfer
+    pub fn set(&mut self, ch: OutputChannelIdx, dac_code: DacCode) {
+        let buf = &(dac_code.0).to_be_bytes()[1..];
 
         match ch {
-            OutputChannel::Zero => {
+            OutputChannelIdx::Zero => {
                 self.pins.sync.0.set_low();
                 // 24 bit write. 4 MSB are zero and 2 LSB are ignored for a 18 bit DAC output.
                 self.spi.write(buf).unwrap();
                 self.pins.sync.0.set_high();
             }
-            OutputChannel::One => {
+            OutputChannelIdx::One => {
                 self.pins.sync.1.set_low();
                 self.spi.write(buf).unwrap();
                 self.pins.sync.1.set_high();
             }
-            OutputChannel::Two => {
+            OutputChannelIdx::Two => {
                 self.pins.sync.2.set_low();
                 self.spi.write(buf).unwrap();
                 self.pins.sync.2.set_high();
             }
-            OutputChannel::Three => {
+            OutputChannelIdx::Three => {
                 self.pins.sync.3.set_low();
                 self.spi.write(buf).unwrap();
                 self.pins.sync.3.set_high();
             }
         }
-        Ok(())
     }
 }
