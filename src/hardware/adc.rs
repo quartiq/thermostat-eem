@@ -222,8 +222,9 @@ impl Adc {
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let res = func(self);
         self.cs[phy as usize].set_state(PinState::Low);
+        let res = func(self);
+        self.cs[phy as usize].set_state(PinState::High);
         res
     }
 
