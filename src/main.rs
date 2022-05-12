@@ -14,7 +14,7 @@ use panic_probe as _; // global panic handler
 
 use enum_iterator::IntoEnumIterator;
 use hardware::{
-    adc::{Adc, AdcCode, InputChannel, StateMachine},
+    adc::{sm::StateMachine, Adc, AdcCode, InputChannel},
     adc_internal::AdcInternal,
     dac::{Dac, DacCode},
     gpio::{Gpio, Led, PoePower},

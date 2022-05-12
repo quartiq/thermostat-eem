@@ -137,6 +137,11 @@ impl AdcPhy {
     }
 }
 
+#[derive(Debug)]
+pub enum Error {
+    Ident,
+}
+
 /// All pins for all ADCs.
 /// * `spi` - Spi clk, miso, mosi (in this order).
 /// * `cs` - The four chip select pins.
@@ -176,7 +181,7 @@ impl Adc {
         spi4_rec: rcc::rec::Spi4,
         spi4: stm32::SPI4,
         pins: AdcPins,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         let rdyn_pullup = pins.rdyn.internal_pull_up(true);
         // SPI MODE_3: idle high, capture on second transition
         let spi: spi::Spi<_, _, u8> =
@@ -189,11 +194,11 @@ impl Adc {
             sync: pins.sync,
         };
 
-        adc.setup(delay);
-        adc
+        adc.setup(delay)?;
+        Ok(adc)
     }
 
-    fn setup(&mut self, delay: &mut impl DelayUs<u16>) {
+    fn setup(&mut self, delay: &mut impl DelayUs<u16>) -> Result<(), Error> {
         // deassert all CS first
         for pin in self.cs.iter_mut() {
             pin.set_state(PinState::High);
@@ -203,11 +208,12 @@ impl Adc {
         self.sync.set_low();
 
         for phy in AdcPhy::into_enum_iter() {
-            self.selected(phy, |adc| adc.setup_adc(delay));
+            self.selected(phy, |adc| adc.setup_adc(delay))?;
         }
 
         // set sync high after initialization of all ADCs
         self.sync.set_high();
+        Ok(())
     }
 
     /// Call a closure while the given `AdcPhy` is selected (while its chip
@@ -222,7 +228,7 @@ impl Adc {
     }
 
     /// Setup an ADC on Thermostat-EEM.
-    fn setup_adc(&mut self, delay: &mut impl DelayUs<u16>) {
+    fn setup_adc(&mut self, delay: &mut impl DelayUs<u16>) -> Result<(), Error> {
         self.adcs.reset();
 
         delay.delay_us(500u16);
@@ -232,7 +238,8 @@ impl Adc {
         if id & 0xfff0 != 0x00d0 {
             // return Err(Error::AdcId);
             // TODO return error insted of panicing here
-            panic!("invalid ID: {id:#04X}");
+            defmt::error!("invalid ID: {=u32:#x}", id);
+            return Err(Error::Ident);
         }
 
         self.adcs.write(
@@ -279,6 +286,8 @@ impl Adc {
         // Re-apply (also set after ADC reset) SYNC_EN flag in gpio register for standard synchronization
         self.adcs
             .write(ad7172::AdcReg::GPIOCON, ad7172::Gpiocon::SyncEn::ENABLED);
+
+        Ok(())
     }
 
     pub fn read_data(&mut self) -> (AdcCode, Option<ad7172::Status>) {
@@ -287,15 +296,18 @@ impl Adc {
     }
 }
 
-statemachine! {
-    transitions: {
-        *Stopped + Start / start = Selected(AdcPhy),
-        Selected(AdcPhy) + Read(AdcChannel) / next = Selected(AdcPhy),
-        Selected(AdcPhy) + Stop / stop = Stopped,
+pub mod sm {
+    use super::*;
+    statemachine! {
+        transitions: {
+            *Stopped + Start / start = Selected(AdcPhy),
+            Selected(AdcPhy) + Read(AdcChannel) / next = Selected(AdcPhy),
+            Selected(AdcPhy) + Stop / stop = Stopped,
+        }
     }
 }
 
-impl StateMachineContext for Adc {
+impl sm::StateMachineContext for Adc {
     /// The data readout has to be initiated by selecting the first ADC.
     fn start(&mut self) -> AdcPhy {
         // set up sampling sequence by selecting the first ADC according to schedule
@@ -324,14 +336,14 @@ impl StateMachineContext for Adc {
     }
 }
 
-impl StateMachine<Adc> {
+impl sm::StateMachine<Adc> {
     /// Set up the RDY pin, start generating interrupts, and start the state machine.
     pub fn start(&mut self, exti: &mut device::EXTI, syscfg: &mut device::SYSCFG) {
         let adc = self.context_mut();
         adc.rdyn.make_interrupt_source(syscfg);
         adc.rdyn.trigger_on_edge(exti, gpio::Edge::Falling);
         adc.rdyn.enable_interrupt(exti);
-        self.process_event(Events::Start).unwrap();
+        self.process_event(sm::Events::Start).unwrap();
     }
 
     /// Handle ADC RDY interrupt.
@@ -339,10 +351,10 @@ impl StateMachine<Adc> {
     /// This routine is called every time the currently selected ADC on Thermostat reports that it has data ready
     /// to be read out by pulling the dout line low. It then reads out the ADC data via SPI.
     pub fn handle_interrupt(&mut self) -> (InputChannel, AdcCode) {
-        if let States::Selected(phy) = *self.state() {
+        if let sm::States::Selected(phy) = *self.state() {
             let (code, status) = self.context_mut().read_data();
             let adc_ch = status.unwrap().channel();
-            self.process_event(Events::Read(adc_ch)).unwrap();
+            self.process_event(sm::Events::Read(adc_ch)).unwrap();
             let input_ch = InputChannel::try_from((phy, adc_ch)).unwrap();
             (input_ch, code)
         } else {

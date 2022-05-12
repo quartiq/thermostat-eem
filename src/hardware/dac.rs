@@ -46,7 +46,7 @@ impl DacCode {
     // DAC constants
     const MAX_DAC_WORD: i32 = 1 << 20; // maximum DAC dataword (exclusive) plus 2 bit due to interface alignment
     const VREF_DAC: f32 = 3.0; // DAC reference voltage
-    pub const MAX_CURRENT: f32 = ((((DacCode::MAX_DAC_WORD - 1) as f32 * DacCode::VREF_DAC)
+    pub const MAX_CURRENT: f32 = (((DacCode::MAX_DAC_WORD - 1) as f32 * DacCode::VREF_DAC
         / DacCode::MAX_DAC_WORD as f32)
         - VREF_TEC)
         / (10.0 * R_SENSE);
@@ -57,7 +57,7 @@ impl TryFrom<f32> for DacCode {
     /// Convert an f32 representing a current int the corresponding DAC output code.
     fn try_from(current: f32) -> Result<DacCode, Error> {
         // Current to DAC word conversion
-        let ctli_voltage = (current * 10.0 * R_SENSE) + VREF_TEC;
+        let ctli_voltage = current * (10.0 * R_SENSE) + VREF_TEC;
         let dac_code = (ctli_voltage * (DacCode::MAX_DAC_WORD as f32 / DacCode::VREF_DAC)) as i32;
 
         if !(0..DacCode::MAX_DAC_WORD).contains(&dac_code) {
