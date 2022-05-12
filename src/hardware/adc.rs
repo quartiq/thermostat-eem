@@ -137,7 +137,6 @@ impl AdcPhy {
     }
 }
 
-#[allow(clippy::complexity)]
 /// All pins for all ADCs.
 /// * `spi` - Spi clk, miso, mosi (in this order).
 /// * `cs` - The four chip select pins.
@@ -149,12 +148,7 @@ pub struct AdcPins {
         gpioe::PE5<gpio::Alternate<5>>,
         gpioe::PE6<gpio::Alternate<5>>,
     ),
-    pub cs: (
-        gpioe::PE0<gpio::Output<gpio::PushPull>>,
-        gpioe::PE1<gpio::Output<gpio::PushPull>>,
-        gpioe::PE3<gpio::Output<gpio::PushPull>>,
-        gpioe::PE4<gpio::Output<gpio::PushPull>>,
-    ),
+    pub cs: [gpio::ErasedPin<gpio::Output>; 4],
     pub rdyn: gpioc::PC11<gpio::Input>,
     pub sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
@@ -162,12 +156,7 @@ pub struct AdcPins {
 #[allow(clippy::complexity)]
 pub struct Adc {
     adcs: ad7172::Ad7172<hal::spi::Spi<hal::stm32::SPI4, hal::spi::Enabled>>,
-    cs: (
-        gpioe::PE0<gpio::Output<gpio::PushPull>>,
-        gpioe::PE1<gpio::Output<gpio::PushPull>>,
-        gpioe::PE3<gpio::Output<gpio::PushPull>>,
-        gpioe::PE4<gpio::Output<gpio::PushPull>>,
-    ),
+    cs: [gpio::ErasedPin<gpio::Output>; 4],
     rdyn: gpioc::PC11<gpio::Input>,
     sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
@@ -206,10 +195,9 @@ impl Adc {
 
     fn setup(&mut self, delay: &mut impl DelayUs<u16>) {
         // deassert all CS first
-        self.set_cs(AdcPhy::Zero, PinState::High);
-        self.set_cs(AdcPhy::One, PinState::High);
-        self.set_cs(AdcPhy::Two, PinState::High);
-        self.set_cs(AdcPhy::Three, PinState::High);
+        for pin in self.cs.iter_mut() {
+            pin.set_state(PinState::High);
+        }
 
         // set sync low first for synchronization at rising edge
         self.sync.set_low();
@@ -222,25 +210,14 @@ impl Adc {
         self.sync.set_high();
     }
 
-    /// Set the chip-select line of an `AdcPhy` to a `PinState`.
-    fn set_cs(&mut self, phy: AdcPhy, state: PinState) {
-        match phy {
-            AdcPhy::Zero => self.cs.0.set_state(state),
-            AdcPhy::One => self.cs.1.set_state(state),
-            AdcPhy::Two => self.cs.2.set_state(state),
-            AdcPhy::Three => self.cs.3.set_state(state),
-        };
-    }
-
     /// Call a closure while the given `AdcPhy` is selected (while its chip
     /// select is asserted).
     fn selected<F, R>(&mut self, phy: AdcPhy, func: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
     {
-        self.set_cs(phy, PinState::Low);
         let res = func(self);
-        self.set_cs(phy, PinState::High);
+        self.cs[phy as usize].set_state(PinState::Low);
         res
     }
 
@@ -255,7 +232,7 @@ impl Adc {
         if id & 0xfff0 != 0x00d0 {
             // return Err(Error::AdcId);
             // TODO return error insted of panicing here
-            panic!();
+            panic!("invalid ID: {id:#04X}");
         }
 
         self.adcs.write(
@@ -323,7 +300,7 @@ impl StateMachineContext for Adc {
     fn start(&mut self) -> AdcPhy {
         // set up sampling sequence by selecting the first ADC according to schedule
         self.rdyn.clear_interrupt_pending_bit();
-        self.set_cs(AdcPhy::Zero, PinState::Low);
+        self.cs[AdcPhy::Zero as usize].set_state(PinState::Low);
         AdcPhy::Zero
     }
 
@@ -334,15 +311,15 @@ impl StateMachineContext for Adc {
     /// again once it has finished
     /// sampling (or when it is selected if it is done at this point) and the routine will start again.
     fn next(&mut self, phy: &AdcPhy, ch: &AdcChannel) -> AdcPhy {
-        self.set_cs(*phy, PinState::High);
+        self.cs[*phy as usize].set_state(PinState::High);
         self.rdyn.clear_interrupt_pending_bit();
         let next = phy.next(ch);
-        self.set_cs(next, PinState::Low);
+        self.cs[next as usize].set_state(PinState::Low);
         next
     }
 
     fn stop(&mut self, phy: &AdcPhy) {
-        self.set_cs(*phy, PinState::High);
+        self.cs[*phy as usize].set_state(PinState::High);
         self.rdyn.clear_interrupt_pending_bit();
     }
 }

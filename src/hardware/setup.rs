@@ -236,12 +236,12 @@ pub fn setup(
         gpioc.pc10.into_alternate(),
         gpioc.pc12.into_alternate(),
         DacPins {
-            sync: (
-                gpiog.pg3.into_push_pull_output(),
-                gpiog.pg2.into_push_pull_output(),
-                gpiog.pg1.into_push_pull_output(),
-                gpiog.pg0.into_push_pull_output(),
-            ),
+            sync: [
+                gpiog.pg3.into_push_pull_output().erase(),
+                gpiog.pg2.into_push_pull_output().erase(),
+                gpiog.pg1.into_push_pull_output().erase(),
+                gpiog.pg0.into_push_pull_output().erase(),
+            ],
         },
     );
 
@@ -303,12 +303,12 @@ pub fn setup(
                 gpioe.pe5.into_alternate(),
                 gpioe.pe6.into_alternate(),
             ),
-            cs: (
-                gpioe.pe0.into_push_pull_output(),
-                gpioe.pe1.into_push_pull_output(),
-                gpioe.pe3.into_push_pull_output(),
-                gpioe.pe4.into_push_pull_output(),
-            ),
+            cs: [
+                gpioe.pe0.into_push_pull_output().erase(),
+                gpioe.pe1.into_push_pull_output().erase(),
+                gpioe.pe3.into_push_pull_output().erase(),
+                gpioe.pe4.into_push_pull_output().erase(),
+            ],
             rdyn: gpioc.pc11.into_pull_up_input(),
             sync: gpiob.pb11.into_push_pull_output(),
         },

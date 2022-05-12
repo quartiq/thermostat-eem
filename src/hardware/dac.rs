@@ -17,12 +17,10 @@ use defmt::Format;
 ///! TEC driver datasheet: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
 ///!
 use super::hal::{
-    gpio::{gpioc::*, gpiog::*, Alternate, Output, PushPull},
+    gpio::{self, gpioc},
     hal::blocking::spi::Write,
     prelude::*,
-    rcc::{rec, CoreClocks},
-    spi::{Enabled, NoMiso, Spi, MODE_1},
-    stm32::SPI3,
+    rcc, spi, stm32,
     time::MegaHertz,
 };
 
@@ -78,21 +76,15 @@ impl From<DacCode> for u32 {
 
 /// DAC gpio pins.
 ///
-/// sync<n> - DAC IC adressing signals
+/// sync[<n>] - DAC IC adressing signals
 /// * <n> specifies Thermostat output channel
-#[allow(clippy::type_complexity)]
 pub struct DacPins {
-    pub sync: (
-        PG3<Output<PushPull>>,
-        PG2<Output<PushPull>>,
-        PG1<Output<PushPull>>,
-        PG0<Output<PushPull>>,
-    ),
+    pub sync: [gpio::ErasedPin<gpio::Output>; 4],
 }
 
 /// DAC driver struct containing the SPI bus and the gpio pins.
 pub struct Dac {
-    spi: Spi<SPI3, Enabled, u8>,
+    spi: spi::Spi<stm32::SPI3, spi::Enabled, u8>,
     pins: DacPins,
 }
 
@@ -107,27 +99,25 @@ impl Dac {
     /// * `mosi` - SPI3 mosi pin
     /// * `pins` - DAC sync pins.
     pub fn new(
-        clocks: &CoreClocks,
-        spi3_rec: rec::Spi3,
-        spi3: SPI3,
-        sck: PC10<Alternate<6>>,
-        mosi: PC12<Alternate<6>>,
+        clocks: &rcc::CoreClocks,
+        spi3_rec: rcc::rec::Spi3,
+        spi3: stm32::SPI3,
+        sck: gpioc::PC10<gpio::Alternate<6>>,
+        mosi: gpioc::PC12<gpio::Alternate<6>>,
         pins: DacPins,
     ) -> Self {
         let spi = spi3.spi(
-            (sck, NoMiso, mosi),
-            MODE_1,
+            (sck, spi::NoMiso, mosi),
+            spi::MODE_1,
             SPI_CLOCK.convert(),
             spi3_rec,
             clocks,
         );
 
         let mut dac = Dac { spi, pins };
-
-        dac.pins.sync.0.set_high();
-        dac.pins.sync.1.set_high();
-        dac.pins.sync.2.set_high();
-        dac.pins.sync.3.set_high();
+        for pin in dac.pins.sync.iter_mut() {
+            pin.set_high();
+        }
 
         // default to zero current
         for i in 0..4 {
@@ -143,30 +133,10 @@ impl Dac {
     /// * `ch` - Thermostat output channel
     /// * `dac_code` - dac output code to transfer
     pub fn set(&mut self, ch: OutputChannelIdx, dac_code: DacCode) {
-        let buf = &(dac_code.0).to_be_bytes()[1..];
-
-        match ch {
-            OutputChannelIdx::Zero => {
-                self.pins.sync.0.set_low();
-                // 24 bit write. 4 MSB are zero and 2 LSB are ignored for a 18 bit DAC output.
-                self.spi.write(buf).unwrap();
-                self.pins.sync.0.set_high();
-            }
-            OutputChannelIdx::One => {
-                self.pins.sync.1.set_low();
-                self.spi.write(buf).unwrap();
-                self.pins.sync.1.set_high();
-            }
-            OutputChannelIdx::Two => {
-                self.pins.sync.2.set_low();
-                self.spi.write(buf).unwrap();
-                self.pins.sync.2.set_high();
-            }
-            OutputChannelIdx::Three => {
-                self.pins.sync.3.set_low();
-                self.spi.write(buf).unwrap();
-                self.pins.sync.3.set_high();
-            }
-        }
+        self.pins.sync[ch as usize].set_low();
+        // 24 bit write. 4 MSB are zero and 2 LSB are ignored for a 18 bit DAC output.
+        let buf = u32::from(dac_code).to_be_bytes();
+        self.spi.write(&buf[1..]).unwrap();
+        self.pins.sync[ch as usize].set_high();
     }
 }
