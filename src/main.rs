@@ -85,6 +85,7 @@ pub struct Telemetry {
     iir_output: [f32; 4],
 }
 
+// Global "hold" IIR to apply to a channel iir state [x0,x1,x2,y0,y1] when the output should hold.
 const IIR_HOLD: iir::IIR<f64> = iir::IIR {
     ba: [0., 0., 0., 1., 0.],
     y_offset: 0.,
