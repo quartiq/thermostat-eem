@@ -1,3 +1,5 @@
+![Thermostat_sw_overview](https://user-images.githubusercontent.com/17088194/168048849-8f743013-f658-47b5-8d7b-937676d35fd8.png)
+
 # thermostat-eem
 Embedded software for the [Thermostat-EEM](https://github.com/sinara-hw/Thermostat_EEM) multichannel temperature controller.
 
