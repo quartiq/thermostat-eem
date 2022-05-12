@@ -1,6 +1,7 @@
 //! # Thermostat_EEM IIR wrapper.
 //!
 
+use super::IIR_HOLD;
 use idsp::iir;
 use miniconf::MiniconfAtomic;
 use serde::{Deserialize, Serialize};
@@ -8,11 +9,17 @@ use serde::{Deserialize, Serialize};
 // TODO make this not atomic and weights an atomic struct
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, MiniconfAtomic)]
 pub struct OutputChannel {
-    /// En-/Disables the TEC driver.
+    /// En-/Disables the TEC driver. This implies "hold".
     ///
     /// # Value
     /// true to shut the driver down, false to enable the driver.
     pub shutdown: bool,
+
+    /// Hold the output.
+    ///
+    /// # Value
+    /// true to hold, false to continue with default iir.
+    pub hold: bool,
 
     /// Maximum absolute (positive and negative) TEC voltage in volt.
     ///
@@ -40,6 +47,7 @@ impl OutputChannel {
     pub fn new(gain: f64, y_min: f64, y_max: f64, weights: [f32; 8]) -> Self {
         OutputChannel {
             shutdown: true,
+            hold: false,
             voltage_limit: 1.0,
             iir: iir::IIR::new(gain, y_min, y_max),
             weights,
@@ -58,6 +66,10 @@ impl OutputChannel {
             .zip(self.weights.iter())
             .map(|(temperature, weight)| *temperature * *weight as f64)
             .sum();
-        self.iir.update(iir_state, weighted_temperature, hold) as f32
+        if self.shutdown || self.hold {
+            IIR_HOLD.update(iir_state, weighted_temperature, hold) as f32
+        } else {
+            self.iir.update(iir_state, weighted_temperature, hold) as f32
+        }
     }
 }
