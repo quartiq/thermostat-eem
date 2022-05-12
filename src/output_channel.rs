@@ -1,7 +1,6 @@
 //! # Thermostat_EEM IIR wrapper.
 //!
 
-use super::IIR_HOLD;
 use idsp::iir;
 use miniconf::MiniconfAtomic;
 use serde::{Deserialize, Serialize};
@@ -61,6 +60,13 @@ impl OutputChannel {
         iir_state: &mut iir::Vec5<f64>,
         hold: bool,
     ) -> f32 {
+        // Global "hold" IIR to apply to a channel iir state [x0,x1,x2,y0,y1] when the output should hold.
+        const IIR_HOLD: iir::IIR<f64> = iir::IIR {
+            ba: [0., 0., 0., 1., 0.],
+            y_offset: 0.,
+            y_min: f64::MIN,
+            y_max: f64::MAX,
+        };
         let weighted_temperature = channel_temperatures
             .iter()
             .zip(self.weights.iter())

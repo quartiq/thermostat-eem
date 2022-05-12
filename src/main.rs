@@ -90,14 +90,6 @@ pub struct Telemetry {
     output_current: [f32; 4],
 }
 
-// Global "hold" IIR to apply to a channel iir state [x0,x1,x2,y0,y1] when the output should hold.
-const IIR_HOLD: iir::IIR<f64> = iir::IIR {
-    ba: [0., 0., 0., 1., 0.],
-    y_offset: 0.,
-    y_min: f64::MIN,
-    y_max: f64::MAX,
-};
-
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
 mod app {
     use super::*;
