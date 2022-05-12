@@ -296,7 +296,7 @@ impl Adc {
 
         self.adcs.write(
             ad7172::AdcReg::FILTCON0,
-            ad7172::Filtcon::Order::SINC5SINC1 | ad7172::Filtcon::Odr::ODR_1_25,
+            ad7172::Filtcon::Order::SINC5SINC1 | ad7172::Filtcon::Odr::ODR_1007,
         );
 
         // Re-apply (also set after ADC reset) SYNC_EN flag in gpio register for standard synchronization
