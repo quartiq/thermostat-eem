@@ -71,7 +71,7 @@ impl Default for Settings {
 }
 
 #[derive(Serialize, Copy, Clone, Default, Debug)]
-pub struct Telemetry {
+pub struct Monitor {
     p3v3_voltage: f32,
     p5v_voltage: f32,
     p12v_voltage: f32,
@@ -81,8 +81,13 @@ pub struct Telemetry {
     output_voltage: [f32; 4],
     poe: PoePower,
     overtemp: bool,
-    channel_temperatures: [f32; 8],
-    iir_output: [f32; 4],
+}
+
+#[derive(Serialize, Copy, Clone, Default, Debug)]
+pub struct Telemetry {
+    monitor: Monitor,
+    channel_temperature: [f32; 8],
+    output_current: [f32; 4],
 }
 
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
@@ -97,7 +102,7 @@ mod app {
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
-        channel_temperatures: [f64; 8], // input channel temperature in °C
+        channel_temperature: [f64; 8], // input channel temperature in °C
         dac: Dac,
     }
 
@@ -151,7 +156,7 @@ mod app {
             settings,
             telemetry: Telemetry::default(),
             gpio: thermostat.gpio,
-            channel_temperatures: [0.0; 8],
+            channel_temperature: [0.0; 8],
         };
 
         (shared, local, init::Monotonics(mono))
@@ -212,24 +217,24 @@ mod app {
         }
     }
 
-    #[task(priority = 1, local=[adc_internal], shared=[network, settings, telemetry, gpio, channel_temperatures])]
+    #[task(priority = 1, local=[adc_internal], shared=[network, settings, telemetry, gpio, channel_temperature])]
     fn telemetry_task(mut c: telemetry_task::Context) {
         let mut telemetry: Telemetry = c.shared.telemetry.lock(|telemetry| *telemetry);
 
         let adc_int = c.local.adc_internal;
-        telemetry.p3v3_voltage = adc_int.read_p3v3_voltage();
-        telemetry.p5v_voltage = adc_int.read_p5v_voltage();
-        telemetry.p12v_voltage = adc_int.read_p12v_voltage();
-        telemetry.p12v_current = adc_int.read_p12v_current();
+        telemetry.monitor.p3v3_voltage = adc_int.read_p3v3_voltage();
+        telemetry.monitor.p5v_voltage = adc_int.read_p5v_voltage();
+        telemetry.monitor.p12v_voltage = adc_int.read_p12v_voltage();
+        telemetry.monitor.p12v_current = adc_int.read_p12v_current();
         for ch in OutputChannelIdx::into_enum_iter() {
             let idx = ch as usize;
-            telemetry.output_vref[idx] = adc_int.read_output_vref(ch);
-            telemetry.output_voltage[idx] = adc_int.read_output_voltage(ch);
-            telemetry.output_current[idx] = adc_int.read_output_current(ch);
+            telemetry.monitor.output_vref[idx] = adc_int.read_output_vref(ch);
+            telemetry.monitor.output_voltage[idx] = adc_int.read_output_voltage(ch);
+            telemetry.monitor.output_current[idx] = adc_int.read_output_current(ch);
         }
         c.shared.gpio.lock(|gpio| {
-            telemetry.overtemp = gpio.overtemp();
-            telemetry.poe = gpio.poe();
+            telemetry.monitor.overtemp = gpio.overtemp();
+            telemetry.monitor.poe = gpio.poe();
         });
 
         c.shared
@@ -251,13 +256,13 @@ mod app {
         c.shared.dac.lock(|dac| dac.set(output_ch, dac_code));
     }
 
-    #[task(priority = 2, shared=[channel_temperatures, settings, telemetry], local=[iir_state], capacity = 4)]
+    #[task(priority = 2, shared=[channel_temperature, settings, telemetry], local=[iir_state], capacity = 4)]
     fn process_output_channel(mut c: process_output_channel::Context, output_ch: OutputChannelIdx) {
         let idx = output_ch as usize;
-        let output_current = (c.shared.settings, c.shared.channel_temperatures).lock(
-            |settings, channel_temperatures| {
+        let output_current = (c.shared.settings, c.shared.channel_temperature).lock(
+            |settings, channel_temperature| {
                 settings.output_channel[idx].update(
-                    channel_temperatures,
+                    channel_temperature,
                     &mut c.local.iir_state[idx],
                     false,
                 )
@@ -265,19 +270,19 @@ mod app {
         );
         c.shared
             .telemetry
-            .lock(|tele| tele.iir_output[idx] = output_current);
+            .lock(|tele| tele.output_current[idx] = output_current);
         convert_current_and_set_dac::spawn(output_ch, output_current).unwrap();
     }
 
     // Higher priority than telemetry but lower than adc data readout.
     // 8 capacity to allow for max. 8 conversions to be queued.
-    #[task(priority = 2, shared=[channel_temperatures, telemetry], capacity = 8)]
+    #[task(priority = 2, shared=[channel_temperature, telemetry], capacity = 8)]
     fn convert_adc_code(c: convert_adc_code::Context, input_ch: InputChannel, adc_code: AdcCode) {
         let idx = input_ch as usize;
-        // convert ADC code to °C and store in channel_temperatures array and telemetry
-        (c.shared.channel_temperatures, c.shared.telemetry).lock(|temp, tele| {
+        // convert ADC code to °C and store in channel_temperature array and telemetry
+        (c.shared.channel_temperature, c.shared.telemetry).lock(|temp, tele| {
             temp[idx] = adc_code.into();
-            tele.channel_temperatures[idx] = temp[idx] as f32;
+            tele.channel_temperature[idx] = temp[idx] as f32;
         });
         // start processing when the last adc channel has been read out
         if input_ch == InputChannel::Seven {
