@@ -8,6 +8,7 @@
 pub mod hardware;
 pub mod net;
 pub mod output_channel;
+pub mod temperature_tele;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _; // global panic handler
@@ -26,6 +27,7 @@ use hardware::{
 use idsp::iir;
 use net::{miniconf::Miniconf, serde::Serialize, NetworkState, NetworkUsers};
 use systick_monotonic::*;
+use temperature_tele::{Temperature, TemperatureBuffer};
 
 #[derive(Clone, Copy, Debug, Miniconf)]
 pub struct Settings {
@@ -86,7 +88,7 @@ pub struct Monitor {
 #[derive(Serialize, Copy, Clone, Default, Debug)]
 pub struct Telemetry {
     monitor: Monitor,
-    channel_temperature: [f32; 8],
+    temperature: [Temperature; 8],
     output_current: [f32; 4],
 }
 
@@ -102,7 +104,8 @@ mod app {
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
-        channel_temperature: [f64; 8], // input channel temperature in °C
+        ch_temperature: [f64; 8], // input channel temperature in °C
+        ch_temperature_buff: [TemperatureBuffer; 8], // temperature buffer for processing telemetry
         dac: Dac,
     }
 
@@ -156,7 +159,8 @@ mod app {
             settings,
             telemetry: Telemetry::default(),
             gpio: thermostat.gpio,
-            channel_temperature: [0.0; 8],
+            ch_temperature: [0.0; 8],
+            ch_temperature_buff: [TemperatureBuffer::default(); 8],
         };
 
         (shared, local, init::Monotonics(mono))
@@ -217,7 +221,7 @@ mod app {
         }
     }
 
-    #[task(priority = 1, local=[adc_internal], shared=[network, settings, telemetry, gpio, channel_temperature])]
+    #[task(priority = 1, local=[adc_internal], shared=[network, settings, telemetry, gpio, ch_temperature_buff])]
     fn telemetry_task(mut c: telemetry_task::Context) {
         let mut telemetry: Telemetry = c.shared.telemetry.lock(|telemetry| *telemetry);
 
@@ -236,6 +240,13 @@ mod app {
             telemetry.monitor.overtemp = gpio.overtemp();
             telemetry.monitor.poe = gpio.poe();
         });
+        // finalize temperature telemetry
+        for ch in InputChannel::into_enum_iter() {
+            telemetry.temperature[ch as usize] = c
+                .shared
+                .ch_temperature_buff
+                .lock(|buff| buff[ch as usize].process());
+        }
 
         c.shared
             .network
@@ -256,18 +267,17 @@ mod app {
         c.shared.dac.lock(|dac| dac.set(output_ch, dac_code));
     }
 
-    #[task(priority = 2, shared=[channel_temperature, settings, telemetry], local=[iir_state], capacity = 4)]
+    #[task(priority = 2, shared=[ch_temperature, settings, telemetry], local=[iir_state], capacity = 4)]
     fn process_output_channel(mut c: process_output_channel::Context, output_ch: OutputChannelIdx) {
         let idx = output_ch as usize;
-        let output_current = (c.shared.settings, c.shared.channel_temperature).lock(
-            |settings, channel_temperature| {
+        let output_current =
+            (c.shared.settings, c.shared.ch_temperature).lock(|settings, ch_temperature| {
                 settings.output_channel[idx].update(
-                    channel_temperature,
+                    ch_temperature,
                     &mut c.local.iir_state[idx],
                     false,
                 )
-            },
-        );
+            });
         c.shared
             .telemetry
             .lock(|tele| tele.output_current[idx] = output_current);
@@ -276,13 +286,20 @@ mod app {
 
     // Higher priority than telemetry but lower than adc data readout.
     // 8 capacity to allow for max. 8 conversions to be queued.
-    #[task(priority = 2, shared=[channel_temperature, telemetry], capacity = 8)]
-    fn convert_adc_code(c: convert_adc_code::Context, input_ch: InputChannel, adc_code: AdcCode) {
+    #[task(priority = 2, shared=[ch_temperature, ch_temperature_buff], capacity = 8)]
+    fn convert_adc_code(
+        mut c: convert_adc_code::Context,
+        input_ch: InputChannel,
+        adc_code: AdcCode,
+    ) {
         let idx = input_ch as usize;
-        // convert ADC code to °C and store in channel_temperature array and telemetry
-        (c.shared.channel_temperature, c.shared.telemetry).lock(|temp, tele| {
-            temp[idx] = adc_code.into();
-            tele.channel_temperature[idx] = temp[idx] as f32;
+        // convert ADC code to °C and store in ch_temperature array and telemetry buffer
+        let temperature = adc_code.into();
+        c.shared.ch_temperature.lock(|temp| {
+            temp[idx] = temperature;
+        });
+        c.shared.ch_temperature_buff.lock(|temp_buff| {
+            temp_buff[idx].add(temperature as f32);
         });
         // start processing when the last adc channel has been read out
         if input_ch == InputChannel::Seven {

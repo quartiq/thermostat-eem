@@ -65,7 +65,7 @@ impl<T: Serialize> TelemetryClient<T> {
     /// # Args
     /// * `telemetry` - The telemetry to report
     pub fn publish(&mut self, telemetry: &T) {
-        let telemetry: Vec<u8, 512> = serde_json_core::to_vec(telemetry).unwrap();
+        let telemetry: Vec<u8, 1024> = serde_json_core::to_vec(telemetry).unwrap();
         self.mqtt
             .client
             .publish(
