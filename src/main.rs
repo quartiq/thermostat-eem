@@ -8,7 +8,7 @@
 pub mod hardware;
 pub mod net;
 pub mod output_channel;
-pub mod temperature_tele;
+pub mod statistics;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _; // global panic handler
@@ -26,8 +26,8 @@ use hardware::{
 };
 use idsp::iir;
 use net::{miniconf::Miniconf, serde::Serialize, NetworkState, NetworkUsers};
+use statistics::{Buffer, Statistics};
 use systick_monotonic::*;
-use temperature_tele::{Buffer, Statistics};
 
 #[derive(Clone, Copy, Debug, Miniconf)]
 pub struct Settings {
