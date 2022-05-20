@@ -242,10 +242,11 @@ mod app {
         });
         // finalize temperature telemetry
         for ch in InputChannel::into_enum_iter() {
-            telemetry.statistics[ch as usize] = c
-                .shared
-                .ch_statistics_buff
-                .lock(|buff| buff[ch as usize].into());
+            telemetry.statistics[ch as usize] = c.shared.ch_statistics_buff.lock(|buff| {
+                let stat = buff[ch as usize].into();
+                buff[ch as usize] = Buffer::default();
+                stat
+            })
         }
 
         c.shared
@@ -299,7 +300,7 @@ mod app {
             temp[idx] = temperature;
         });
         c.shared.ch_statistics_buff.lock(|temp_buff| {
-            temp_buff[idx].add(temperature);
+            temp_buff[idx].update(temperature);
         });
         // start processing when the last adc channel has been read out
         if input_ch == InputChannel::Seven {
