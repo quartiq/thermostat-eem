@@ -27,7 +27,7 @@ use hardware::{
 use idsp::iir;
 use net::{miniconf::Miniconf, serde::Serialize, NetworkState, NetworkUsers};
 use systick_monotonic::*;
-use temperature_tele::{Statistics, StatisticsBuffer};
+use temperature_tele::{Buffer, Statistics};
 
 #[derive(Clone, Copy, Debug, Miniconf)]
 pub struct Settings {
@@ -104,8 +104,8 @@ mod app {
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
-        ch_temperature: [f64; 8], // input channel temperature in °C
-        ch_statistics_buff: [StatisticsBuffer; 8], // temperature buffer for processing telemetry
+        ch_temperature: [f64; 8],        // input channel temperature in °C
+        ch_statistics_buff: [Buffer; 8], // temperature buffer for processing telemetry
         dac: Dac,
     }
 
@@ -160,7 +160,7 @@ mod app {
             telemetry: Telemetry::default(),
             gpio: thermostat.gpio,
             ch_temperature: [0.0; 8],
-            ch_statistics_buff: [StatisticsBuffer::default(); 8],
+            ch_statistics_buff: [Buffer::default(); 8],
         };
 
         (shared, local, init::Monotonics(mono))
@@ -245,7 +245,7 @@ mod app {
             telemetry.statistics[ch as usize] = c
                 .shared
                 .ch_statistics_buff
-                .lock(|buff| buff[ch as usize].process());
+                .lock(|buff| buff[ch as usize].into());
         }
 
         c.shared
@@ -299,7 +299,7 @@ mod app {
             temp[idx] = temperature;
         });
         c.shared.ch_statistics_buff.lock(|temp_buff| {
-            temp_buff[idx].add(temperature as f32);
+            temp_buff[idx].add(temperature);
         });
         // start processing when the last adc channel has been read out
         if input_ch == InputChannel::Seven {
