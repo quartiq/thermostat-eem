@@ -16,7 +16,7 @@ pub struct TemperatureBuffer {
     min: f32,
     max: f32,
     accumulator: f32,
-    pub counter: u32,
+    counter: u32,
 }
 
 impl TemperatureBuffer {
