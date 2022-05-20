@@ -2,24 +2,24 @@
 
 use serde::Serialize;
 
-/// Temperature telemetry struct.
+/// Statistics telemetry struct.
 #[derive(Serialize, Copy, Clone, Default, Debug)]
-pub struct Temperature {
+pub struct Statistics {
     mean: f32,
     min: f32,
     max: f32,
 }
 
-/// Temperature buffer for computing min/max/mean of the last telemetry period.
+/// Statistics buffer for computing min/max/mean of the last telemetry period.
 #[derive(Default, Copy, Clone, Debug)]
-pub struct TemperatureBuffer {
+pub struct StatisticsBuffer {
     min: f32,
     max: f32,
     accumulator: f32,
     counter: u32,
 }
 
-impl TemperatureBuffer {
+impl StatisticsBuffer {
     /// Add a new temperature sample to the buffer. This will add it to the accumulator,
     /// update min/max and increment the counter.
     pub fn add(&mut self, temp: f32) {
@@ -29,11 +29,11 @@ impl TemperatureBuffer {
         self.counter += 1;
     }
 
-    /// Process temperature buffer. Calculates mean, returns the finalized Temperature type
+    /// Process temperature buffer. Calculates mean, returns the finalized Statistics type
     /// and resets the buffer.
-    pub fn process(&mut self) -> Temperature {
+    pub fn process(&mut self) -> Statistics {
         let mean = self.accumulator / self.counter as f32;
-        let temp = Temperature {
+        let temp = Statistics {
             mean,
             max: self.max,
             min: self.min,

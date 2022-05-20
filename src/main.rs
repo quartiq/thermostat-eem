@@ -27,7 +27,7 @@ use hardware::{
 use idsp::iir;
 use net::{miniconf::Miniconf, serde::Serialize, NetworkState, NetworkUsers};
 use systick_monotonic::*;
-use temperature_tele::{Temperature, TemperatureBuffer};
+use temperature_tele::{Statistics, StatisticsBuffer};
 
 #[derive(Clone, Copy, Debug, Miniconf)]
 pub struct Settings {
@@ -88,7 +88,7 @@ pub struct Monitor {
 #[derive(Serialize, Copy, Clone, Default, Debug)]
 pub struct Telemetry {
     monitor: Monitor,
-    temperature: [Temperature; 8],
+    statistics: [Statistics; 8],
     output_current: [f32; 4],
 }
 
@@ -105,7 +105,7 @@ mod app {
         telemetry: Telemetry,
         gpio: Gpio,
         ch_temperature: [f64; 8], // input channel temperature in °C
-        ch_temperature_buff: [TemperatureBuffer; 8], // temperature buffer for processing telemetry
+        ch_statistics_buff: [StatisticsBuffer; 8], // temperature buffer for processing telemetry
         dac: Dac,
     }
 
@@ -160,7 +160,7 @@ mod app {
             telemetry: Telemetry::default(),
             gpio: thermostat.gpio,
             ch_temperature: [0.0; 8],
-            ch_temperature_buff: [TemperatureBuffer::default(); 8],
+            ch_statistics_buff: [StatisticsBuffer::default(); 8],
         };
 
         (shared, local, init::Monotonics(mono))
@@ -221,7 +221,7 @@ mod app {
         }
     }
 
-    #[task(priority = 1, local=[adc_internal], shared=[network, settings, telemetry, gpio, ch_temperature_buff])]
+    #[task(priority = 1, local=[adc_internal], shared=[network, settings, telemetry, gpio, ch_statistics_buff])]
     fn telemetry_task(mut c: telemetry_task::Context) {
         let mut telemetry: Telemetry = c.shared.telemetry.lock(|telemetry| *telemetry);
 
@@ -242,9 +242,9 @@ mod app {
         });
         // finalize temperature telemetry
         for ch in InputChannel::into_enum_iter() {
-            telemetry.temperature[ch as usize] = c
+            telemetry.statistics[ch as usize] = c
                 .shared
-                .ch_temperature_buff
+                .ch_statistics_buff
                 .lock(|buff| buff[ch as usize].process());
         }
 
@@ -286,7 +286,7 @@ mod app {
 
     // Higher priority than telemetry but lower than adc data readout.
     // 8 capacity to allow for max. 8 conversions to be queued.
-    #[task(priority = 2, shared=[ch_temperature, ch_temperature_buff], capacity = 8)]
+    #[task(priority = 2, shared=[ch_temperature, ch_statistics_buff], capacity = 8)]
     fn convert_adc_code(
         mut c: convert_adc_code::Context,
         input_ch: InputChannel,
@@ -298,7 +298,7 @@ mod app {
         c.shared.ch_temperature.lock(|temp| {
             temp[idx] = temperature;
         });
-        c.shared.ch_temperature_buff.lock(|temp_buff| {
+        c.shared.ch_statistics_buff.lock(|temp_buff| {
             temp_buff[idx].add(temperature as f32);
         });
         // start processing when the last adc channel has been read out
