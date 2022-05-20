@@ -23,10 +23,15 @@ impl TemperatureBuffer {
     /// Add a new temperature sample to the buffer. This will add it to the accumulator,
     /// update min/max and increment the counter.
     pub fn add(&mut self, temp: f32) {
-        self.counter += 1;
+        if self.counter == 0 {
+            self.min = temp;
+            self.max = temp;
+        } else {
+            self.max = self.max.max(temp);
+            self.min = self.min.min(temp);
+        }
         self.accumulator += temp;
-        self.max = self.max.max(temp);
-        self.min = self.min.min(temp);
+        self.counter += 1;
     }
 
     /// Process temperature buffer. Calculates average, returns the finalized Temperature type
