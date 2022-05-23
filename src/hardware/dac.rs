@@ -1,5 +1,3 @@
-use defmt::Format;
-
 ///! Thermostat DAC driver
 ///!
 ///! This file contains the driver for the 4 Thermostat DAC output channels.
@@ -9,10 +7,6 @@ use defmt::Format;
 ///!
 ///! The 4 channel DAC ICs share an SPI bus and are addressed using individual "sync"
 ///! signals, similar to a chip select signal.
-///! The TEC driver ICs feature a shutdown mode controlled by a shutdown signal and
-///! current limits controlled by another input voltage. The shutdown signal is aggregated
-///! into the DAC driver using a gpio, while the current limits make use of the Thermostat
-///! PWM driver.
 ///! DAC datasheet: https://www.analog.com/media/en/technical-documentation/data-sheets/AD5680.pdf
 ///! TEC driver datasheet: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
 ///!
@@ -25,8 +19,9 @@ use super::hal::{
 };
 
 use super::OutputChannelIdx;
+use defmt::Format;
 
-// Note: 30MHz clock valid according to DAC datasheet. This lead to spurious RxFIFO overruns on the STM side when probing the spi clock with a scope probe.
+// Note: Up to 30MHz clock valid according to DAC datasheet. This lead to spurious RxFIFO overruns on the STM side when probing the spi clock with a scope probe.
 const SPI_CLOCK: MegaHertz = MegaHertz::MHz(8);
 
 // DAC and PWM shared constants
@@ -127,7 +122,7 @@ impl Dac {
         dac
     }
 
-    /// Set the DAC output to on a channel.
+    /// Set the DAC output on a channel.
     ///
     /// # Args
     /// * `ch` - Thermostat output channel

@@ -125,7 +125,7 @@ impl AdcPhy {
     ///
     /// *Note*: The schedule has to  correspond to the configuration of the individual ADCs.
     /// For this specific schedule all the ADCs are configured the same and are synced so they
-    /// all start sampling at the same time. The schedule now first reads out each phy
+    /// all start sampling at the same time. The schedule now reads out each phy
     /// round-robin.
     /// This corresponds to the sequence of Thermostat channels 0,2,4,6,1,3,5,7.
     ///
@@ -237,8 +237,6 @@ impl Adc {
         let id = self.adcs.read(ad7172::AdcReg::ID);
         // check that ID is 0x00DX, as per datasheet
         if id & 0xfff0 != 0x00d0 {
-            // return Err(Error::AdcId);
-            // TODO return error insted of panicing here
             defmt::error!("invalid ID: {=u32:#x}", id);
             return Err(Error::Ident);
         }
