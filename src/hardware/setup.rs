@@ -10,7 +10,7 @@ use super::hal::{
 use crate::hardware::SRC_MAC;
 
 use super::{
-    adc::{Adc, AdcPins, StateMachine},
+    adc::{sm::StateMachine, Adc, AdcPins},
     adc_internal::{AdcInternal, AdcInternalPins},
     dac::{Dac, DacPins},
     delay,
@@ -236,12 +236,12 @@ pub fn setup(
         gpioc.pc10.into_alternate(),
         gpioc.pc12.into_alternate(),
         DacPins {
-            sync: (
-                gpiog.pg3.into_push_pull_output(),
-                gpiog.pg2.into_push_pull_output(),
-                gpiog.pg1.into_push_pull_output(),
-                gpiog.pg0.into_push_pull_output(),
-            ),
+            sync: [
+                gpiog.pg3.into_push_pull_output().erase(),
+                gpiog.pg2.into_push_pull_output().erase(),
+                gpiog.pg1.into_push_pull_output().erase(),
+                gpiog.pg0.into_push_pull_output().erase(),
+            ],
         },
     );
 
@@ -292,27 +292,30 @@ pub fn setup(
     // enable MCO 2MHz clock output to ADCs
     gpioa.pa8.into_alternate::<0>();
 
-    let mut adc_sm = StateMachine::new(Adc::new(
-        &mut delay,
-        &ccdr.clocks,
-        ccdr.peripheral.SPI4,
-        device.SPI4,
-        AdcPins {
-            spi: (
-                gpioe.pe2.into_alternate(),
-                gpioe.pe5.into_alternate(),
-                gpioe.pe6.into_alternate(),
-            ),
-            cs: (
-                gpioe.pe0.into_push_pull_output(),
-                gpioe.pe1.into_push_pull_output(),
-                gpioe.pe3.into_push_pull_output(),
-                gpioe.pe4.into_push_pull_output(),
-            ),
-            rdyn: gpioc.pc11.into_pull_up_input(),
-            sync: gpiob.pb11.into_push_pull_output(),
-        },
-    ));
+    let mut adc_sm = StateMachine::new(
+        Adc::new(
+            &mut delay,
+            &ccdr.clocks,
+            ccdr.peripheral.SPI4,
+            device.SPI4,
+            AdcPins {
+                spi: (
+                    gpioe.pe2.into_alternate(),
+                    gpioe.pe5.into_alternate(),
+                    gpioe.pe6.into_alternate(),
+                ),
+                cs: [
+                    gpioe.pe0.into_push_pull_output().erase(),
+                    gpioe.pe1.into_push_pull_output().erase(),
+                    gpioe.pe3.into_push_pull_output().erase(),
+                    gpioe.pe4.into_push_pull_output().erase(),
+                ],
+                rdyn: gpioc.pc11.into_pull_up_input(),
+                sync: gpiob.pb11.into_push_pull_output(),
+            },
+        )
+        .unwrap(),
+    );
     adc_sm.start(&mut device.EXTI, &mut device.SYSCFG);
 
     info!("Setup Ethernet");

@@ -125,7 +125,7 @@ impl AdcPhy {
     ///
     /// *Note*: The schedule has to  correspond to the configuration of the individual ADCs.
     /// For this specific schedule all the ADCs are configured the same and are synced so they
-    /// all start sampling at the same time. The schedule now first reads out each phy
+    /// all start sampling at the same time. The schedule now reads out each phy
     /// round-robin.
     /// This corresponds to the sequence of Thermostat channels 0,2,4,6,1,3,5,7.
     ///
@@ -137,7 +137,11 @@ impl AdcPhy {
     }
 }
 
-#[allow(clippy::complexity)]
+#[derive(Debug)]
+pub enum Error {
+    Ident,
+}
+
 /// All pins for all ADCs.
 /// * `spi` - Spi clk, miso, mosi (in this order).
 /// * `cs` - The four chip select pins.
@@ -149,12 +153,7 @@ pub struct AdcPins {
         gpioe::PE5<gpio::Alternate<5>>,
         gpioe::PE6<gpio::Alternate<5>>,
     ),
-    pub cs: (
-        gpioe::PE0<gpio::Output<gpio::PushPull>>,
-        gpioe::PE1<gpio::Output<gpio::PushPull>>,
-        gpioe::PE3<gpio::Output<gpio::PushPull>>,
-        gpioe::PE4<gpio::Output<gpio::PushPull>>,
-    ),
+    pub cs: [gpio::ErasedPin<gpio::Output>; 4],
     pub rdyn: gpioc::PC11<gpio::Input>,
     pub sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
@@ -162,12 +161,7 @@ pub struct AdcPins {
 #[allow(clippy::complexity)]
 pub struct Adc {
     adcs: ad7172::Ad7172<hal::spi::Spi<hal::stm32::SPI4, hal::spi::Enabled>>,
-    cs: (
-        gpioe::PE0<gpio::Output<gpio::PushPull>>,
-        gpioe::PE1<gpio::Output<gpio::PushPull>>,
-        gpioe::PE3<gpio::Output<gpio::PushPull>>,
-        gpioe::PE4<gpio::Output<gpio::PushPull>>,
-    ),
+    cs: [gpio::ErasedPin<gpio::Output>; 4],
     rdyn: gpioc::PC11<gpio::Input>,
     sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
@@ -187,7 +181,7 @@ impl Adc {
         spi4_rec: rcc::rec::Spi4,
         spi4: stm32::SPI4,
         pins: AdcPins,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         let rdyn_pullup = pins.rdyn.internal_pull_up(true);
         // SPI MODE_3: idle high, capture on second transition
         let spi: spi::Spi<_, _, u8> =
@@ -200,36 +194,26 @@ impl Adc {
             sync: pins.sync,
         };
 
-        adc.setup(delay);
-        adc
+        adc.setup(delay)?;
+        Ok(adc)
     }
 
-    fn setup(&mut self, delay: &mut impl DelayUs<u16>) {
+    fn setup(&mut self, delay: &mut impl DelayUs<u16>) -> Result<(), Error> {
         // deassert all CS first
-        self.set_cs(AdcPhy::Zero, PinState::High);
-        self.set_cs(AdcPhy::One, PinState::High);
-        self.set_cs(AdcPhy::Two, PinState::High);
-        self.set_cs(AdcPhy::Three, PinState::High);
+        for pin in self.cs.iter_mut() {
+            pin.set_state(PinState::High);
+        }
 
         // set sync low first for synchronization at rising edge
         self.sync.set_low();
 
         for phy in AdcPhy::into_enum_iter() {
-            self.selected(phy, |adc| adc.setup_adc(delay));
+            self.selected(phy, |adc| adc.setup_adc(delay))?;
         }
 
         // set sync high after initialization of all ADCs
         self.sync.set_high();
-    }
-
-    /// Set the chip-select line of an `AdcPhy` to a `PinState`.
-    fn set_cs(&mut self, phy: AdcPhy, state: PinState) {
-        match phy {
-            AdcPhy::Zero => self.cs.0.set_state(state),
-            AdcPhy::One => self.cs.1.set_state(state),
-            AdcPhy::Two => self.cs.2.set_state(state),
-            AdcPhy::Three => self.cs.3.set_state(state),
-        };
+        Ok(())
     }
 
     /// Call a closure while the given `AdcPhy` is selected (while its chip
@@ -238,14 +222,14 @@ impl Adc {
     where
         F: FnOnce(&mut Self) -> R,
     {
-        self.set_cs(phy, PinState::Low);
+        self.cs[phy as usize].set_state(PinState::Low);
         let res = func(self);
-        self.set_cs(phy, PinState::High);
+        self.cs[phy as usize].set_state(PinState::High);
         res
     }
 
     /// Setup an ADC on Thermostat-EEM.
-    fn setup_adc(&mut self, delay: &mut impl DelayUs<u16>) {
+    fn setup_adc(&mut self, delay: &mut impl DelayUs<u16>) -> Result<(), Error> {
         self.adcs.reset();
 
         delay.delay_us(500u16);
@@ -253,9 +237,8 @@ impl Adc {
         let id = self.adcs.read(ad7172::AdcReg::ID);
         // check that ID is 0x00DX, as per datasheet
         if id & 0xfff0 != 0x00d0 {
-            // return Err(Error::AdcId);
-            // TODO return error insted of panicing here
-            panic!();
+            defmt::error!("invalid ID: {=u32:#x}", id);
+            return Err(Error::Ident);
         }
 
         self.adcs.write(
@@ -302,6 +285,8 @@ impl Adc {
         // Re-apply (also set after ADC reset) SYNC_EN flag in gpio register for standard synchronization
         self.adcs
             .write(ad7172::AdcReg::GPIOCON, ad7172::Gpiocon::SyncEn::ENABLED);
+
+        Ok(())
     }
 
     pub fn read_data(&mut self) -> (AdcCode, Option<ad7172::Status>) {
@@ -310,20 +295,23 @@ impl Adc {
     }
 }
 
-statemachine! {
-    transitions: {
-        *Stopped + Start / start = Selected(AdcPhy),
-        Selected(AdcPhy) + Read(AdcChannel) / next = Selected(AdcPhy),
-        Selected(AdcPhy) + Stop / stop = Stopped,
+pub mod sm {
+    use super::*;
+    statemachine! {
+        transitions: {
+            *Stopped + Start / start = Selected(AdcPhy),
+            Selected(AdcPhy) + Read(AdcChannel) / next = Selected(AdcPhy),
+            Selected(AdcPhy) + Stop / stop = Stopped,
+        }
     }
 }
 
-impl StateMachineContext for Adc {
+impl sm::StateMachineContext for Adc {
     /// The data readout has to be initiated by selecting the first ADC.
     fn start(&mut self) -> AdcPhy {
         // set up sampling sequence by selecting the first ADC according to schedule
         self.rdyn.clear_interrupt_pending_bit();
-        self.set_cs(AdcPhy::Zero, PinState::Low);
+        self.cs[AdcPhy::Zero as usize].set_state(PinState::Low);
         AdcPhy::Zero
     }
 
@@ -334,27 +322,27 @@ impl StateMachineContext for Adc {
     /// again once it has finished
     /// sampling (or when it is selected if it is done at this point) and the routine will start again.
     fn next(&mut self, phy: &AdcPhy, ch: &AdcChannel) -> AdcPhy {
-        self.set_cs(*phy, PinState::High);
+        self.cs[*phy as usize].set_state(PinState::High);
         self.rdyn.clear_interrupt_pending_bit();
         let next = phy.next(ch);
-        self.set_cs(next, PinState::Low);
+        self.cs[next as usize].set_state(PinState::Low);
         next
     }
 
     fn stop(&mut self, phy: &AdcPhy) {
-        self.set_cs(*phy, PinState::High);
+        self.cs[*phy as usize].set_state(PinState::High);
         self.rdyn.clear_interrupt_pending_bit();
     }
 }
 
-impl StateMachine<Adc> {
+impl sm::StateMachine<Adc> {
     /// Set up the RDY pin, start generating interrupts, and start the state machine.
     pub fn start(&mut self, exti: &mut device::EXTI, syscfg: &mut device::SYSCFG) {
         let adc = self.context_mut();
         adc.rdyn.make_interrupt_source(syscfg);
         adc.rdyn.trigger_on_edge(exti, gpio::Edge::Falling);
         adc.rdyn.enable_interrupt(exti);
-        self.process_event(Events::Start).unwrap();
+        self.process_event(sm::Events::Start).unwrap();
     }
 
     /// Handle ADC RDY interrupt.
@@ -362,10 +350,10 @@ impl StateMachine<Adc> {
     /// This routine is called every time the currently selected ADC on Thermostat reports that it has data ready
     /// to be read out by pulling the dout line low. It then reads out the ADC data via SPI.
     pub fn handle_interrupt(&mut self) -> (InputChannel, AdcCode) {
-        if let States::Selected(phy) = *self.state() {
+        if let sm::States::Selected(phy) = *self.state() {
             let (code, status) = self.context_mut().read_data();
             let adc_ch = status.unwrap().channel();
-            self.process_event(Events::Read(adc_ch)).unwrap();
+            self.process_event(sm::Events::Read(adc_ch)).unwrap();
             let input_ch = InputChannel::try_from((phy, adc_ch)).unwrap();
             (input_ch, code)
         } else {
