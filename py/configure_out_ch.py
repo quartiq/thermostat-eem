@@ -2,7 +2,8 @@
 """
 Adapted from Stabilizer iir_coefficients.py.
 
-Description: Algorithms to generate biquad (second order IIR) coefficients for Thermostat-EEM.
+Description: Algorithms to generate biquad (second order IIR) coefficients for Thermostat-EEM. 
+The tool configures one Thermostat-EEM output channel to the specified settings with the correct filter coefficients.
 """
 import argparse
 import asyncio
@@ -12,8 +13,6 @@ import logging
 from math import pi
 
 import miniconf
-
-import stabilizer
 
 logger = logging.getLogger(__name__)
 
@@ -211,14 +210,14 @@ def _main():
                         help='Increase logging verbosity')
     parser.add_argument("--broker", "-b", type=str, default="10.42.0.1",
                         help="The MQTT broker to use to communicate with "
-                        "Stabilizer (%(default)s)")
+                        "Thermostat-EEM (%(default)s)")
     parser.add_argument("--prefix", "-p", type=str,
                         default="dt/sinara/thermostat-eem/+",
                         help="The Stabilizer device prefix in MQTT, "
                         "wildcards allowed as long as the match is unique "
                         "(%(default)s)")
     parser.add_argument("--no-discover", "-d", action="store_true",
-                        help="Do not discover Stabilizer device prefix.")
+                        help="Do not discover device prefix.")
 
     parser.add_argument("--channel", "-c", type=int, choices=[0, 1, 2, 3],
                         required=True, help="The output channel to configure.")
