@@ -46,7 +46,7 @@ def add_argument(*args, **kwargs):
 # # Coefficients Calculation Function
 #     Description:
 #       This function takes in two input arguments and returns the IIR filter
-#       coefficients for Stabilizer to represent the necessary filter.
+#       coefficients for Thermostat to represent the necessary filter.
 #
 #     Args:
 #       args: The filter command-line arguments. Any filter-related arguments
@@ -54,7 +54,7 @@ def add_argument(*args, **kwargs):
 #
 #     Returns:
 #       [b0, b1, b2, -a1, -a2] IIR coefficients to be programmed into a
-#       Stabilizer IIR filter configuration.
+#       Thermostat IIR filter configuration.
 Filter = collections.namedtuple(
     "Filter", ["help", "arguments", "coefficients"])
 
@@ -204,8 +204,7 @@ def pid_coefficients(args):
 
 def _main():
     parser = argparse.ArgumentParser(
-        description="Configure Stabilizer dual-iir filter parameters."
-                    "Note: This script assumes an AFE input gain of 1.")
+        description="Configure Thermostat filter parameters.")
     parser.add_argument('-v', '--verbose', action='count', default=0,
                         help='Increase logging verbosity')
     parser.add_argument("--broker", "-b", type=str, default="10.42.0.1",
@@ -213,7 +212,7 @@ def _main():
                         "Thermostat-EEM (%(default)s)")
     parser.add_argument("--prefix", "-p", type=str,
                         default="dt/sinara/thermostat-eem/+",
-                        help="The Stabilizer device prefix in MQTT, "
+                        help="The Thermostat device prefix in MQTT, "
                         "wildcards allowed as long as the match is unique "
                         "(%(default)s)")
     parser.add_argument("--no-discover", "-d", action="store_true",
