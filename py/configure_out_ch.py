@@ -183,12 +183,12 @@ def pid_coefficients(args):
 
     # Determine filter order
     if args.Kii != 0:
-        assert (args.Kdd, args.Kd) == (0, 0), \
-            "IIR filters I^2 and D or D^2 gain are unsupported"
+        assert (args.Kdd, args.Kd, args.Kdd_limit, args.Kd_limit) == (0, 0, float('inf'), float('inf')), \
+            "IIR filters I^2 and D or D^2 gain/limit are unsupported"
         order = 2
     elif args.Ki != 0:
-        assert args.Kdd == 0, \
-            "IIR filters with I and D^2 gain are unsupported"
+        assert (args.Kdd, args.Kdd_limit) == (0, float('inf')), \
+            "IIR filters with I and D^2 gain/limit are unsupported"
         order = 1
     else:
         order = 0

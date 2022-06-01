@@ -42,7 +42,7 @@ def _main():
     if forward_gain == 0 and args.x_offset != 0:
         print("Filter has no DC gain but x_offset is non-zero")
 
-    f = np.logspace(-7, np.log10(1/args.sample_period), 1024, endpoint=False)
+    f = np.logspace(-7, np.log10(0.5/args.sample_period), 1024, endpoint=False)
     f, h = signal.freqz(
         coefficients[:3], [1] + [-c for c in coefficients[3:]], worN=f, fs=1/args.sample_period)
     fig, ax = plt.subplots()
