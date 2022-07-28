@@ -11,6 +11,7 @@ pub use serde;
 
 pub mod network_processor;
 pub mod telemetry;
+pub mod interlock;
 
 use crate::hardware::{system_timer::SystemTimer, EthernetPhy, NetworkManager, NetworkStack};
 use minimq::embedded_nal::IpAddr;
@@ -70,7 +71,7 @@ where
         app: &str,
         mac: smoltcp_nal::smoltcp::wire::EthernetAddress,
         broker: IpAddr,
-    ) -> Self {
+    ) -> (Self, String<128>) {
         let stack_manager =
             cortex_m::singleton!(: NetworkManager = NetworkManager::new(stack)).unwrap();
 
@@ -95,11 +96,11 @@ where
             broker,
         );
 
-        NetworkUsers {
+        (NetworkUsers {
             miniconf: settings,
             processor,
             telemetry,
-        }
+        }, prefix)
     }
 
     /// Update and process all of the network users state.

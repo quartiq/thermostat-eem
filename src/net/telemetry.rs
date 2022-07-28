@@ -78,6 +78,10 @@ impl<T: Serialize> TelemetryClient<T> {
             .ok();
     }
 
+    pub fn inner_mut(&mut self) -> &mut minimq::Minimq<NetworkReference, SystemTimer, 1024, 1> {
+        &mut self.mqtt
+    }
+
     /// Update the telemetry client
     ///
     /// # Note

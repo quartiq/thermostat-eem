@@ -24,6 +24,7 @@ use hardware::{
     system_timer::SystemTimer,
     OutputChannelIdx,
 };
+use heapless::String;
 use idsp::iir;
 use net::{miniconf::Miniconf, serde::Serialize, NetworkState, NetworkUsers};
 use statistics::{Buffer, Statistics};
@@ -115,6 +116,7 @@ mod app {
         pwm: Pwm,
         adc_internal: AdcInternal,
         iir_state: [iir::Vec5<f64>; 4],
+        mqtt_interlock_prefix: String<128>,
     }
 
     #[init]
@@ -128,7 +130,7 @@ mod app {
 
         let mono = Systick::new(systick, thermostat.clocks.sysclk().to_Hz());
 
-        let network = NetworkUsers::new(
+        let (network, prefix) = NetworkUsers::new(
             thermostat.net.stack,
             thermostat.net.phy,
             clock,
@@ -151,6 +153,7 @@ mod app {
             pwm: thermostat.pwm,
             adc_internal: thermostat.adc_internal,
             iir_state: [[0.; 5]; 4],
+            mqtt_interlock_prefix: prefix,
         };
 
         let shared = Shared {
@@ -256,6 +259,23 @@ mod app {
         // TODO: validate telemetry period.
         let telemetry_period = c.shared.settings.lock(|settings| settings.telemetry_period);
         telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
+    }
+
+    #[task(priority = 1, shared=[network], local=[mqtt_interlock_prefix])]
+    fn mqtt_interlock(mut c: mqtt_interlock::Context) {
+        c.shared.network.lock(|net| {
+            net.telemetry
+                .inner_mut()
+                .client
+                .publish(
+                    &c.local.mqtt_interlock_prefix,
+                    &[1],
+                    minimq::QoS::AtMostOnce,
+                    minimq::Retain::NotRetained,
+                    &[],
+                )
+                .ok()
+        });
     }
 
     #[task(priority = 2, shared=[dac], capacity = 4)]
