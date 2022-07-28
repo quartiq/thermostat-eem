@@ -56,13 +56,17 @@ impl AdcInternal {
         // Setup ADCs
         let (mut adc1, _adc2) = adc::adc12(adc.0, adc.1, delay, adc_rcc.0, clocks);
         let mut adc3 = adc::Adc::adc3(adc.2, delay, adc_rcc.1, clocks);
+
         adc.3.ccr.modify(|_, w| w.presc().div2()); // Set ADC 1/2 clock prescaler after adc init but before enable
         adc1.calibrate(); // re-calibrate after clock has changed
         let mut adc1 = adc1.enable();
+        adc1.set_sample_time(adc::AdcSampleTime::T_810);
         adc1.set_resolution(adc::Resolution::SIXTEENBIT);
+
         adc.4.ccr.modify(|_, w| w.presc().div2()); // Set ADC 3 clock prescaler after adc init but before enable
         adc3.calibrate(); // re-calibrate after clock has changed
         let mut adc3 = adc3.enable();
+        adc1.set_sample_time(adc::AdcSampleTime::T_810);
         adc3.set_resolution(adc::Resolution::SIXTEENBIT);
 
         AdcInternal { adc1, adc3, pins }
