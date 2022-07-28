@@ -275,7 +275,13 @@ pub fn setup(
         &mut delay,
         &ccdr.clocks,
         (ccdr.peripheral.ADC12, ccdr.peripheral.ADC3),
-        (device.ADC1, device.ADC2, device.ADC3),
+        (
+            device.ADC1,
+            device.ADC2,
+            device.ADC3,
+            device.ADC12_COMMON,
+            device.ADC3_COMMON,
+        ),
         adc_internal_pins,
     );
 
