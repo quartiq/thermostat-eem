@@ -130,7 +130,7 @@ mod app {
 
         let mono = Systick::new(systick, thermostat.clocks.sysclk().to_Hz());
 
-        let (network, prefix) = NetworkUsers::new(
+        let (network, mut prefix) = NetworkUsers::new(
             thermostat.net.stack,
             thermostat.net.phy,
             clock,
@@ -147,6 +147,9 @@ mod app {
         ethernet_link::spawn().unwrap();
         settings_update::spawn(settings).unwrap();
         telemetry_task::spawn().unwrap();
+        mqtt_interlock::spawn_after(100.millis()).unwrap();
+
+        prefix.push_str("/interlock").unwrap(); // add interlock to topic
 
         let local = Local {
             adc_sm: thermostat.adc_sm,
@@ -276,6 +279,7 @@ mod app {
                 )
                 .ok()
         });
+        mqtt_interlock::spawn_after(100.millis()).unwrap();
     }
 
     #[task(priority = 2, shared=[dac], capacity = 4)]
