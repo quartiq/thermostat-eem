@@ -22,6 +22,7 @@ use minimq::embedded_nal::IpAddr;
 pub struct TelemetryClient<T: Serialize> {
     mqtt: minimq::Minimq<NetworkReference, SystemTimer, 1024, 1>,
     telemetry_topic: String<128>,
+    interlock_topic: String<128>,
     _telemetry: core::marker::PhantomData<T>,
 }
 
@@ -49,9 +50,13 @@ impl<T: Serialize> TelemetryClient<T> {
         let mut telemetry_topic: String<128> = String::from(prefix);
         telemetry_topic.push_str("/telemetry").unwrap();
 
+        let mut interlock_topic: String<128> = String::from(prefix);
+        interlock_topic.push_str("/interlock").unwrap();
+
         Self {
             mqtt,
             telemetry_topic,
+            interlock_topic,
             _telemetry: core::marker::PhantomData::default(),
         }
     }
@@ -62,7 +67,7 @@ impl<T: Serialize> TelemetryClient<T> {
     /// Telemetry is reported in a "best-effort" fashion. Failure to transmit telemetry will cause
     /// it to be silently dropped.
     ///
-    /// # Args
+    /// # Argu8
     /// * `telemetry` - The telemetry to report
     pub fn publish(&mut self, telemetry: &T) {
         let telemetry: Vec<u8, 1024> = serde_json_core::to_vec(telemetry).unwrap();
@@ -78,8 +83,19 @@ impl<T: Serialize> TelemetryClient<T> {
             .ok();
     }
 
-    pub fn inner_mut(&mut self) -> &mut minimq::Minimq<NetworkReference, SystemTimer, 1024, 1> {
-        &mut self.mqtt
+    /// A secondaey functionality tugged onto the telemetry client that publishes onto another
+    /// "/interlock" topic.
+    pub fn publish_interlock(&mut self) {
+        self.mqtt
+            .client
+            .publish(
+                &self.interlock_topic,
+                &[1u8], // simply publish a 1
+                minimq::QoS::AtMostOnce,
+                minimq::Retain::NotRetained,
+                &[],
+            )
+            .ok();
     }
 
     /// Update the telemetry client

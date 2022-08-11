@@ -266,19 +266,9 @@ mod app {
 
     #[task(priority = 1, shared=[network], local=[mqtt_interlock_prefix])]
     fn mqtt_interlock(mut c: mqtt_interlock::Context) {
-        c.shared.network.lock(|net| {
-            net.telemetry
-                .inner_mut()
-                .client
-                .publish(
-                    &c.local.mqtt_interlock_prefix,
-                    &[1],
-                    minimq::QoS::AtMostOnce,
-                    minimq::Retain::NotRetained,
-                    &[],
-                )
-                .ok()
-        });
+        c.shared
+            .network
+            .lock(|net| net.telemetry.publish_interlock());
         mqtt_interlock::spawn_after(100.millis()).unwrap();
     }
 

@@ -9,9 +9,9 @@ pub use heapless;
 pub use miniconf;
 pub use serde;
 
+pub mod interlock;
 pub mod network_processor;
 pub mod telemetry;
-pub mod interlock;
 
 use crate::hardware::{system_timer::SystemTimer, EthernetPhy, NetworkManager, NetworkStack};
 use minimq::embedded_nal::IpAddr;
@@ -96,11 +96,14 @@ where
             broker,
         );
 
-        (NetworkUsers {
-            miniconf: settings,
-            processor,
-            telemetry,
-        }, prefix)
+        (
+            NetworkUsers {
+                miniconf: settings,
+                processor,
+                telemetry,
+            },
+            prefix,
+        )
     }
 
     /// Update and process all of the network users state.
