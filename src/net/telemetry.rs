@@ -90,7 +90,7 @@ impl<T: Serialize> TelemetryClient<T> {
             .client
             .publish(
                 &self.interlock_topic,
-                &[1u8], // simply publish a 1
+                &"1".as_bytes(), // simply publish a 1
                 minimq::QoS::AtMostOnce,
                 minimq::Retain::NotRetained,
                 &[],
