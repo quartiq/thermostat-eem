@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
 
-from configure_out_ch import get_filters
+from configure_output_ch import get_filters
 import thermostat
 
 # pylint: disable=invalid-name, duplicate-code, redefined-builtin
@@ -49,7 +49,7 @@ def _main():
     if forward_gain == 0 and args.x_offset != 0:
         print("Filter has no DC gain but x_offset is non-zero")
 
-    f = np.logspace(-8, 0, 1024, endpoint=False)*(.5/args.sample_period)
+    f = np.logspace(-8, 0, 1024, endpoint=False) * (0.5 / args.sample_period)
     f, h = signal.freqz(
         coefficients[:3],
         np.r_[1, [-c for c in coefficients[3:]]],
