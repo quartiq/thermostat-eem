@@ -1,9 +1,6 @@
 #!/usr/bin/python3
 """
-Adapted from Stabilizer iir_coefficients.py.
-
-Description: Algorithms to generate biquad (second order IIR) coefficients for Thermostat-EEM.
-The tool configures one Thermostat-EEM output channel to the specified settings with
+Tool to configure one Thermostat-EEM output channel to the specified settings with
 the correct filter coefficients.
 """
 import argparse
@@ -15,6 +12,7 @@ from stabilizer.iir_coefficients import get_filters
 import thermostat
 
 logger = logging.getLogger(__name__)
+
 
 def _main():
     parser = argparse.ArgumentParser(
