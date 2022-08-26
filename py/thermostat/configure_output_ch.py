@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def _main():
     parser = argparse.ArgumentParser(
-        description="Configure Thermostat filter parameters."
+        description="Configure Thermostat output channel."
     )
     parser.add_argument(
         "-v", "--verbose", action="count", default=0, help="Increase logging verbosity"
