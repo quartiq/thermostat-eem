@@ -15,9 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def _main():
-    parser = argparse.ArgumentParser(
-        description="Configure Thermostat output channel."
-    )
+    parser = argparse.ArgumentParser(description="Configure Thermostat output channel.")
     parser.add_argument(
         "-v", "--verbose", action="count", default=0, help="Increase logging verbosity"
     )
@@ -63,40 +61,42 @@ def _main():
         "--x-offset",
         type=float,
         default=0,
-        help="The channel input offset (%(default)s V)",
+        help="The channel input offset (%(default)s K)",
     )
     parser.add_argument(
         "--y-min",
         type=float,
         default=-1,
-        help="The channel minimum output (%(default)s V)",
+        help="The channel minimum output (%(default)s A)",
     )
     parser.add_argument(
         "--y-max",
         type=float,
         default=1,
-        help="The channel maximum output (%(default)s V)",
+        help="The channel maximum output (%(default)s A)",
     )
     parser.add_argument(
         "--y-offset",
         type=float,
         default=0,
-        help="The channel output offset (%(default)s V)",
+        help="The channel output offset (%(default)s A)",
     )
     parser.add_argument(
         "--input-weights",
+        "-w",
         type=float,
+        nargs="+",
         default=[1, 0, 0, 0, 0, 0, 0, 0],
-        help="Input channel weights (%(default)s V)",
+        help="Input channel weights (%(default)s)",
     )
     parser.add_argument(
         "--shutdown",
         type=bool,
         default=False,
-        help="Channel TEC shutdown (%(default)s V)",
+        help="Channel TEC shutdown (%(default)s)",
     )
     parser.add_argument(
-        "--hold", type=bool, default=False, help="Channel IIR hold (%(default)s V)"
+        "--hold", type=bool, default=False, help="Channel IIR hold (%(default)s)"
     )
     parser.add_argument(
         "--voltage-limit",
@@ -153,20 +153,31 @@ def _main():
 
         # Set the filter coefficients.
         await interface.command(
-            f"output_channel/{args.channel}",
+            f"output_channel/{args.channel}/shutdown",
+            args.shutdown,
+        )
+        await interface.command(
+            f"output_channel/{args.channel}/hold",
+            args.hold,
+        )
+        await interface.command(
+            f"output_channel/{args.channel}/voltage_limit",
+            args.voltage_limit,
+        )
+        await interface.command(
+            f"output_channel/{args.channel}/iir",
             {
-                "shutdown": args.shutdown,
-                "hold": args.hold,
-                "voltage_limit": args.voltage_limit,
-                "iir": {
-                    "ba": coefficients,
-                    "y_offset": args.y_offset + forward_gain * args.x_offset,
-                    "y_min": args.y_min,
-                    "y_max": args.y_max,
-                },
-                "weights": args.input_weights,
+                "ba": coefficients,
+                "y_offset": args.y_offset + forward_gain * args.x_offset,
+                "y_min": args.y_min,
+                "y_max": args.y_max,
             },
         )
+        for i, w in enumerate(args.input_weights):
+            await interface.command(
+                f"output_channel/{args.channel}/weights/{i}",
+                w,
+            )
 
     asyncio.run(configure())
 
