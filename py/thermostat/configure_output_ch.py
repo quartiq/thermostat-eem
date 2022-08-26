@@ -173,10 +173,10 @@ def _main():
                 "y_max": args.y_max,
             },
         )
-        for i, w in enumerate(args.input_weights):
+        for i, weight in enumerate(args.input_weights):
             await interface.command(
                 f"output_channel/{args.channel}/weights/{i}",
-                w,
+                weight,
             )
 
     asyncio.run(configure())
