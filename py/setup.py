@@ -13,11 +13,6 @@ setup(
     author="QUARTIQ GmbH",
     license="MIT",
     install_requires=[
-        "numpy",
-        "scipy",
-        "matplotlib",
-        "gmqtt",
-        # pylint: disable=line-too-long
         "miniconf-mqtt@git+https://github.com/quartiq/miniconf@develop#subdirectory=py/miniconf-mqtt",
     ],
 )
