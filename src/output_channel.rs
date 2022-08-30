@@ -2,11 +2,10 @@
 //!
 
 use idsp::iir;
-use miniconf::MiniconfAtomic;
+use miniconf::Miniconf;
 use serde::{Deserialize, Serialize};
 
-// TODO make this not atomic and weights an atomic struct
-#[derive(Copy, Clone, Debug, Deserialize, Serialize, MiniconfAtomic)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, Miniconf)]
 pub struct OutputChannel {
     /// En-/Disables the TEC driver. This implies "hold".
     ///

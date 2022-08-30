@@ -92,6 +92,19 @@ pub enum Led {
     Led6 = 6,
     Led7 = 7,
 }
+
+// Channel enabled indicator LEDs. First set of four from top to bottom.
+impl From<OutputChannelIdx> for Led {
+    fn from(other: OutputChannelIdx) -> Led {
+        match other {
+            OutputChannelIdx::Zero => Led::Led3,
+            OutputChannelIdx::One => Led::Led2,
+            OutputChannelIdx::Two => Led::Led1,
+            OutputChannelIdx::Three => Led::Led0,
+        }
+    }
+}
+
 /// GPIO struct.
 ///
 /// pins - All Thermostat GPIO pins.

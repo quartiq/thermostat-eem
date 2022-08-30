@@ -50,15 +50,6 @@ pub struct Settings {
     /// # Value
     /// See [output_channel::OutputChannel]
     output_channel: [output_channel::OutputChannel; 4],
-
-    /// LED0 state.
-    ///
-    /// # Path
-    /// `led`
-    ///
-    /// # Value
-    /// "true" or "false".
-    led: bool,
 }
 
 impl Default for Settings {
@@ -68,7 +59,6 @@ impl Default for Settings {
             output_channel: [{
                 output_channel::OutputChannel::new(0., -0., 0., [0., 0., 0., 0., 0., 0., 0., 0.])
             }; 4],
-            led: false,
         }
     }
 }
@@ -203,10 +193,6 @@ mod app {
             *current_settings = settings;
         });
 
-        // led is proxy for real settings and telemetry later
-        c.shared
-            .gpio
-            .lock(|gpio| gpio.set_led(Led::Led0, settings.led.into()));
         let pwm = c.local.pwm;
         for ch in OutputChannelIdx::into_enum_iter() {
             let s = settings.output_channel[ch as usize];
@@ -221,9 +207,10 @@ mod app {
                 .unwrap();
             pwm.set_limit(Limit::NegativeCurrent(ch), current_limit_negative)
                 .unwrap();
-            c.shared
-                .gpio
-                .lock(|gpio| gpio.set_shutdown(ch, s.shutdown.into()));
+            c.shared.gpio.lock(|gpio| {
+                gpio.set_shutdown(ch, s.shutdown.into());
+                gpio.set_led(ch.into(), (!s.shutdown).into()) // fix leds to channel state
+            });
         }
     }
 
