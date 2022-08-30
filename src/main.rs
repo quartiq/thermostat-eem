@@ -18,7 +18,7 @@ use hardware::{
     adc::{sm::StateMachine, Adc, AdcCode, InputChannel},
     adc_internal::AdcInternal,
     dac::{Dac, DacCode},
-    gpio::{Gpio, Led, PoePower},
+    gpio::{Gpio, PoePower},
     hal,
     pwm::{Limit, Pwm},
     system_timer::SystemTimer,
