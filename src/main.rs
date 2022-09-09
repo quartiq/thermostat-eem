@@ -10,7 +10,8 @@ pub mod net;
 pub mod output_channel;
 pub mod statistics;
 
-use defmt_rtt as _; // global logger
+use defmt_rtt as _;
+// global logger
 use panic_probe as _; // global panic handler
 
 use enum_iterator::IntoEnumIterator;
@@ -24,9 +25,8 @@ use hardware::{
     system_timer::SystemTimer,
     OutputChannelIdx,
 };
-use heapless::String;
 use idsp::iir;
-use net::{miniconf::Miniconf, serde::Serialize, NetworkState, NetworkUsers};
+use net::{miniconf::Miniconf, serde::Serialize, NetworkState, NetworkUsers, interlock::InterlockTarget};
 use statistics::{Buffer, Statistics};
 use systick_monotonic::*;
 
@@ -50,6 +50,8 @@ pub struct Settings {
     /// # Value
     /// See [output_channel::OutputChannel]
     output_channel: [output_channel::OutputChannel; 4],
+
+    interlock_target: InterlockTarget,
 }
 
 impl Default for Settings {
@@ -59,6 +61,7 @@ impl Default for Settings {
             output_channel: [{
                 output_channel::OutputChannel::new(0., -0., 0., [0., 0., 0., 0., 0., 0., 0., 0.])
             }; 4],
+            interlock_target:
         }
     }
 }
@@ -106,7 +109,6 @@ mod app {
         pwm: Pwm,
         adc_internal: AdcInternal,
         iir_state: [iir::Vec5<f64>; 4],
-        mqtt_interlock_prefix: String<128>,
     }
 
     #[init]
@@ -120,7 +122,7 @@ mod app {
 
         let mono = Systick::new(systick, thermostat.clocks.sysclk().to_Hz());
 
-        let (network, mut prefix) = NetworkUsers::new(
+        let network = NetworkUsers::new(
             thermostat.net.stack,
             thermostat.net.phy,
             clock,
@@ -139,14 +141,11 @@ mod app {
         telemetry_task::spawn().unwrap();
         mqtt_interlock::spawn_after(100.millis()).unwrap();
 
-        prefix.push_str("/interlock").unwrap(); // add interlock to topic
-
         let local = Local {
             adc_sm: thermostat.adc_sm,
             pwm: thermostat.pwm,
             adc_internal: thermostat.adc_internal,
             iir_state: [[0.; 5]; 4],
-            mqtt_interlock_prefix: prefix,
         };
 
         let shared = Shared {
@@ -251,7 +250,7 @@ mod app {
         telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
     }
 
-    #[task(priority = 1, shared=[network], local=[mqtt_interlock_prefix])]
+    #[task(priority = 1, shared=[network])]
     fn mqtt_interlock(mut c: mqtt_interlock::Context) {
         c.shared
             .network

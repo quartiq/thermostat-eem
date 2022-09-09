@@ -71,7 +71,7 @@ where
         app: &str,
         mac: smoltcp_nal::smoltcp::wire::EthernetAddress,
         broker: IpAddr,
-    ) -> (Self, String<128>) {
+    ) -> Self {
         let stack_manager =
             cortex_m::singleton!(: NetworkManager = NetworkManager::new(stack)).unwrap();
 
@@ -96,14 +96,11 @@ where
             broker,
         );
 
-        (
-            NetworkUsers {
-                miniconf: settings,
-                processor,
-                telemetry,
-            },
-            prefix,
-        )
+        NetworkUsers {
+            miniconf: settings,
+            processor,
+            telemetry,
+        }
     }
 
     /// Update and process all of the network users state.

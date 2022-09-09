@@ -51,7 +51,7 @@ impl<T: Serialize> TelemetryClient<T> {
         telemetry_topic.push_str("/telemetry").unwrap();
 
         let mut interlock_topic: String<128> = String::from(prefix);
-        interlock_topic.push_str("/interlock").unwrap();
+        interlock_topic.push_str("/interlock/interlock").unwrap();
 
         Self {
             mqtt,
