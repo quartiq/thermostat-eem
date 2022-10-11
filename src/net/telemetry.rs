@@ -22,7 +22,6 @@ use minimq::embedded_nal::IpAddr;
 pub struct TelemetryClient<T: Serialize> {
     mqtt: minimq::Minimq<NetworkReference, SystemTimer, 1024, 1>,
     telemetry_topic: String<128>,
-    interlock_topic: String<128>,
     _telemetry: core::marker::PhantomData<T>,
 }
 
@@ -50,13 +49,9 @@ impl<T: Serialize> TelemetryClient<T> {
         let mut telemetry_topic: String<128> = String::from(prefix);
         telemetry_topic.push_str("/telemetry").unwrap();
 
-        let mut interlock_topic: String<128> = String::from(prefix);
-        interlock_topic.push_str("/interlock/interlock").unwrap();
-
         Self {
             mqtt,
             telemetry_topic,
-            interlock_topic,
             _telemetry: core::marker::PhantomData::default(),
         }
     }
@@ -85,12 +80,12 @@ impl<T: Serialize> TelemetryClient<T> {
 
     /// A secondaey functionality tugged onto the telemetry client that publishes onto another
     /// "/interlock" topic.
-    pub fn publish_interlock(&mut self) {
+    pub fn publish_interlock(&mut self, interlock_topic: &String<128>) {
         self.mqtt
             .client
             .publish(
-                &self.interlock_topic,
-                &"1".as_bytes(), // simply publish a 1
+                interlock_topic,
+                &serde_json_core::to_vec::<bool, 4>(&true).unwrap(),
                 minimq::QoS::AtMostOnce,
                 minimq::Retain::NotRetained,
                 &[],

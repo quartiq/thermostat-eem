@@ -1,13 +1,14 @@
-
 use heapless::String;
-use miniconf::{Miniconf, Error, MiniconfMetadata};
+use miniconf::{Error, Miniconf, MiniconfMetadata};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
-pub struct InterlockTarget {
-    target: String<64>
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Interlock {
+    pub armed: bool,
+    pub target: String<128>,
 }
 
-impl Miniconf for InterlockTarget {
+impl Miniconf for Interlock {
     fn string_set(
         &mut self,
         mut topic_parts: core::iter::Peekable<core::str::Split<char>>,
@@ -48,7 +49,7 @@ impl Miniconf for InterlockTarget {
         index: &mut [usize],
         _topic: &mut heapless::String<TS>,
     ) -> Option<()> {
-        if index.len() == 0 {
+        if index.is_empty() {
             // Note: During expected execution paths using `iter()`, the size of the
             // index stack is checked in advance to make sure this condition doesn't occur.
             // However, it's possible to happen if the user manually calls `recurse_paths`.
@@ -65,8 +66,4 @@ impl Miniconf for InterlockTarget {
             None
         }
     }
-}
-
-impl Copy for InterlockTarget {
-
 }
