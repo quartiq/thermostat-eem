@@ -17,6 +17,13 @@ pub struct Interlock {
     /// # Value
     /// Any string up to 128 characters.
     pub target: String<128>,
+
+    /// Interlock period in milliseconds.
+    /// The Interlock will publish its state with this period.
+    ///
+    /// # Value
+    /// u64
+    pub period_ms: u64,
 }
 
 impl Miniconf for Interlock {

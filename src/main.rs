@@ -71,6 +71,7 @@ impl Default for Settings {
             interlock: Interlock {
                 armed: false,
                 target: heapless::String::<128>::default(),
+                period_ms: 1000,
             },
         }
     }
@@ -149,7 +150,7 @@ mod app {
         ethernet_link::spawn().unwrap();
         settings_update::spawn(settings.clone()).unwrap();
         telemetry_task::spawn().unwrap();
-        mqtt_interlock::spawn_after(100.millis()).unwrap();
+        mqtt_interlock::spawn().unwrap();
 
         let local = Local {
             adc_sm: thermostat.adc_sm,
@@ -218,6 +219,8 @@ mod app {
             });
         }
 
+        mqtt_interlock::spawn_after(settings.interlock.period_ms.millis()).unwrap();
+
         // Verify settings and make them available
         c.shared.settings.lock(|current_settings| {
             *current_settings = settings;
@@ -272,7 +275,8 @@ mod app {
                 .network
                 .lock(|net| net.telemetry.publish_interlock(&interlock.target));
         }
-        mqtt_interlock::spawn_after(100.millis()).unwrap();
+        // Note that you have to wait for a full period of the previous setting first for a change of period to take affect.
+        mqtt_interlock::spawn_after(interlock.period_ms.millis()).unwrap();
     }
 
     #[task(priority = 2, shared=[dac], capacity = 4)]
