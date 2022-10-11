@@ -62,7 +62,7 @@ impl<T: Serialize> TelemetryClient<T> {
     /// Telemetry is reported in a "best-effort" fashion. Failure to transmit telemetry will cause
     /// it to be silently dropped.
     ///
-    /// # Argu8
+    /// # Args
     /// * `telemetry` - The telemetry to report
     pub fn publish(&mut self, telemetry: &T) {
         let telemetry: Vec<u8, 1024> = serde_json_core::to_vec(telemetry).unwrap();

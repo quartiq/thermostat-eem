@@ -51,6 +51,13 @@ pub struct Settings {
     /// See [output_channel::OutputChannel]
     output_channel: [output_channel::OutputChannel; 4],
 
+    /// Interlock settings.
+    ///
+    /// # Path
+    /// `interlock`
+    ///
+    /// # Value
+    /// See [Interlock]
     interlock: Interlock,
 }
 

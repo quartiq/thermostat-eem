@@ -4,7 +4,18 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Interlock {
+    /// Set the interlock to armed (true) or disarmed (false).
+    ///
+    /// # Value
+    /// True to arm, false to disarm.
     pub armed: bool,
+
+    /// Interlock target.
+    /// The Interlock will publish its state (true or false) onto this mqtt path.
+    /// Full path to the desired target. No wildcards.
+    ///
+    /// # Value
+    /// Any string up to 128 characters.
     pub target: String<128>,
 }
 
