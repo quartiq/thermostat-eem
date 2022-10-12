@@ -23,7 +23,7 @@ asm-delay = "0.9.0"
 smoltcp-nal = { version = "0.2", features = ["shared-stack"] }
 cortex-m-rtic = "1.0.0"
 embedded-time = "0.12.1"
-miniconf = "0.3"
+miniconf = "0.5"
 systick-monotonic = "1.0.0"
 heapless = { version = "0.7", features = ["serde"] }
 minimq = "0.5.2"
@@ -37,7 +37,7 @@ shared-bus-rtic = { version = "0.2", features = ["cortex-m"] }
 byteorder = { version = "1", default-features = false }
 smlang = "0.5.1"
 enum-iterator = "0.7.0"
-idsp = "0.7.1"
+idsp = "0.8.0"
 
 [profile.dev]
 opt-level = 3
