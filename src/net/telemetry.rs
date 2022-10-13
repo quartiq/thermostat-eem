@@ -78,7 +78,7 @@ impl<T: Serialize> TelemetryClient<T> {
             .ok();
     }
 
-    /// A secondaey functionality tugged onto the telemetry client that publishes onto another
+    /// A secondary functionality tugged onto the telemetry client that publishes onto another
     /// "/interlock" topic.
     pub fn publish_interlock(&mut self, interlock_topic: &String<128>) {
         self.mqtt
