@@ -219,8 +219,6 @@ mod app {
             });
         }
 
-        mqtt_interlock::spawn_after(settings.interlock.period_ms.millis()).unwrap();
-
         // Verify settings and make them available
         c.shared.settings.lock(|current_settings| {
             *current_settings = settings;
