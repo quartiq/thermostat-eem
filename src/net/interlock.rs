@@ -24,6 +24,22 @@ pub struct Interlock {
     /// # Value
     /// u64
     pub period_ms: u64,
+
+    /// Lower temperature limits for the interlock.
+    ///
+    /// The interlock will trip if any of the input channels go below its minimum temperature.
+    ///
+    /// # Value
+    /// [f32; 8]
+    pub temperature_limit_lower: [f32; 8],
+
+    /// Upper temperature limits for the interlock.
+    ///
+    /// The interlock will trip if any of the input channels go above its maximum temperature.
+    ///
+    /// # Value
+    /// [f32; 8]
+    pub temperature_limit_upper: [f32; 8],
 }
 
 impl Miniconf for Interlock {

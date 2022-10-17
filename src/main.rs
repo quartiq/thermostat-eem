@@ -72,6 +72,8 @@ impl Default for Settings {
                 armed: false,
                 target: heapless::String::<128>::default(),
                 period_ms: 1000,
+                temperature_limit_lower: [f32::MIN; 8],
+                temperature_limit_upper: [f32::MAX; 8],
             },
         }
     }
@@ -262,16 +264,28 @@ mod app {
         telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
     }
 
-    #[task(priority = 1, shared=[network, settings])]
+    #[task(priority = 1, shared=[network, settings, ch_temperature])]
     fn mqtt_interlock(mut c: mqtt_interlock::Context) {
         let interlock = c
             .shared
             .settings
             .lock(|settings| settings.interlock.clone());
         if interlock.armed {
+            let tempemperatures = c.shared.ch_temperature.lock(|temp| *temp);
+            let mut tripped = false;
+            for ((temp, lower), upper) in tempemperatures
+                .iter()
+                .map(|temp| *temp as f32)
+                .zip(interlock.temperature_limit_lower)
+                .zip(interlock.temperature_limit_upper)
+            {
+                if temp < lower || temp > upper {
+                    tripped = true
+                }
+            }
             c.shared
                 .network
-                .lock(|net| net.telemetry.publish_interlock(&interlock.target));
+                .lock(|net| net.telemetry.publish_interlock(&interlock.target, &tripped));
         }
         // Note that you have to wait for a full period of the previous setting first for a change of period to take affect.
         mqtt_interlock::spawn_after(interlock.period_ms.millis()).unwrap();
