@@ -273,14 +273,19 @@ mod app {
         if interlock.armed {
             let tempemperatures = c.shared.ch_temperature.lock(|temp| *temp);
             let mut tripped = false;
-            for ((temp, lower), upper) in tempemperatures
+            for (i, ((temp, lower), upper)) in tempemperatures
                 .iter()
                 .map(|temp| *temp as f32)
                 .zip(interlock.temperature_limit_lower)
                 .zip(interlock.temperature_limit_upper)
+                .enumerate()
             {
                 if temp < lower || temp > upper {
-                    tripped = true
+                    tripped = true;
+                    defmt::error!(
+                        "channel {:?} temperature out of range, interlock tripped!",
+                        i
+                    );
                 }
             }
             c.shared
