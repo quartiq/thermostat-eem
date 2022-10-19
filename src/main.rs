@@ -271,13 +271,13 @@ mod app {
             .lock(|settings| settings.interlock.clone());
         if interlock.armed {
             let temperatures = c.shared.ch_temperature.lock(|temp| *temp);
-            let tripped = temperatures
+            let interlocked = temperatures
                 .iter()
                 .zip(interlock.temperature_limits)
                 .enumerate()
-                .any(|(i, (&temp, limits))| {
-                    let t = !(limits[0]..limits[1]).contains(&(temp as f32));
-                    if t {
+                .all(|(i, (&temp, limits))| {
+                    let t = (limits[0]..limits[1]).contains(&(temp as f32));
+                    if !t {
                         defmt::error!(
                             "channel {:?} temperature out of range, interlock tripped!",
                             i
@@ -285,9 +285,10 @@ mod app {
                     }
                     t
                 });
-            c.shared
-                .network
-                .lock(|net| net.telemetry.publish_interlock(&interlock.target, &tripped));
+            c.shared.network.lock(|net| {
+                net.telemetry
+                    .publish_interlock(&interlock.target, &interlocked)
+            });
         }
         // Note that you have to wait for a full period of the previous setting first for a change of period to take affect.
         mqtt_interlock::spawn_after(interlock.period_ms.millis()).unwrap();
