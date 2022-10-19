@@ -46,3 +46,6 @@ opt-level = 3
 opt-level = 3
 lto = true
 codegen-units = 1
+
+[patch.crates-io]
+miniconf = { git = 'https://github.com/quartiq/miniconf', branch = 'nk/heapless-strings', commit = 'd450aec' }
