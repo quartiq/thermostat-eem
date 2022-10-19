@@ -72,6 +72,7 @@ impl Default for Settings {
                 armed: false,
                 target: heapless::String::<128>::default(),
                 period_ms: 1000,
+                temperature_limits: [[f32::MIN, f32::MAX]; 8],
             },
         }
     }
@@ -262,16 +263,32 @@ mod app {
         telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
     }
 
-    #[task(priority = 1, shared=[network, settings])]
+    #[task(priority = 1, shared=[network, settings, ch_temperature])]
     fn mqtt_interlock(mut c: mqtt_interlock::Context) {
         let interlock = c
             .shared
             .settings
             .lock(|settings| settings.interlock.clone());
         if interlock.armed {
-            c.shared
-                .network
-                .lock(|net| net.telemetry.publish_interlock(&interlock.target));
+            let temperatures = c.shared.ch_temperature.lock(|temp| *temp);
+            let interlocked = temperatures
+                .iter()
+                .zip(interlock.temperature_limits)
+                .enumerate()
+                .all(|(i, (&temp, limits))| {
+                    let t = (limits[0]..limits[1]).contains(&(temp as f32));
+                    if !t {
+                        defmt::error!(
+                            "channel {:?} temperature out of range, interlock tripped!",
+                            i
+                        );
+                    }
+                    t
+                });
+            c.shared.network.lock(|net| {
+                net.telemetry
+                    .publish_interlock(&interlock.target, &interlocked)
+            });
         }
         // Note that you have to wait for a full period of the previous setting first for a change of period to take affect.
         mqtt_interlock::spawn_after(interlock.period_ms.millis()).unwrap();

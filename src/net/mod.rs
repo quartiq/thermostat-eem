@@ -186,4 +186,13 @@ pub struct Interlock {
     /// # Value
     /// u64
     pub period_ms: u64,
+
+    /// Temperature limits for the interlock.
+    ///
+    /// Array of lower (0) and (1) limits for the valid temperature range of the interlock.
+    /// The interlock will trip if any of the input channels go below its minimum or above its maximum temperature.
+    ///
+    /// # Value
+    /// [[f32, f32]; 8]
+    pub temperature_limits: [[f32; 2]; 8],
 }
