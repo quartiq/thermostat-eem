@@ -72,8 +72,7 @@ impl Default for Settings {
                 armed: false,
                 target: heapless::String::<128>::default(),
                 period_ms: 1000,
-                temperature_limit_lower: [f32::MIN; 8],
-                temperature_limit_upper: [f32::MAX; 8],
+                temperature_limits: [[f32::MIN, f32::MAX]; 8],
             },
         }
     }
@@ -273,14 +272,13 @@ mod app {
         if interlock.armed {
             let tempemperatures = c.shared.ch_temperature.lock(|temp| *temp);
             let mut tripped = false;
-            for (i, ((temp, lower), upper)) in tempemperatures
+            for (i, (temp, limit)) in tempemperatures
                 .iter()
                 .map(|temp| *temp as f32)
-                .zip(interlock.temperature_limit_lower)
-                .zip(interlock.temperature_limit_upper)
+                .zip(interlock.temperature_limits)
                 .enumerate()
             {
-                if temp < lower || temp > upper {
+                if temp < limit[0] || temp > limit[1] {
                     tripped = true;
                     defmt::error!(
                         "channel {:?} temperature out of range, interlock tripped!",
