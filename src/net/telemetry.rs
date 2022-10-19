@@ -78,6 +78,21 @@ impl<T: Serialize> TelemetryClient<T> {
             .ok();
     }
 
+    /// A secondary functionality tugged onto the telemetry client that publishes onto another
+    /// "/interlock" topic.
+    pub fn publish_interlock(&mut self, interlock_topic: &String<128>) {
+        self.mqtt
+            .client
+            .publish(
+                interlock_topic,
+                &serde_json_core::to_vec::<bool, 4>(&true).unwrap(),
+                minimq::QoS::AtMostOnce,
+                minimq::Retain::NotRetained,
+                &[],
+            )
+            .ok();
+    }
+
     /// Update the telemetry client
     ///
     /// # Note

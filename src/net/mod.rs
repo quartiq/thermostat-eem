@@ -40,7 +40,7 @@ pub enum NetworkState {
     NoChange,
 }
 /// A structure of Stabilizer's default network users.
-pub struct NetworkUsers<S: Default + Miniconf, T: Serialize> {
+pub struct NetworkUsers<S: Default + Miniconf + Clone, T: Serialize> {
     pub miniconf: miniconf::MqttClient<S, NetworkReference, SystemTimer, 512>,
     pub processor: NetworkProcessor,
     pub telemetry: TelemetryClient<T>,
@@ -48,7 +48,7 @@ pub struct NetworkUsers<S: Default + Miniconf, T: Serialize> {
 
 impl<S, T> NetworkUsers<S, T>
 where
-    S: Default + Miniconf,
+    S: Default + Miniconf + Clone,
     T: Serialize,
 {
     /// Construct Stabilizer's default network users.
@@ -84,6 +84,7 @@ where
             &prefix,
             broker,
             clock,
+            S::default(),
         )
         .unwrap();
 
@@ -160,4 +161,29 @@ pub fn get_device_prefix(
     write!(&mut prefix, "dt/sinara/{}/{}", app, mac).unwrap();
 
     prefix
+}
+
+/// Miniconf settings for the MQTT interlock.
+#[derive(Clone, Debug, Miniconf)]
+pub struct Interlock {
+    /// Set the interlock to armed (true) or disarmed (false).
+    ///
+    /// # Value
+    /// True to arm, false to disarm.
+    pub armed: bool,
+
+    /// Interlock target.
+    /// The Interlock will publish its state (true or false) onto this mqtt path.
+    /// Full path to the desired target. No wildcards.
+    ///
+    /// # Value
+    /// Any string up to 128 characters.
+    pub target: String<128>,
+
+    /// Interlock period in milliseconds.
+    /// The Interlock will publish its state with this period.
+    ///
+    /// # Value
+    /// u64
+    pub period_ms: u64,
 }
