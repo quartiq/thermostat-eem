@@ -270,22 +270,21 @@ mod app {
             .settings
             .lock(|settings| settings.interlock.clone());
         if interlock.armed {
-            let tempemperatures = c.shared.ch_temperature.lock(|temp| *temp);
-            let mut tripped = false;
-            for (i, (temp, limit)) in tempemperatures
+            let temperatures = c.shared.ch_temperature.lock(|temp| *temp);
+            let tripped = temperatures
                 .iter()
-                .map(|temp| *temp as f32)
                 .zip(interlock.temperature_limits)
                 .enumerate()
-            {
-                if temp < limit[0] || temp > limit[1] {
-                    tripped = true;
-                    defmt::error!(
-                        "channel {:?} temperature out of range, interlock tripped!",
-                        i
-                    );
-                }
-            }
+                .any(|(i, (&temp, limits))| {
+                    let t = !(limits[0]..limits[1]).contains(&(temp as f32));
+                    if t {
+                        defmt::error!(
+                            "channel {:?} temperature out of range, interlock tripped!",
+                            i
+                        );
+                    }
+                    t
+                });
             c.shared
                 .network
                 .lock(|net| net.telemetry.publish_interlock(&interlock.target, &tripped));
