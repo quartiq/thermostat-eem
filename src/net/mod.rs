@@ -9,7 +9,6 @@ pub use heapless;
 pub use miniconf;
 pub use serde;
 
-pub mod interlock;
 pub mod network_processor;
 pub mod telemetry;
 
@@ -162,4 +161,45 @@ pub fn get_device_prefix(
     write!(&mut prefix, "dt/sinara/{}/{}", app, mac).unwrap();
 
     prefix
+}
+
+/// Miniconf settings for the MQTT interlock.
+#[derive(Clone, Debug, Miniconf)]
+pub struct Interlock {
+    /// Set the interlock to armed (true) or disarmed (false).
+    ///
+    /// # Value
+    /// True to arm, false to disarm.
+    pub armed: bool,
+
+    /// Interlock target.
+    /// The Interlock will publish its state (true or false) onto this mqtt path.
+    /// Full path to the desired target. No wildcards.
+    ///
+    /// # Value
+    /// Any string up to 128 characters.
+    pub target: String<128>,
+
+    /// Interlock period in milliseconds.
+    /// The Interlock will publish its state with this period.
+    ///
+    /// # Value
+    /// u64
+    pub period_ms: u64,
+
+    /// Lower temperature limits for the interlock.
+    ///
+    /// The interlock will trip if any of the input channels go below its minimum temperature.
+    ///
+    /// # Value
+    /// [f32; 8]
+    pub temperature_limit_lower: [f32; 8],
+
+    /// Upper temperature limits for the interlock.
+    ///
+    /// The interlock will trip if any of the input channels go above its maximum temperature.
+    ///
+    /// # Value
+    /// [f32; 8]
+    pub temperature_limit_upper: [f32; 8],
 }

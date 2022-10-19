@@ -26,7 +26,7 @@ use hardware::{
     OutputChannelIdx,
 };
 use idsp::iir;
-use net::{interlock::Interlock, miniconf::Miniconf, serde::Serialize, NetworkState, NetworkUsers};
+use net::{miniconf::Miniconf, serde::Serialize, Interlock, NetworkState, NetworkUsers};
 use statistics::{Buffer, Statistics};
 use systick_monotonic::*;
 
