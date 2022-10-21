@@ -48,4 +48,4 @@ lto = true
 codegen-units = 1
 
 [patch.crates-io]
-miniconf = { git = 'https://github.com/quartiq/miniconf', branch = 'nk/heapless-strings', commit = 'd450aec' }
+miniconf = { git = 'https://github.com/quartiq/miniconf', rev='3a07a7f'}

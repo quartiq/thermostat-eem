@@ -89,6 +89,7 @@ pub struct Monitor {
     output_voltage: [f32; 4],
     poe: PoePower,
     overtemp: bool,
+    interlock: [bool; 8], // interlock status for each input channel
 }
 
 #[derive(Serialize, Copy, Clone, Default, Debug)]
@@ -263,7 +264,7 @@ mod app {
         telemetry_task::spawn_after(((telemetry_period * 1000.0) as u64).millis()).unwrap();
     }
 
-    #[task(priority = 1, shared=[network, settings, ch_temperature])]
+    #[task(priority = 1, shared=[network, settings, ch_temperature, telemetry])]
     fn mqtt_interlock(mut c: mqtt_interlock::Context) {
         let interlock = c
             .shared
@@ -277,6 +278,9 @@ mod app {
                 .enumerate()
                 .all(|(i, (&temp, limits))| {
                     let t = (limits[0]..limits[1]).contains(&(temp as f32));
+                    c.shared
+                        .telemetry
+                        .lock(|tele| tele.monitor.interlock[i] = t);
                     if !t {
                         defmt::error!(
                             "channel {:?} temperature out of range, interlock tripped!",

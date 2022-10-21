@@ -242,7 +242,7 @@ dependencies = [
 [[package]]
 name = "derive_miniconf"
 version = "0.5.0"
-source = "git+https://github.com/quartiq/miniconf?branch=nk/heapless-strings#d450aec26234226723ead12bf177a112b44b9526"
+source = "git+https://github.com/quartiq/miniconf?rev=3a07a7f#3a07a7ffbaa238c34613a1171790a60d5f5b696c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -471,7 +471,7 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 [[package]]
 name = "miniconf"
 version = "0.5.0"
-source = "git+https://github.com/quartiq/miniconf?branch=nk/heapless-strings#d450aec26234226723ead12bf177a112b44b9526"
+source = "git+https://github.com/quartiq/miniconf?rev=3a07a7f#3a07a7ffbaa238c34613a1171790a60d5f5b696c"
 dependencies = [
  "derive_miniconf",
  "heapless",
