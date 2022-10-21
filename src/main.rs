@@ -89,6 +89,7 @@ pub struct Monitor {
     output_voltage: [f32; 4],
     poe: PoePower,
     overtemp: bool,
+    interlock: [bool; 8], // interlock status for each input channel
 }
 
 #[derive(Serialize, Copy, Clone, Default, Debug)]
@@ -96,7 +97,6 @@ pub struct Telemetry {
     monitor: Monitor,
     statistics: [Statistics; 8],
     output_current: [f32; 4],
-    interlock: [bool; 8], // interlock status for each input channel
 }
 
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
@@ -278,7 +278,7 @@ mod app {
                 .enumerate()
                 .all(|(i, (&temp, limits))| {
                     let t = (limits[0]..limits[1]).contains(&(temp as f32));
-                    c.shared.telemetry.lock(|tele| tele.interlock[i] = t);
+                    c.shared.telemetry.lock(|tele| tele.monitor.interlock[i] = t);
                     if !t {
                         defmt::error!(
                             "channel {:?} temperature out of range, interlock tripped!",
