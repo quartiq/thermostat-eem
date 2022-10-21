@@ -278,7 +278,9 @@ mod app {
                 .enumerate()
                 .all(|(i, (&temp, limits))| {
                     let t = (limits[0]..limits[1]).contains(&(temp as f32));
-                    c.shared.telemetry.lock(|tele| tele.monitor.interlock[i] = t);
+                    c.shared
+                        .telemetry
+                        .lock(|tele| tele.monitor.interlock[i] = t);
                     if !t {
                         defmt::error!(
                             "channel {:?} temperature out of range, interlock tripped!",
