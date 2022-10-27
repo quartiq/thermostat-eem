@@ -164,9 +164,18 @@ pub fn get_device_prefix(
 }
 
 /// Miniconf settings for the MQTT alarm.
+/// The alarm simply publishes "false" onto its [target] as long as all the channels are
+/// within their [temperature_limits] (aka logical OR of all channels).
+/// Otherwise it publishes "true" (aka true, there is an alarm).
+///
+/// The publishing interval is given by [period_ms].
+///
+/// The alarm is non-latching. If alarm was "true" for a while and the temperatures come within
+/// limits again, alarm will be "false" again.
 #[derive(Clone, Debug, Miniconf)]
 pub struct Alarm {
     /// Set the alarm to armed (true) or disarmed (false).
+    /// If the alarm is armed, the device will publish it's alarm state onto the [target].
     ///
     /// # Value
     /// True to arm, false to disarm.
@@ -191,6 +200,7 @@ pub struct Alarm {
     ///
     /// Array of lower (0) and (1) limits for the valid temperature range of the alarm.
     /// The alarm will be enabled if any of the input channels goes below its minimum or above its maximum temperature.
+    /// The alarm is non latching and clears itself once all channels are in their respective limits.
     ///
     /// # Value
     /// [[f32, f32]; 8]
