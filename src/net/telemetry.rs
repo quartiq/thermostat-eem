@@ -85,7 +85,7 @@ impl<T: Serialize> TelemetryClient<T> {
             .client
             .publish(
                 alarm_topic,
-                &serde_json_core::to_vec::<bool, 5>(&alarm).unwrap(),
+                &serde_json_core::to_vec::<bool, 5>(alarm).unwrap(),
                 minimq::QoS::AtMostOnce,
                 minimq::Retain::NotRetained,
                 &[],
