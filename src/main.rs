@@ -274,9 +274,9 @@ mod app {
                 .zip(alarm.temperature_limits)
                 .enumerate()
                 .all(|(i, (&temp, limits))| {
-                    let t = (limits[0]..limits[1]).contains(&(temp as f32));
+                    let t = !(limits[0]..limits[1]).contains(&(temp as f32));
                     c.shared.telemetry.lock(|tele| tele.monitor.alarm[i] = t);
-                    if !t {
+                    if t {
                         defmt::error!("channel {:?} temperature out of range, Alarm tripped!", i);
                     }
                     t
