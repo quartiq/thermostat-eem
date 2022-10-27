@@ -26,7 +26,7 @@ use hardware::{
     OutputChannelIdx,
 };
 use idsp::iir;
-use net::{miniconf::Miniconf, serde::Serialize, Interlock, NetworkState, NetworkUsers};
+use net::{miniconf::Miniconf, serde::Serialize, Alarm, NetworkState, NetworkUsers};
 use statistics::{Buffer, Statistics};
 use systick_monotonic::*;
 
@@ -51,14 +51,14 @@ pub struct Settings {
     /// See [output_channel::OutputChannel]
     output_channel: [output_channel::OutputChannel; 4],
 
-    /// Interlock settings.
+    /// Alarm settings.
     ///
     /// # Path
-    /// `interlock`
+    /// `Alarm`
     ///
     /// # Value
-    /// See [Interlock]
-    interlock: Interlock,
+    /// See [Alarm]
+    alarm: Alarm,
 }
 
 impl Default for Settings {
@@ -68,7 +68,7 @@ impl Default for Settings {
             output_channel: [{
                 output_channel::OutputChannel::new(0., -0., 0., [0., 0., 0., 0., 0., 0., 0., 0.])
             }; 4],
-            interlock: Interlock {
+            alarm: Alarm {
                 armed: false,
                 target: heapless::String::<128>::default(),
                 period_ms: 1000,
@@ -89,7 +89,7 @@ pub struct Monitor {
     output_voltage: [f32; 4],
     poe: PoePower,
     overtemp: bool,
-    interlock: [bool; 8], // interlock status for each input channel
+    alarm: [bool; 8], // Alarm status for each input channel
 }
 
 #[derive(Serialize, Copy, Clone, Default, Debug)]
@@ -152,7 +152,7 @@ mod app {
         ethernet_link::spawn().unwrap();
         settings_update::spawn(settings.clone()).unwrap();
         telemetry_task::spawn().unwrap();
-        mqtt_interlock::spawn().unwrap();
+        mqtt_alarm::spawn().unwrap();
 
         let local = Local {
             adc_sm: thermostat.adc_sm,
@@ -265,37 +265,28 @@ mod app {
     }
 
     #[task(priority = 1, shared=[network, settings, ch_temperature, telemetry])]
-    fn mqtt_interlock(mut c: mqtt_interlock::Context) {
-        let interlock = c
-            .shared
-            .settings
-            .lock(|settings| settings.interlock.clone());
-        if interlock.armed {
+    fn mqtt_alarm(mut c: mqtt_alarm::Context) {
+        let alarm = c.shared.settings.lock(|settings| settings.alarm.clone());
+        if alarm.armed {
             let temperatures = c.shared.ch_temperature.lock(|temp| *temp);
-            let interlocked = temperatures
+            let alarm_state = temperatures
                 .iter()
-                .zip(interlock.temperature_limits)
+                .zip(alarm.temperature_limits)
                 .enumerate()
                 .all(|(i, (&temp, limits))| {
-                    let t = (limits[0]..limits[1]).contains(&(temp as f32));
-                    c.shared
-                        .telemetry
-                        .lock(|tele| tele.monitor.interlock[i] = t);
-                    if !t {
-                        defmt::error!(
-                            "channel {:?} temperature out of range, interlock tripped!",
-                            i
-                        );
+                    let t = !(limits[0]..limits[1]).contains(&(temp as f32));
+                    c.shared.telemetry.lock(|tele| tele.monitor.alarm[i] = t);
+                    if t {
+                        defmt::error!("channel {:?} temperature out of range, Alarm tripped!", i);
                     }
                     t
                 });
-            c.shared.network.lock(|net| {
-                net.telemetry
-                    .publish_interlock(&interlock.target, &interlocked)
-            });
+            c.shared
+                .network
+                .lock(|net| net.telemetry.publish_alarm(&alarm.target, &alarm_state));
         }
         // Note that you have to wait for a full period of the previous setting first for a change of period to take affect.
-        mqtt_interlock::spawn_after(interlock.period_ms.millis()).unwrap();
+        mqtt_alarm::spawn_after(alarm.period_ms.millis()).unwrap();
     }
 
     #[task(priority = 2, shared=[dac], capacity = 4)]

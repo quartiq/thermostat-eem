@@ -163,34 +163,44 @@ pub fn get_device_prefix(
     prefix
 }
 
-/// Miniconf settings for the MQTT interlock.
+/// Miniconf settings for the MQTT alarm.
+/// The alarm simply publishes "false" onto its [target] as long as all the channels are
+/// within their [temperature_limits] (aka logical OR of all channels).
+/// Otherwise it publishes "true" (aka true, there is an alarm).
+///
+/// The publishing interval is given by [period_ms].
+///
+/// The alarm is non-latching. If alarm was "true" for a while and the temperatures come within
+/// limits again, alarm will be "false" again.
 #[derive(Clone, Debug, Miniconf)]
-pub struct Interlock {
-    /// Set the interlock to armed (true) or disarmed (false).
+pub struct Alarm {
+    /// Set the alarm to armed (true) or disarmed (false).
+    /// If the alarm is armed, the device will publish it's alarm state onto the [target].
     ///
     /// # Value
     /// True to arm, false to disarm.
     pub armed: bool,
 
-    /// Interlock target.
-    /// The Interlock will publish its state (true or false) onto this mqtt path.
+    /// Alarm target.
+    /// The alarm will publish its state (true or false) onto this mqtt path.
     /// Full path to the desired target. No wildcards.
     ///
     /// # Value
     /// Any string up to 128 characters.
     pub target: String<128>,
 
-    /// Interlock period in milliseconds.
-    /// The Interlock will publish its state with this period.
+    /// Alarm period in milliseconds.
+    /// The alarm will publish its state with this period.
     ///
     /// # Value
     /// u64
     pub period_ms: u64,
 
-    /// Temperature limits for the interlock.
+    /// Temperature limits for the alarm.
     ///
-    /// Array of lower (0) and (1) limits for the valid temperature range of the interlock.
-    /// The interlock will trip if any of the input channels go below its minimum or above its maximum temperature.
+    /// Array of lower (0) and (1) limits for the valid temperature range of the alarm.
+    /// The alarm will be enabled if any of the input channels goes below its minimum or above its maximum temperature.
+    /// The alarm is non latching and clears itself once all channels are in their respective limits.
     ///
     /// # Value
     /// [[f32, f32]; 8]
