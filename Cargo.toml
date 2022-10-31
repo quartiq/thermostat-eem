@@ -27,7 +27,7 @@ miniconf = "0.5"
 systick-monotonic = "1.0.0"
 heapless = { version = "0.7", features = ["serde"] }
 minimq = "0.5.2"
-serde = { version = "1.0.136", features = ["derive"], default-features = false }
+serde = { version = "1.0.147", features = ["derive"], default-features = false }
 serde-json-core = "0.4"
 num_enum = { version = "0.5.6", default-features = false }
 defmt = "0.3.0"
