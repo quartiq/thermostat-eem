@@ -62,8 +62,8 @@ pub struct PwmPins {
     ),
 }
 
-type Pt0<T, S> = super::hal::pwm::Pwm<T, S, ComplementaryDisabled, ActiveHigh, ActiveHigh>;
-type Pt1<T, S> = super::hal::pwm::Pwm<T, S, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
+type Pt0<T, const S: u8> = super::hal::pwm::Pwm<T, S, ComplementaryDisabled>;
+type Pt1<T, const S: u8> = super::hal::pwm::Pwm<T, S, ComplementaryImpossible>;
 
 /// PWM driver struct containing the PWM output pins.
 #[allow(clippy::type_complexity)]
