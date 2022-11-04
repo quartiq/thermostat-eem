@@ -27,13 +27,13 @@ pub type NetworkReference = smoltcp_nal::shared::NetworkStackProxy<'static, Netw
 /// The default MQTT broker IP address if unspecified.
 pub const DEFAULT_MQTT_BROKER: [u8; 4] = [10, 34, 16, 10];
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum UpdateState {
     NoChange,
     Updated,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum NetworkState {
     SettingsChanged,
     Updated,
