@@ -3,7 +3,7 @@ use super::hal::{
     hal::PwmPin,
     prelude::*,
     pwm::Pwm,
-    pwm::{ActiveHigh, ComplementaryDisabled, C2},
+    pwm::{ComplementaryDisabled, C2},
     // rcc::ResetEnable,
     rcc::{rec, CoreClocks},
     stm32::{TIM2, TIM8},
@@ -20,7 +20,7 @@ pub enum Error {
 }
 
 pub struct Fan {
-    pwm: Pwm<TIM8, C2, ComplementaryDisabled, ActiveHigh, ActiveHigh>,
+    pwm: Pwm<TIM8, C2, ComplementaryDisabled>,
     // tacho:
 }
 
