@@ -853,11 +853,11 @@ dependencies = [
 
 [[package]]
 name = "smlang"
-version = "0.5.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a8a20583c0a718b7ab6ea17871a1bb0c55911df67277d255418e9e82167f44e"
+checksum = "b62b263177e999fea25b50588d4413d1686f070d6fe986c3b2e5a7a4d2c532e9"
 dependencies = [
- "smlang-macros 0.5.1",
+ "smlang-macros 0.6.0",
 ]
 
 [[package]]
@@ -873,9 +873,9 @@ dependencies = [
 
 [[package]]
 name = "smlang-macros"
-version = "0.5.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a20fec38ee915442c56be307cc054a490131b335212054b7cdc3bf0f73da4d8f"
+checksum = "c682cc05cd4c0dce61656d654b1aef023e7d4b27b58834af94b31391df081469"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1000,7 +1000,7 @@ dependencies = [
  "serde",
  "serde-json-core",
  "shared-bus-rtic",
- "smlang 0.5.1",
+ "smlang 0.6.0",
  "smoltcp-nal",
  "stm32h7xx-hal",
  "systick-monotonic",
