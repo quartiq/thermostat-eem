@@ -131,7 +131,7 @@ pub fn setup(
         .sysclk(400.MHz())
         .hclk(200.MHz())
         .per_ck(100.MHz())
-        .pll2_p_ck(100.MHz())
+        .pll2_p_ck(80.MHz())
         .pll2_q_ck(100.MHz())
         .mco1_from_hse(2.MHz())
         .freeze(vos, &device.SYSCFG);

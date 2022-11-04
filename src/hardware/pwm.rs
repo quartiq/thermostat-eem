@@ -9,7 +9,7 @@ use super::{
         gpio::{gpiob::*, gpioc::*, gpiod::*, gpioe::*, Alternate},
         hal::PwmPin,
         prelude::*,
-        pwm::{ActiveHigh, ComplementaryDisabled, ComplementaryImpossible, C1, C2, C3, C4},
+        pwm::{ComplementaryDisabled, ComplementaryImpossible, C1, C2, C3, C4},
         rcc::{rec, CoreClocks},
         stm32::{TIM1, TIM3, TIM4},
         time::KiloHertz,
@@ -62,8 +62,8 @@ pub struct PwmPins {
     ),
 }
 
-type Pt0<T, S> = super::hal::pwm::Pwm<T, S, ComplementaryDisabled, ActiveHigh, ActiveHigh>;
-type Pt1<T, S> = super::hal::pwm::Pwm<T, S, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
+type Pt0<T, const S: u8> = super::hal::pwm::Pwm<T, S, ComplementaryDisabled>;
+type Pt1<T, const S: u8> = super::hal::pwm::Pwm<T, S, ComplementaryImpossible>;
 
 /// PWM driver struct containing the PWM output pins.
 #[allow(clippy::type_complexity)]
