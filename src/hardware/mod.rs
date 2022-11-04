@@ -2,7 +2,7 @@
 //!
 //! Hardware specific setup etc.
 
-use enum_iterator::IntoEnumIterator;
+use enum_iterator::Sequence;
 use num_enum::TryFromPrimitive;
 pub use stm32h7xx_hal as hal;
 
@@ -41,7 +41,7 @@ pub type NetworkManager = smoltcp_nal::shared::NetworkManager<
 
 pub type EthernetPhy = hal::ethernet::phy::LAN8742A<hal::ethernet::EthernetMAC>;
 
-#[derive(Clone, Copy, TryFromPrimitive, IntoEnumIterator, defmt::Format, Debug)]
+#[derive(Clone, Copy, TryFromPrimitive, Sequence, defmt::Format, Debug)]
 #[repr(usize)]
 pub enum OutputChannelIdx {
     Zero = 0,

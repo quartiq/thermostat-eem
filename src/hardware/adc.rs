@@ -1,7 +1,7 @@
 // Thermostat ADC struct.
 
 use defmt::Format;
-use enum_iterator::IntoEnumIterator;
+use enum_iterator::{all, Sequence};
 use num_enum::{TryFromPrimitive, TryFromPrimitiveError};
 use smlang::statemachine;
 
@@ -85,7 +85,7 @@ impl From<AdcCode> for f64 {
     }
 }
 
-#[derive(Clone, Copy, TryFromPrimitive, Debug, Format, PartialEq, IntoEnumIterator)]
+#[derive(Clone, Copy, TryFromPrimitive, Debug, Format, PartialEq, Sequence)]
 #[repr(usize)]
 pub enum InputChannel {
     Zero = 0,
@@ -108,7 +108,7 @@ impl TryFrom<(AdcPhy, AdcChannel)> for InputChannel {
     }
 }
 
-#[derive(Clone, Copy, TryFromPrimitive, Debug, Format, IntoEnumIterator)]
+#[derive(Clone, Copy, TryFromPrimitive, Debug, Format, Sequence)]
 #[repr(usize)]
 pub enum AdcPhy {
     Zero = 0,
@@ -207,7 +207,7 @@ impl Adc {
         // set sync low first for synchronization at rising edge
         self.sync.set_low();
 
-        for phy in AdcPhy::into_enum_iter() {
+        for phy in all::<AdcPhy>() {
             self.selected(phy, |adc| adc.setup_adc(delay))?;
         }
 
