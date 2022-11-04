@@ -14,7 +14,7 @@ use defmt_rtt as _;
 // global logger
 use panic_probe as _; // global panic handler
 
-use enum_iterator::IntoEnumIterator;
+use enum_iterator::all;
 use hardware::{
     adc::{sm::StateMachine, Adc, AdcCode, InputChannel},
     adc_internal::AdcInternal,
@@ -202,7 +202,7 @@ mod app {
         });
 
         let pwm = c.local.pwm;
-        for ch in OutputChannelIdx::into_enum_iter() {
+        for ch in all::<OutputChannelIdx>() {
             let s = settings.output_channel[ch as usize];
             // set current limits to 5% higher/lower than iir y_max/y_min and clamp output to valid range.
             let current_limit_positive =
@@ -236,7 +236,7 @@ mod app {
         telemetry.monitor.p5v_voltage = adc_int.read_p5v_voltage();
         telemetry.monitor.p12v_voltage = adc_int.read_p12v_voltage();
         telemetry.monitor.p12v_current = adc_int.read_p12v_current();
-        for ch in OutputChannelIdx::into_enum_iter() {
+        for ch in all::<OutputChannelIdx>() {
             let idx = ch as usize;
             telemetry.monitor.output_vref[idx] = adc_int.read_output_vref(ch);
             telemetry.monitor.output_voltage[idx] = adc_int.read_output_voltage(ch);
@@ -247,7 +247,7 @@ mod app {
             telemetry.monitor.poe = gpio.poe();
         });
         // finalize temperature telemetry
-        for ch in InputChannel::into_enum_iter() {
+        for ch in all::<InputChannel>() {
             telemetry.statistics[ch as usize] = c.shared.ch_statistics_buff.lock(|buff| {
                 let stat = buff[ch as usize].into();
                 buff[ch as usize] = Buffer::default();
