@@ -155,7 +155,7 @@ pub fn setup(
         log::set_logger(&LOGGER)
             .map(|()| log::set_max_level(log::LevelFilter::Trace))
             .unwrap();
-        log::info!("Starting");
+        log::info!("Start logging");
     }
     let pwr = device.PWR.constrain();
     let vos = pwr.freeze();
