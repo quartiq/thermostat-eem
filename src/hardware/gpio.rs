@@ -5,7 +5,6 @@ use super::hal::{
     hal::digital::v2::PinState,
 };
 use crate::net::serde::Serialize;
-use defmt::Format;
 
 use super::OutputChannelIdx;
 
@@ -46,7 +45,7 @@ impl From<State> for PinState {
     }
 }
 
-#[derive(Copy, Clone, Debug, Serialize, Format)]
+#[derive(Copy, Clone, Debug, Serialize)]
 pub enum PoePower {
     /// No Power over Ethernet detected
     Absent,

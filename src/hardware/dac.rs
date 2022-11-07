@@ -19,7 +19,6 @@ use super::hal::{
 };
 
 use super::OutputChannelIdx;
-use defmt::Format;
 
 // Note: Up to 30MHz clock valid according to DAC datasheet. This lead to spurious RxFIFO overruns on the STM side when probing the spi clock with a scope probe.
 const SPI_CLOCK: MegaHertz = MegaHertz::MHz(8);
@@ -35,7 +34,7 @@ pub enum Error {
 }
 
 /// A type representing a DAC sample.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Debug)]
 pub struct DacCode(u32);
 impl DacCode {
     // DAC constants
