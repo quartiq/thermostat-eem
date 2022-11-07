@@ -1,8 +1,10 @@
 //! # Thermostat_EEM IIR wrapper.
 //!
 
+use crate::hardware::pwm::Pwm;
 use idsp::iir;
 use miniconf::Miniconf;
+use num_traits::Signed;
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, Miniconf)]
@@ -76,5 +78,23 @@ impl OutputChannel {
         } else {
             self.iir.update(iir_state, weighted_temperature, hold) as f32
         }
+    }
+
+    /// Performs finalization of the output_channel miniconf settings:
+    /// - Clamping of the limits
+    /// - Normalization of the weights
+    pub fn finalize_settings(&mut self) {
+        self.iir.y_max = (self.iir.y_max + 0.05 * 3.0).clamp(0.0, Pwm::MAX_CURRENT_LIMIT as f64);
+        self.iir.y_min = (self.iir.y_min - 0.05 * 3.0).clamp(-Pwm::MAX_CURRENT_LIMIT as f64, 0.0);
+        self.voltage_limit = self.voltage_limit.clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
+        let divisor: f32 = self.weights.iter().map(|w| w.abs()).sum();
+        if divisor != 0.0 {
+            for w in &mut self.weights {
+                *w = *w / divisor;
+            }
+        }
+        log::info!("self.weights: {:?}", self.weights);
+        log::info!("self.voltage_limit: {:?}", self.voltage_limit);
+        log::info!("self.y_max: {:?}", self.iir.y_max);
     }
 }
