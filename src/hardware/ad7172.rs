@@ -1,7 +1,6 @@
 // (AD7172 https://www.analog.com/media/en/technical-documentation/data-sheets/AD7172-2.pdf)
 
 use core::fmt::Debug;
-use defmt::Format;
 use num_enum::TryFromPrimitive;
 
 use super::hal::hal::blocking::spi::{Transfer, Write};
@@ -52,7 +51,7 @@ pub mod Comms {
     }
 }
 
-#[derive(Clone, Copy, TryFromPrimitive, Debug, Format)]
+#[derive(Clone, Copy, TryFromPrimitive, Debug)]
 #[repr(usize)]
 pub enum AdcChannel {
     Zero = 0,

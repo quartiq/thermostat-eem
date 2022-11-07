@@ -10,8 +10,6 @@ pub mod net;
 pub mod output_channel;
 pub mod statistics;
 
-use defmt_rtt as _;
-// global logger
 use panic_probe as _; // global panic handler
 
 use enum_iterator::all;
@@ -277,7 +275,7 @@ mod app {
                     let t = !(limits[0]..limits[1]).contains(&(temp as f32));
                     c.shared.telemetry.lock(|tele| tele.monitor.alarm[i] = t);
                     if t {
-                        defmt::error!("channel {:?} temperature out of range, Alarm tripped!", i);
+                        log::error!("channel {:?} temperature out of range, Alarm tripped!", i);
                     }
                     t
                 });

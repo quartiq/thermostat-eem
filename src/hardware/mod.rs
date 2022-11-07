@@ -41,7 +41,7 @@ pub type NetworkManager = smoltcp_nal::shared::NetworkManager<
 
 pub type EthernetPhy = hal::ethernet::phy::LAN8742A<hal::ethernet::EthernetMAC>;
 
-#[derive(Clone, Copy, TryFromPrimitive, Sequence, defmt::Format, Debug)]
+#[derive(Clone, Copy, TryFromPrimitive, Sequence, Debug)]
 #[repr(usize)]
 pub enum OutputChannelIdx {
     Zero = 0,

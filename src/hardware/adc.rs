@@ -1,6 +1,5 @@
 // Thermostat ADC struct.
 
-use defmt::Format;
 use enum_iterator::{all, Sequence};
 use num_enum::{TryFromPrimitive, TryFromPrimitiveError};
 use smlang::statemachine;
@@ -19,7 +18,7 @@ use super::hal::{
 use num_traits::float::Float;
 
 /// A type representing an ADC sample.
-#[derive(Copy, Clone, Debug, Format)]
+#[derive(Copy, Clone, Debug)]
 pub struct AdcCode(u32);
 impl AdcCode {
     const GAIN: f32 = 0x555555 as _; // Default ADC gain from datasheet.
@@ -85,7 +84,7 @@ impl From<AdcCode> for f64 {
     }
 }
 
-#[derive(Clone, Copy, TryFromPrimitive, Debug, Format, PartialEq, Eq, Sequence)]
+#[derive(Clone, Copy, TryFromPrimitive, Debug, PartialEq, Eq, Sequence)]
 #[repr(usize)]
 pub enum InputChannel {
     Zero = 0,
@@ -108,7 +107,7 @@ impl TryFrom<(AdcPhy, AdcChannel)> for InputChannel {
     }
 }
 
-#[derive(Clone, Copy, TryFromPrimitive, Debug, Format, Sequence)]
+#[derive(Clone, Copy, TryFromPrimitive, Debug, Sequence)]
 #[repr(usize)]
 pub enum AdcPhy {
     Zero = 0,
@@ -237,7 +236,7 @@ impl Adc {
         let id = self.adcs.read(ad7172::AdcReg::ID);
         // check that ID is 0x00DX, as per datasheet
         if id & 0xfff0 != 0x00d0 {
-            defmt::error!("invalid ID: {=u32:#x}", id);
+            log::error!("invalid ID: {:#x}", id);
             return Err(Error::Ident);
         }
 

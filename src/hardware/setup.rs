@@ -1,3 +1,5 @@
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use crate::hardware::system_timer;
 use smoltcp_nal::smoltcp;
 
@@ -20,7 +22,7 @@ use super::{
     EthernetPhy, NetworkStack,
 };
 
-use defmt::info;
+use log::info;
 
 const NUM_TCP_SOCKETS: usize = 4;
 const NUM_UDP_SOCKETS: usize = 1;
@@ -114,6 +116,47 @@ pub fn setup(
     mut device: stm32h7xx_hal::stm32::Peripherals,
     clock: system_timer::SystemTimer,
 ) -> ThermostatDevices {
+    // Set up RTT logging
+    {
+        // Enable debug during WFE/WFI-induced sleep
+        device.DBGMCU.cr.modify(|_, w| w.dbgsleep_d1().set_bit());
+
+        // Set up RTT channel to use for `rprintln!()` as "best effort".
+        // This removes a critical section around the logging and thus allows
+        // high-prio tasks to always interrupt at low latency.
+        // It comes at a cost:
+        // If a high-priority tasks preempts while we are logging something,
+        // and if we then also want to log from within that high-preiority task,
+        // the high-prio log message will be lost.
+
+        let channels = rtt_target::rtt_init_default!();
+        // Note(unsafe): The closure we pass does not establish a critical section
+        // as demanded but it does ensure synchronization and implements a lock.
+        unsafe {
+            rtt_target::set_print_channel_cs(
+                channels.up.0,
+                &((|arg, f| {
+                    static LOCKED: AtomicBool = AtomicBool::new(false);
+                    if LOCKED.compare_exchange_weak(
+                        false,
+                        true,
+                        Ordering::Acquire,
+                        Ordering::Relaxed,
+                    ) == Ok(false)
+                    {
+                        f(arg);
+                        LOCKED.store(false, Ordering::Release);
+                    }
+                }) as rtt_target::CriticalSectionFunc),
+            );
+        }
+
+        static LOGGER: rtt_logger::RTTLogger = rtt_logger::RTTLogger::new(log::LevelFilter::Debug);
+        log::set_logger(&LOGGER)
+            .map(|()| log::set_max_level(log::LevelFilter::Trace))
+            .unwrap();
+        log::info!("Starting");
+    }
     let pwr = device.PWR.constrain();
     let vos = pwr.freeze();
 
@@ -180,9 +223,9 @@ pub fn setup(
         overtemp: gpiog.pg12.into_floating_input(),
     };
     let gpio = Gpio::new(gpio_pins);
-    info!("HWREV: {}", gpio.hwrev());
-    info!("PoE Power: {}", gpio.poe());
-    info!("Overtemp: {}", gpio.overtemp());
+    info!("HWREV: {:?}", gpio.hwrev());
+    info!("PoE Power: {:?}", gpio.poe());
+    info!("Overtemp: {:?}", gpio.overtemp());
 
     info!("Setup fan");
     let fan = Fan::new(
