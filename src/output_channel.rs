@@ -22,12 +22,14 @@ pub struct OutputChannel {
     pub hold: bool,
 
     /// Maximum absolute (positive and negative) TEC voltage in volt.
+    /// These will be clamped to the maximum of 4.3 V.
     ///
     /// # Value
     /// 0.0 to 4.3
     pub voltage_limit: f32,
 
     /// IIR filter parameters.
+    /// The y limits will be clamped to the maximum output current of +-3 A.
     ///
     /// # Value
     /// See [iir::IIR#miniconf]
@@ -35,6 +37,7 @@ pub struct OutputChannel {
 
     /// Thermostat input channel weights. Each input temperature is multiplied by its weight
     /// and the accumulated output is fed into the IIR.
+    /// The weights will be internally normalized to one (sum of the absolute values).
     ///
     /// # Value
     /// [f32; 8]
@@ -84,8 +87,8 @@ impl OutputChannel {
     /// - Clamping of the limits
     /// - Normalization of the weights
     pub fn finalize_settings(&mut self) {
-        self.iir.y_max = (self.iir.y_max + 0.05 * 3.0).clamp(0.0, Pwm::MAX_CURRENT_LIMIT as f64);
-        self.iir.y_min = (self.iir.y_min - 0.05 * 3.0).clamp(-Pwm::MAX_CURRENT_LIMIT as f64, 0.0);
+        self.iir.y_max = self.iir.y_max.clamp(0.0, Pwm::MAX_CURRENT_LIMIT as f64);
+        self.iir.y_min = self.iir.y_min.clamp(-Pwm::MAX_CURRENT_LIMIT as f64, 0.0);
         self.voltage_limit = self.voltage_limit.clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
         let divisor: f32 = self.weights.iter().map(|w| w.abs()).sum();
         if divisor != 0.0 {
