@@ -202,19 +202,13 @@ mod app {
         let pwm = c.local.pwm;
         for ch in all::<OutputChannelIdx>() {
             let mut s = settings.output_channel[ch as usize];
-            s.finalize_settings(); // clamp limits and normalize weights
+            let current_limits = s.finalize_settings(); // clamp limits and normalize weights
             pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
             // give 5% extra headroom for PWM current limits
-            pwm.set_limit(
-                Limit::PositiveCurrent(ch),
-                s.iir.y_max as f32 + 0.05 * Pwm::MAX_CURRENT_LIMIT,
-            )
-            .unwrap();
-            pwm.set_limit(
-                Limit::NegativeCurrent(ch),
-                s.iir.y_min as f32 - 0.05 * Pwm::MAX_CURRENT_LIMIT,
-            )
-            .unwrap();
+            pwm.set_limit(Limit::PositiveCurrent(ch), current_limits[0])
+                .unwrap();
+            pwm.set_limit(Limit::NegativeCurrent(ch), current_limits[1])
+                .unwrap();
             c.shared.gpio.lock(|gpio| {
                 gpio.set_shutdown(ch, s.shutdown.into());
                 gpio.set_led(ch.into(), (!s.shutdown).into()) // fix leds to channel state

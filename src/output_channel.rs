@@ -86,18 +86,26 @@ impl OutputChannel {
     /// Performs finalization of the output_channel miniconf settings:
     /// - Clamping of the limits
     /// - Normalization of the weights
-    pub fn finalize_settings(&mut self) {
-        self.iir.y_max = self.iir.y_max.clamp(0.0, Pwm::MAX_CURRENT_LIMIT as f64);
-        self.iir.y_min = self.iir.y_min.clamp(-Pwm::MAX_CURRENT_LIMIT as f64, 0.0);
+    /// Returns the current limits.
+    pub fn finalize_settings(&mut self) -> [f32; 2] {
+        self.iir.y_max = self
+            .iir
+            .y_max
+            .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT);
+        self.iir.y_min = self
+            .iir
+            .y_min
+            .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT);
         self.voltage_limit = self.voltage_limit.clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
         let divisor: f32 = self.weights.iter().map(|w| w.abs()).sum();
         if divisor != 0.0 {
             for w in &mut self.weights {
-                *w = *w / divisor;
+                *w /= divisor;
             }
         }
-        log::info!("self.weights: {:?}", self.weights);
-        log::info!("self.voltage_limit: {:?}", self.voltage_limit);
-        log::info!("self.y_max: {:?}", self.iir.y_max);
+        [
+            (self.iir.y_max + 0.05 * Pwm::MAX_CURRENT_LIMIT).min(0.) as f32,
+            (self.iir.y_min - 0.05 * Pwm::MAX_CURRENT_LIMIT).max(0.) as f32,
+        ]
     }
 }
