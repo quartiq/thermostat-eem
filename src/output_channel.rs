@@ -1,8 +1,10 @@
 //! # Thermostat_EEM IIR wrapper.
 //!
 
+use crate::hardware::pwm::Pwm;
 use idsp::iir;
 use miniconf::Miniconf;
+use num_traits::Signed;
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, Miniconf)]
@@ -20,12 +22,14 @@ pub struct OutputChannel {
     pub hold: bool,
 
     /// Maximum absolute (positive and negative) TEC voltage in volt.
+    /// These will be clamped to the maximum of 4.3 V.
     ///
     /// # Value
     /// 0.0 to 4.3
     pub voltage_limit: f32,
 
     /// IIR filter parameters.
+    /// The y limits will be clamped to the maximum output current of +-3 A.
     ///
     /// # Value
     /// See [iir::IIR#miniconf]
@@ -33,6 +37,7 @@ pub struct OutputChannel {
 
     /// Thermostat input channel weights. Each input temperature is multiplied by its weight
     /// and the accumulated output is fed into the IIR.
+    /// The weights will be internally normalized to one (sum of the absolute values).
     ///
     /// # Value
     /// [f32; 8]
@@ -76,5 +81,33 @@ impl OutputChannel {
         } else {
             self.iir.update(iir_state, weighted_temperature, hold) as f32
         }
+    }
+
+    /// Performs finalization of the output_channel miniconf settings:
+    /// - Clamping of the limits
+    /// - Normalization of the weights
+    /// Returns the current limits.
+    pub fn finalize_settings(&mut self) -> [f32; 2] {
+        self.iir.y_max = self
+            .iir
+            .y_max
+            .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT);
+        self.iir.y_min = self
+            .iir
+            .y_min
+            .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT);
+        self.voltage_limit = self.voltage_limit.clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
+        let divisor: f32 = self.weights.iter().map(|w| w.abs()).sum();
+        if divisor != 0.0 {
+            for w in &mut self.weights {
+                *w /= divisor;
+            }
+        }
+        [
+            // [Pwm::MAX_CURRENT_LIMIT] + 5% is still below 100% duty cycle for the PWM limits and therefore OK.
+            // Might not be OK for a different shunt resistor or different PWM setup.
+            (self.iir.y_max + 0.05 * Pwm::MAX_CURRENT_LIMIT).min(0.) as f32,
+            (self.iir.y_min - 0.05 * Pwm::MAX_CURRENT_LIMIT).max(0.) as f32,
+        ]
     }
 }

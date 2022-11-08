@@ -201,17 +201,13 @@ mod app {
 
         let pwm = c.local.pwm;
         for ch in all::<OutputChannelIdx>() {
-            let s = settings.output_channel[ch as usize];
-            // set current limits to 5% higher/lower than iir y_max/y_min and clamp output to valid range.
-            let current_limit_positive =
-                (s.iir.y_max as f32 + 0.05 * 3.0).clamp(0.0, Pwm::MAX_CURRENT_LIMIT);
-            let current_limit_negative =
-                (s.iir.y_min as f32 - 0.05 * 3.0).clamp(-Pwm::MAX_CURRENT_LIMIT, 0.0);
-            // TODO: implement what happens if user chooses invalid voltage limit. currently just panick.
+            let mut s = settings.output_channel[ch as usize];
+            let current_limits = s.finalize_settings(); // clamp limits and normalize weights
             pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
-            pwm.set_limit(Limit::PositiveCurrent(ch), current_limit_positive)
+            // give 5% extra headroom for PWM current limits
+            pwm.set_limit(Limit::PositiveCurrent(ch), current_limits[0])
                 .unwrap();
-            pwm.set_limit(Limit::NegativeCurrent(ch), current_limit_negative)
+            pwm.set_limit(Limit::NegativeCurrent(ch), current_limits[1])
                 .unwrap();
             c.shared.gpio.lock(|gpio| {
                 gpio.set_shutdown(ch, s.shutdown.into());
