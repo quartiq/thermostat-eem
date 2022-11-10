@@ -96,10 +96,10 @@ pub enum Led {
 impl From<OutputChannelIdx> for Led {
     fn from(other: OutputChannelIdx) -> Led {
         match other {
-            OutputChannelIdx::Zero => Led::Led3,
-            OutputChannelIdx::One => Led::Led2,
-            OutputChannelIdx::Two => Led::Led1,
-            OutputChannelIdx::Three => Led::Led0,
+            OutputChannelIdx::Zero => Led::Led0,
+            OutputChannelIdx::One => Led::Led1,
+            OutputChannelIdx::Two => Led::Led2,
+            OutputChannelIdx::Three => Led::Led3,
         }
     }
 }
