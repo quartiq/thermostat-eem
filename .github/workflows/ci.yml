@@ -8,6 +8,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  pull_request: write
+
 jobs:
   style:
     runs-on: ubuntu-latest
