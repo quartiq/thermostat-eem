@@ -39,7 +39,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9a69a963b70ddacfcd382524f72a4576f359af9334b3bf48a79566590bb8bfa"
 dependencies = [
  "bitrate",
- "cortex-m 0.7.6",
+ "cortex-m 0.6.7",
  "embedded-hal",
 ]
 
@@ -241,31 +241,11 @@ dependencies = [
 
 [[package]]
 name = "enum-iterator"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c79a6321a1197d7730510c7e3f6cb80432dfefecb32426de8cea0aa19b4bb8d7"
-dependencies = [
- "enum-iterator-derive 0.6.0",
-]
-
-[[package]]
-name = "enum-iterator"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91a4ec26efacf4aeff80887a175a419493cb6f8b5480d26387eb0bd038976187"
 dependencies = [
- "enum-iterator-derive 1.1.0",
-]
-
-[[package]]
-name = "enum-iterator-derive"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e94aa31f7c0dc764f57896dc615ddd76fc13b0d5dca7eb6cc5e018a5a09ec06"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
+ "enum-iterator-derive",
 ]
 
 [[package]]
@@ -427,10 +407,10 @@ dependencies = [
  "heapless",
  "log",
  "miniconf_derive",
- "minimq 0.6.1",
+ "minimq",
  "serde",
  "serde-json-core",
- "smlang 0.6.0",
+ "smlang",
 ]
 
 [[package]]
@@ -446,20 +426,6 @@ dependencies = [
 
 [[package]]
 name = "minimq"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c8e06869d0d2be282e85fdbabdd6f8103155f583f2169206cf6cfc75f3f6474"
-dependencies = [
- "bit_field",
- "embedded-nal",
- "embedded-time",
- "enum-iterator 0.6.0",
- "heapless",
- "smlang 0.4.2",
-]
-
-[[package]]
-name = "minimq"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b76ac76e900c755ca49946b2316d76c13e8af097495cd250acea7d09218b7e5"
@@ -470,7 +436,7 @@ dependencies = [
  "heapless",
  "num_enum",
  "serde",
- "smlang 0.6.0",
+ "smlang",
  "varint-rs",
 ]
 
@@ -842,31 +808,11 @@ dependencies = [
 
 [[package]]
 name = "smlang"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75f6a641648330c38cc8e0574ddc03807617dc8f27f3005c368522769f818896"
-dependencies = [
- "smlang-macros 0.2.1",
-]
-
-[[package]]
-name = "smlang"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b62b263177e999fea25b50588d4413d1686f070d6fe986c3b2e5a7a4d2c532e9"
 dependencies = [
- "smlang-macros 0.6.0",
-]
-
-[[package]]
-name = "smlang-macros"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac6db7d915f8478423db4889a8933f0f557ec345b3e94495800d7b32b1ac7250"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
+ "smlang-macros",
 ]
 
 [[package]]
@@ -984,12 +930,12 @@ dependencies = [
  "cortex-m-rt",
  "cortex-m-rtic",
  "embedded-time",
- "enum-iterator 1.2.0",
+ "enum-iterator",
  "heapless",
  "idsp",
  "log",
  "miniconf",
- "minimq 0.5.3",
+ "minimq",
  "num-traits",
  "num_enum",
  "panic-probe",
@@ -998,7 +944,7 @@ dependencies = [
  "serde",
  "serde-json-core",
  "shared-bus-rtic",
- "smlang 0.6.0",
+ "smlang",
  "smoltcp-nal",
  "stm32h7xx-hal",
  "systick-monotonic",
