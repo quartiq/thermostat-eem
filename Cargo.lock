@@ -39,7 +39,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9a69a963b70ddacfcd382524f72a4576f359af9334b3bf48a79566590bb8bfa"
 dependencies = [
  "bitrate",
- "cortex-m 0.6.7",
+ "cortex-m 0.7.6",
  "embedded-hal",
 ]
 
@@ -201,17 +201,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "derive_miniconf"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c587b2363b948e4035fc1e8ac33278dc6fda9a40190a22abe55839fcaeda161"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "embedded-dma"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -367,11 +356,10 @@ dependencies = [
 
 [[package]]
 name = "idsp"
-version = "0.8.6"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a978f7c533b86cabab1a431b8abedfd667a62f4fed91f5a42bb950128ff8b77"
+checksum = "e8bd715966e5f76cd088c9dac68b25552e9c558c72a5ce95176ab50e436c081f"
 dependencies = [
- "miniconf 0.5.0",
  "num-complex 0.4.2",
  "num-traits",
  "serde",
@@ -432,21 +420,6 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "miniconf"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76ba55ad97c893ffe5293ea3c0d19c505e164f6628ead64d25dada828deb3673"
-dependencies = [
- "derive_miniconf",
- "heapless",
- "log",
- "minimq 0.5.3",
- "serde",
- "serde-json-core 0.4.0",
- "smlang 0.4.2",
-]
-
-[[package]]
-name = "miniconf"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "184b4633fb234558e57a3f1105c63358d0ff224cf8d75cc8b9621df597b7a16e"
@@ -456,7 +429,7 @@ dependencies = [
  "miniconf_derive",
  "minimq 0.6.1",
  "serde",
- "serde-json-core 0.5.0",
+ "serde-json-core",
  "smlang 0.6.0",
 ]
 
@@ -824,17 +797,6 @@ dependencies = [
 
 [[package]]
 name = "serde-json-core"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8014aeea272bca0f0779778d43253f2f3375b414185b30e6ecc4d3e4a9994781"
-dependencies = [
- "heapless",
- "ryu",
- "serde",
-]
-
-[[package]]
-name = "serde-json-core"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58ec3c8fe427f45ee3aaa0ebb9f0d9ab8ae9ad05d12047fe7249ae5ea9374ff0"
@@ -1026,7 +988,7 @@ dependencies = [
  "heapless",
  "idsp",
  "log",
- "miniconf 0.6.2",
+ "miniconf",
  "minimq 0.5.3",
  "num-traits",
  "num_enum",
@@ -1034,7 +996,7 @@ dependencies = [
  "rtt-logger",
  "rtt-target",
  "serde",
- "serde-json-core 0.5.0",
+ "serde-json-core",
  "shared-bus-rtic",
  "smlang 0.6.0",
  "smoltcp-nal",
