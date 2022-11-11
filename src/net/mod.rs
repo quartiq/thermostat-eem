@@ -20,7 +20,7 @@ use telemetry::TelemetryClient;
 use core::fmt::Write;
 use heapless::String;
 use miniconf::Miniconf;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub type NetworkReference = smoltcp_nal::shared::NetworkStackProxy<'static, NetworkStack>;
 
@@ -172,7 +172,7 @@ pub fn get_device_prefix(
 ///
 /// The alarm is non-latching. If alarm was "true" for a while and the temperatures come within
 /// limits again, alarm will be "false" again.
-#[derive(Clone, Debug, Miniconf)]
+#[derive(Clone, Debug, Miniconf, Serialize, Deserialize)]
 pub struct Alarm {
     /// Set the alarm to armed (true) or disarmed (false).
     /// If the alarm is armed, the device will publish it's alarm state onto the [target].
@@ -204,5 +204,6 @@ pub struct Alarm {
     ///
     /// # Value
     /// [[f32, f32]; 8]
+    #[miniconf(defer)]
     pub temperature_limits: [[f32; 2]; 8],
 }

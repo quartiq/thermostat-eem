@@ -41,7 +41,7 @@ pub struct OutputChannel {
     ///
     /// # Value
     /// [f32; 8]
-    weights: [f32; 8],
+    pub weights: [f32; 8],
 }
 
 impl OutputChannel {

@@ -47,7 +47,8 @@ pub struct Settings {
     ///
     /// # Value
     /// See [output_channel::OutputChannel]
-    output_channel: [output_channel::OutputChannel; 4],
+    #[miniconf(defer)]
+    output_channel: miniconf::Array<output_channel::OutputChannel, 4>,
 
     /// Alarm settings.
     ///
@@ -56,6 +57,7 @@ pub struct Settings {
     ///
     /// # Value
     /// See [Alarm]
+    #[miniconf(defer)]
     alarm: Alarm,
 }
 
@@ -63,9 +65,13 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
-            output_channel: [{
-                output_channel::OutputChannel::new(0., -0., 0., [0., 0., 0., 0., 0., 0., 0., 0.])
-            }; 4],
+            output_channel: [output_channel::OutputChannel::new(
+                0.,
+                -0.,
+                0.,
+                [0., 0., 0., 0., 0., 0., 0., 0.],
+            ); 4]
+                .into(),
             alarm: Alarm {
                 armed: false,
                 target: heapless::String::<128>::default(),
