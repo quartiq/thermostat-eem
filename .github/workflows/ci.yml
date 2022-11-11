@@ -2,15 +2,13 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [master]
     
   pull_request:
     branches: [main]
 env:
   CARGO_TERM_COLOR: always
 
-permissions:
-  pull_request: write
+permissions: write-all
 
 jobs:
   style:
