@@ -39,7 +39,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9a69a963b70ddacfcd382524f72a4576f359af9334b3bf48a79566590bb8bfa"
 dependencies = [
  "bitrate",
- "cortex-m 0.7.6",
+ "cortex-m 0.6.7",
  "embedded-hal",
 ]
 
@@ -1034,7 +1034,7 @@ dependencies = [
  "rtt-logger",
  "rtt-target",
  "serde",
- "serde-json-core 0.4.0",
+ "serde-json-core 0.5.0",
  "shared-bus-rtic",
  "smlang 0.6.0",
  "smoltcp-nal",
