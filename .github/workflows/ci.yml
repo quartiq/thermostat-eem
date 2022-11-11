@@ -10,6 +10,7 @@ env:
 
 permissions:
   pull_request: write
+  push: write
 
 jobs:
   style:
