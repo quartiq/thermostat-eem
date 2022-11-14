@@ -106,8 +106,8 @@ impl OutputChannel {
         [
             // [Pwm::MAX_CURRENT_LIMIT] + 5% is still below 100% duty cycle for the PWM limits and therefore OK.
             // Might not be OK for a different shunt resistor or different PWM setup.
-            (self.iir.y_max + 0.05 * Pwm::MAX_CURRENT_LIMIT).min(0.) as f32,
-            (self.iir.y_min - 0.05 * Pwm::MAX_CURRENT_LIMIT).max(0.) as f32,
+            (self.iir.y_max + 0.05 * Pwm::MAX_CURRENT_LIMIT).max(0.) as f32,
+            (self.iir.y_min - 0.05 * Pwm::MAX_CURRENT_LIMIT).min(0.) as f32,
         ]
     }
 }
