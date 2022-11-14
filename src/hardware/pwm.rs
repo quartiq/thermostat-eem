@@ -130,8 +130,8 @@ impl Pwm {
     /// Set PWM TEC limits.
     ///
     /// # Args
-    /// * `ch` - Thermostat output channel
-    /// * `limit` - TEC limit type
+    /// * `lim` - TEC limit type
+    /// * `val` - value to be set (in ampere/volt)
     pub fn set_limit(&mut self, lim: Limit, val: f32) -> Result<(), Error> {
         /// Convert maximum current to relative pulsewidth for the (analog voltage)
         /// max output current inputs of the TEC driver.
