@@ -24,7 +24,7 @@ smoltcp-nal = { version = "0.2", features = ["shared-stack"] }
 cortex-m-rtic = "1.0.0"
 embedded-time = "0.12.1"
 miniconf = "0.6.2"
-systick-monotonic = "1.0.0"
+systick-monotonic = "1.0.1"
 heapless = { version = "0.7", features = ["serde"] }
 minimq = "0.6.1"
 serde = { version = "1.0.147", features = ["derive"], default-features = false }
