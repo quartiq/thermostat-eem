@@ -269,18 +269,19 @@ mod app {
         let alarm = c.shared.settings.lock(|settings| settings.alarm.clone());
         if alarm.armed {
             let temperatures = c.shared.ch_temperature.lock(|temp| *temp);
-            let alarm_state = temperatures
+            let mut alarm_state = false;
+            for (i, (&temp, limits)) in temperatures
                 .iter()
                 .zip(alarm.temperature_limits)
                 .enumerate()
-                .all(|(i, (&temp, limits))| {
-                    let t = !(limits[0]..limits[1]).contains(&(temp as f32));
-                    c.shared.telemetry.lock(|tele| tele.monitor.alarm[i] = t);
-                    if t {
-                        log::error!("channel {:?} temperature out of range, Alarm tripped!", i);
-                    }
-                    t
-                });
+            {
+                let t = !(limits[0]..limits[1]).contains(&(temp as f32));
+                c.shared.telemetry.lock(|tele| tele.monitor.alarm[i] = t);
+                if t {
+                    alarm_state = true;
+                    log::error!("channel {} temperature out of range, Alarm tripped!", i);
+                }
+            }
             c.shared
                 .network
                 .lock(|net| net.telemetry.publish_alarm(&alarm.target, &alarm_state));
