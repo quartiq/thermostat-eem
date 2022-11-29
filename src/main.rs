@@ -279,7 +279,7 @@ mod app {
                 c.shared.telemetry.lock(|tele| tele.monitor.alarm[i] = t);
                 if t {
                     alarm_state = true;
-                    log::error!("channel {:?} temperature out of range, Alarm tripped!", i);
+                    log::error!("channel {} temperature out of range, Alarm tripped!", i);
                 }
             }
             c.shared
