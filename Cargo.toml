@@ -23,7 +23,7 @@ asm-delay = "0.9.0"
 smoltcp-nal = { version = "0.2", features = ["shared-stack"] }
 cortex-m-rtic = "1.0.0"
 embedded-time = "0.12.1"
-miniconf = "0.6.2"
+miniconf = "0.6.3"
 systick-monotonic = "1.0.1"
 heapless = { version = "0.7", features = ["serde"] }
 minimq = "0.6.1"
