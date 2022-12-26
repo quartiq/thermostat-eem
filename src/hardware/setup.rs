@@ -9,7 +9,6 @@ use super::hal::{
     gpio::{GpioExt, Speed},
     prelude::*,
 };
-use crate::hardware::SRC_MAC;
 
 use super::{
     adc::{sm::StateMachine, Adc, AdcPins},
