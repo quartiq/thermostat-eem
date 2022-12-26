@@ -376,7 +376,6 @@ pub fn setup(
 
     // The EEPROM is a variant without address bits, so the 3 LSB of this word are "dont-cares".
     const I2C_ADDR: u8 = 0x50;
-
     // The MAC address is stored in the last 6 bytes of the 256 byte address space.
     const MAC_POINTER: u8 = 0xFA;
 
