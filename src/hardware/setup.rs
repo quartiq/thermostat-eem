@@ -367,11 +367,11 @@ pub fn setup(
     adc_sm.start(&mut device.EXTI, &mut device.SYSCFG);
 
     let mut eeprom_i2c = {
-        let sda = gpiof.pf0.into_alternate().set_open_drain();
-        let scl = gpiof.pf1.into_alternate().set_open_drain();
+        let sda = gpiob.pb9.into_alternate().set_open_drain();
+        let scl = gpiob.pb8.into_alternate().set_open_drain();
         device
-            .I2C2
-            .i2c((scl, sda), 100.kHz(), ccdr.peripheral.I2C2, &ccdr.clocks)
+            .I2C1
+            .i2c((scl, sda), 100.kHz(), ccdr.peripheral.I2C1, &ccdr.clocks)
     };
 
     // The EEPROM is a variant without address bits, so the 3 LSB of this word are "dont-cares".
