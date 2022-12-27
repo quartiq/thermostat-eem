@@ -9,7 +9,6 @@ use super::hal::{
     gpio::{GpioExt, Speed},
     prelude::*,
 };
-use crate::hardware::SRC_MAC;
 
 use super::{
     adc::{sm::StateMachine, Adc, AdcPins},
@@ -367,9 +366,27 @@ pub fn setup(
     );
     adc_sm.start(&mut device.EXTI, &mut device.SYSCFG);
 
-    info!("Setup Ethernet");
-    let mac_addr = smoltcp::wire::EthernetAddress(SRC_MAC);
+    let mut eeprom_i2c = {
+        let sda = gpiob.pb9.into_alternate().set_open_drain();
+        let scl = gpiob.pb8.into_alternate().set_open_drain();
+        device
+            .I2C1
+            .i2c((scl, sda), 100.kHz(), ccdr.peripheral.I2C1, &ccdr.clocks)
+    };
+
+    // The EEPROM is a variant without address bits, so the 3 LSB of this word are "dont-cares".
+    const I2C_ADDR: u8 = 0x50;
+    // The MAC address is stored in the last 6 bytes of the 256 byte address space.
+    const MAC_POINTER: u8 = 0xFA;
+
+    let mut buffer = [0u8; 6];
+    eeprom_i2c
+        .write_read(I2C_ADDR, &[MAC_POINTER], &mut buffer)
+        .unwrap();
+    let mac_addr = smoltcp::wire::EthernetAddress(buffer);
     log::info!("EUI48: {}", mac_addr);
+
+    info!("Setup Ethernet");
 
     // Setup network
     let net = {

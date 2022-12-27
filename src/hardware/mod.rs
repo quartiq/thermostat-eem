@@ -17,10 +17,6 @@ pub mod pwm;
 pub mod setup;
 pub mod system_timer;
 
-// Thermostat MAC definition
-// ToDo: implement eeprom MAC
-const SRC_MAC: [u8; 6] = [0x80, 0x1f, 0x12, 0x63, 0x84, 0x1b];
-
 // Number of TX descriptors in the ethernet descriptor ring.
 const TX_DESRING_CNT: usize = 4;
 
