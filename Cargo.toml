@@ -21,7 +21,7 @@ log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"
 panic-probe = { version = "0.3.0", features = ["print-rtt"] }
 asm-delay = "0.9.0"
 smoltcp-nal = { version = "0.2", features = ["shared-stack"] }
-cortex-m-rtic = "1.0.0"
+cortex-m-rtic = "1.1.4"
 embedded-time = "0.12.1"
 miniconf = "0.6.3"
 systick-monotonic = "1.0.1"
