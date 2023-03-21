@@ -29,7 +29,7 @@ heapless = { version = "0.7", features = ["serde"] }
 minimq = "0.6.1"
 serde = { version = "1.0.152", features = ["derive"], default-features = false }
 serde-json-core = "0.5"
-num_enum = { version = "0.5.10", default-features = false }
+num_enum = { version = "0.5.11", default-features = false }
 rtt-logger = "0.2"
 rtt-target = { version = "0.3", features = ["cortex-m"] }
 num-traits = { version = "0.2", default-features = false, features = ["libm"] }
