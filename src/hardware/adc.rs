@@ -122,11 +122,13 @@ impl AdcPhy {
     /// four individual input channels. To allow flexibility in the configuration of the
     /// channels, this readout schedule defines the ordering of readout of the channels.
     ///
-    /// *Note*: The schedule has to  correspond to the configuration of the individual ADCs.
+    /// *Note*: The schedule has to correspond to the configuration of the individual ADCs.
     /// For this specific schedule all the ADCs are configured the same and are synced so they
     /// all start sampling at the same time. The schedule now reads out each phy
     /// round-robin.
     /// This corresponds to the sequence of Thermostat channels 0,2,4,6,1,3,5,7.
+    ///
+    /// Needed for AI-ARTIQ: 0,2,4,6,1,3,5,7,0,2,4,8,1,3,5,9
     ///
     /// The schedule would change if the incoming sample sequence changes (heterogeneous
     /// channel/adc configuration).
@@ -315,11 +317,10 @@ impl sm::StateMachineContext for Adc {
     }
 
     /// Uses the schedule implemented in `AdcPhy::next()` to decide which ADC will have data ready next.
-    /// It clears the interupt pending flag
-    /// (which does not trigger an interrupt right away since the currently selected ADC does not have new data),
-    /// deselects the current ADC and selects the next in line. The next ADC will then trigger the interrupt
-    /// again once it has finished
-    /// sampling (or when it is selected if it is done at this point) and the routine will start again.
+    /// It clears the interupt pending flag (which does not trigger an interrupt right away since the currently
+    /// selected ADC does not have new data), deselects the current ADC and selects the next in line.
+    /// The next ADC will then trigger the interrupt again once it has finished sampling (or when it is
+    /// selected if it is done at this point) and the routine will start again.
     fn next(&mut self, phy: &AdcPhy, ch: &AdcChannel) -> AdcPhy {
         self.cs[*phy as usize].set_state(PinState::High);
         self.rdyn.clear_interrupt_pending_bit();
