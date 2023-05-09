@@ -40,14 +40,14 @@ pub struct OutputChannel {
     /// The weights will be internally normalized to one (sum of the absolute values).
     ///
     /// # Value
-    /// [f32; 8]
-    pub weights: [f32; 8],
+    /// [[f32; 4]; 4]
+    pub weights: [[f32; 4]; 4],
 }
 
 impl OutputChannel {
     /// idsp https://docs.rs/idsp/latest/idsp/ f64 implementation with input
     /// weights to route and weigh 8 input channels into one IIR.
-    pub fn new(gain: f64, y_min: f64, y_max: f64, weights: [f32; 8]) -> Self {
+    pub fn new(gain: f64, y_min: f64, y_max: f64, weights: [[f32; 4]; 4]) -> Self {
         OutputChannel {
             shutdown: true,
             hold: false,
@@ -60,7 +60,7 @@ impl OutputChannel {
     /// compute weigthed iir input, iir state and return the new output
     pub fn update(
         &mut self,
-        channel_temperatures: &[f64; 8],
+        channel_temperatures: &[[f64; 4]; 4],
         iir_state: &mut iir::Vec5<f64>,
         hold: bool,
     ) -> f32 {
@@ -73,7 +73,8 @@ impl OutputChannel {
         };
         let weighted_temperature = channel_temperatures
             .iter()
-            .zip(self.weights.iter())
+            .flatten()
+            .zip(self.weights.iter().flatten())
             .map(|(temperature, weight)| *temperature * *weight as f64)
             .sum();
         if self.shutdown || self.hold {
@@ -97,11 +98,13 @@ impl OutputChannel {
             .y_min
             .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT);
         self.voltage_limit = self.voltage_limit.clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
-        let divisor: f32 = self.weights.iter().map(|w| w.abs()).sum();
+        let divisor: f32 = self.weights.iter().flatten().map(|w| w.abs()).sum();
+        // maybe todo: ensure that the weights actually impact an enabled channel
         if divisor != 0.0 {
-            for w in &mut self.weights {
-                *w /= divisor;
-            }
+            self.weights
+                .iter_mut()
+                .flatten()
+                .for_each(|w| *w /= divisor)
         }
         [
             // [Pwm::MAX_CURRENT_LIMIT] + 5% is still below 100% duty cycle for the PWM limits and therefore OK.

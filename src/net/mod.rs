@@ -203,7 +203,7 @@ pub struct Alarm {
     /// The alarm is non latching and clears itself once all channels are in their respective limits.
     ///
     /// # Value
-    /// [[f32, f32]; 8]
+    /// [[[f32, f32]; 4]; 4]
     #[miniconf(defer)]
-    pub temperature_limits: [[f32; 2]; 8],
+    pub temperature_limits: [[[f32; 2]; 4]; 4],
 }
