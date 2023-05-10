@@ -73,6 +73,7 @@ impl OutputChannel {
             .iter()
             .flatten()
             .zip(self.weights.iter().flatten())
+            // zero default for weight and temp is OK here since they should always be 'None' together and then we want to add zero
             .map(|(t, w)| t.unwrap_or(0.) * w.unwrap_or(0.) as f64)
             .sum();
         if self.shutdown || self.hold {

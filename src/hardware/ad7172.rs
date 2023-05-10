@@ -112,6 +112,7 @@ pub mod Gpiocon {
 pub mod Channel {
     pub mod ChEn {
         pub const ENABLED: u32 = 1 << 15;
+        pub const DISABLED: u32 = 0 << 15;
     }
     pub mod SetupSel {
         pub const SETUP_0: u32 = 0b00 << 12;

@@ -1,7 +1,7 @@
 // Thermostat ADC struct.
 
 use enum_iterator::{all, Sequence};
-use num_enum::{TryFromPrimitive, TryFromPrimitiveError};
+use num_enum::TryFromPrimitive;
 use smlang::statemachine;
 
 use super::ad7172::{self, AdcChannel};
@@ -84,7 +84,7 @@ impl From<AdcCode> for f64 {
     }
 }
 
-#[derive(Clone, Copy, TryFromPrimitive, Debug, Sequence)]
+#[derive(Clone, Copy, TryFromPrimitive, Debug, Sequence, PartialEq, Eq)]
 #[repr(usize)]
 pub enum AdcPhy {
     Zero = 0,
@@ -126,13 +126,46 @@ pub struct AdcPins {
     pub sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum AdcInput {
+    Ain0 = 0,
+    Ain1 = 1,
+    Ain2 = 2,
+    Ain3 = 3,
+    Ain4 = 4,
+}
+/// ADC configuration structure.
+/// Maybe this struct will be extended with further configuration options for the ADCs in the future.
+#[derive(Clone, Copy, Debug)]
+pub struct AdcConfig {
+    /// Configuration for all ADC inputs.
+    /// If the first AdcInput is assigned to an ADC channel and the second is 'None', it will be single ended and positively referenced to GND.
+    /// If the second AdcInput is assigned to an ADC channel and the first is 'None', it will be single ended and negatively referenced to GND.
+    /// If two AdcInputs are assigned to an ADC channel, they will be differential.
+    /// If no AdcInput is assigned to an ADC channel, it will be disabled.
+    pub input_config: [[[Option<AdcInput>; 2]; 4]; 4],
+}
+
+impl From<AdcConfig> for [[bool; 4]; 4] {
+    fn from(config: AdcConfig) -> Self {
+        let mut result = [[false; 4]; 4];
+        config
+            .input_config
+            .iter()
+            .flatten()
+            .zip(result.iter_mut().flatten())
+            .for_each(|(cfg, ch)| *ch = cfg[0].is_some() || cfg[1].is_some());
+        result
+    }
+}
+
 #[allow(clippy::complexity)]
 pub struct Adc {
     adcs: ad7172::Ad7172<hal::spi::Spi<hal::stm32::SPI4, hal::spi::Enabled>>,
-
     cs: [gpio::ErasedPin<gpio::Output>; 4],
     rdyn: gpioc::PC11<gpio::Input>,
     sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
+    config: AdcConfig,
 }
 
 impl Adc {
@@ -150,6 +183,7 @@ impl Adc {
         spi4_rec: rcc::rec::Spi4,
         spi4: stm32::SPI4,
         pins: AdcPins,
+        config: AdcConfig,
     ) -> Result<Self, Error> {
         let rdyn_pullup = pins.rdyn.internal_pull_up(true);
         // SPI MODE_3: idle high, capture on second transition
@@ -161,13 +195,14 @@ impl Adc {
             cs: pins.cs,
             rdyn: rdyn_pullup,
             sync: pins.sync,
+            config,
         };
 
-        adc.setup(delay)?;
+        adc.setup(delay, config)?;
         Ok(adc)
     }
 
-    fn setup(&mut self, delay: &mut impl DelayUs<u16>) -> Result<(), Error> {
+    fn setup(&mut self, delay: &mut impl DelayUs<u16>, config: AdcConfig) -> Result<(), Error> {
         // deassert all CS first
         for pin in self.cs.iter_mut() {
             pin.set_state(PinState::High);
@@ -177,12 +212,19 @@ impl Adc {
         self.sync.set_low();
 
         for phy in all::<AdcPhy>() {
-            self.selected(phy, |adc| adc.setup_adc(delay))?;
+            self.selected(phy, |adc| {
+                adc.setup_adc(delay, config.input_config[phy as usize])
+            })?;
         }
 
         // set sync high after initialization of all ADCs
         self.sync.set_high();
         Ok(())
+    }
+
+    /// Returns the configuration of which ADC channels are enabled.
+    pub fn channels(&self) -> [[bool; 4]; 4] {
+        self.config.into()
     }
 
     /// Call a closure while the given `AdcPhy` is selected (while its chip
@@ -198,7 +240,11 @@ impl Adc {
     }
 
     /// Setup an ADC on Thermostat-EEM.
-    fn setup_adc(&mut self, delay: &mut impl DelayUs<u16>) -> Result<(), Error> {
+    fn setup_adc(
+        &mut self,
+        delay: &mut impl DelayUs<u16>,
+        input_config: [[Option<AdcInput>; 2]; 4],
+    ) -> Result<(), Error> {
         self.adcs.reset();
 
         delay.delay_us(500u16);
@@ -220,21 +266,44 @@ impl Adc {
         self.adcs
             .write(ad7172::AdcReg::IFMODE, ad7172::Ifmode::DataStat::ENABLED);
 
-        self.adcs.write(
-            ad7172::AdcReg::CH0,
-            ad7172::Channel::ChEn::ENABLED
-                | ad7172::Channel::SetupSel::SETUP_0
-                | ad7172::Channel::Ainpos::AIN0
-                | ad7172::Channel::Ainneg::AIN1,
-        );
-
-        self.adcs.write(
-            ad7172::AdcReg::CH1,
-            ad7172::Channel::ChEn::ENABLED
-                | ad7172::Channel::SetupSel::SETUP_0
-                | ad7172::Channel::Ainpos::AIN2
-                | ad7172::Channel::Ainneg::AIN3,
-        );
+        for (channel, data) in input_config.iter().enumerate().map(|(ch, cfg)| {
+            let channel = match ch {
+                0 => ad7172::AdcReg::CH0,
+                1 => ad7172::AdcReg::CH1,
+                2 => ad7172::AdcReg::CH2,
+                3 => ad7172::AdcReg::CH3,
+                _ => unreachable!(),
+            };
+            let en = if cfg[0].is_some() || cfg[1].is_some() {
+                ad7172::Channel::ChEn::ENABLED
+            } else {
+                ad7172::Channel::ChEn::DISABLED
+            };
+            // Single ended inputs are always relative to GND which is on AIN4 for Thermostat-EEM.
+            // If the first input of a channel is None and the second is Some(_), it will be negatively reverenced to GND.
+            let ainpos = cfg[0]
+                .as_ref()
+                .map_or(ad7172::Channel::Ainneg::AIN4, |a| match a {
+                    AdcInput::Ain0 => ad7172::Channel::Ainpos::AIN0,
+                    AdcInput::Ain1 => ad7172::Channel::Ainpos::AIN1,
+                    AdcInput::Ain2 => ad7172::Channel::Ainpos::AIN2,
+                    AdcInput::Ain3 => ad7172::Channel::Ainpos::AIN3,
+                    AdcInput::Ain4 => ad7172::Channel::Ainpos::AIN4,
+                });
+            let ainneg = cfg[0]
+                .as_ref()
+                .map_or(ad7172::Channel::Ainneg::AIN4, |a| match a {
+                    AdcInput::Ain0 => ad7172::Channel::Ainneg::AIN0,
+                    AdcInput::Ain1 => ad7172::Channel::Ainneg::AIN1,
+                    AdcInput::Ain2 => ad7172::Channel::Ainneg::AIN2,
+                    AdcInput::Ain3 => ad7172::Channel::Ainneg::AIN3,
+                    AdcInput::Ain4 => ad7172::Channel::Ainneg::AIN4,
+                });
+            let data = en | ad7172::Channel::SetupSel::SETUP_0 | ainpos | ainneg; // only Setup 0 for now
+            (channel, data)
+        }) {
+            self.adcs.write(channel, data);
+        }
 
         self.adcs.write(
             ad7172::AdcReg::SETUPCON0,

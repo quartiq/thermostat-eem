@@ -14,6 +14,8 @@ use panic_probe as _; // global panic handler
 
 use enum_iterator::all;
 use hardware::{
+    ad7172::AdcChannel,
+    adc::AdcPhy,
     adc::{sm::StateMachine, Adc, AdcCode},
     adc_internal::AdcInternal,
     dac::{Dac, DacCode},
@@ -99,11 +101,6 @@ pub struct Telemetry {
 
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
 mod app {
-    use crate::{
-        hardware::{ad7172::AdcChannel, adc::AdcPhy},
-        net::telemetry,
-    };
-
     use super::*;
 
     #[monotonic(binds = SysTick, default = true)]
@@ -166,14 +163,31 @@ mod app {
             iir_state: [[0.; 5]; 4],
         };
 
+        log::info!("thermostat.adc_channels: {:?}", thermostat.adc_channels);
+
+        // Initialize enabled temperatures and statistics buffers.
+        let mut temperature: [[Option<f64>; 4]; 4] = [[None; 4]; 4];
+        let mut statistics_buff: [[Option<Buffer>; 4]; 4] = [[None; 4]; 4];
+        thermostat
+            .adc_channels
+            .iter()
+            .flatten()
+            .zip(temperature.iter_mut().flatten())
+            .zip(statistics_buff.iter_mut().flatten())
+            .for_each(|((ch, temp), buff)| {
+                if *ch {
+                    (*temp, *buff) = (Some(0.), Some(Buffer::default()))
+                }
+            });
+
         let shared = Shared {
             dac: thermostat.dac,
             network,
             settings,
             telemetry: Telemetry::default(),
             gpio: thermostat.gpio,
-            temperature: [[None; 4]; 4],
-            statistics_buff: [[None; 4]; 4],
+            temperature,
+            statistics_buff,
         };
 
         (shared, local, init::Monotonics(mono))
@@ -247,15 +261,15 @@ mod app {
             telemetry.monitor.overtemp = gpio.overtemp();
             telemetry.monitor.poe = gpio.poe();
         });
-        // finalize temperature telemetry
 
+        // finalize temperature telemetry and reset buffer
         c.shared.statistics_buff.lock(|buff| {
             buff.iter_mut()
                 .flatten()
                 .zip(telemetry.statistics.iter_mut().flatten())
                 .for_each(|(buff, stat)| {
                     *stat = buff.map(|b| b.into());
-                    *buff = buff.map(|b| Buffer::default());
+                    *buff = buff.map(|_| Buffer::default());
                 })
         });
 
@@ -273,7 +287,7 @@ mod app {
         let alarm = c.shared.settings.lock(|settings| settings.alarm.clone());
         if alarm.armed {
             let temperatures = c.shared.temperature.lock(|temp| *temp);
-            let alarm_tele = c.shared.telemetry.lock(|telemetry| telemetry.monitor.alarm);
+            let mut alarm_tele = c.shared.telemetry.lock(|telemetry| telemetry.monitor.alarm);
             let mut alarm_state = false;
             for ((&temp, limits), alarm_tele) in temperatures
                 .iter()
@@ -331,17 +345,18 @@ mod app {
         ch: AdcChannel,
         adc_code: AdcCode,
     ) {
-        let idx = input_ch as usize;
-        // convert ADC code to °C and store in temperature array and telemetry buffer
+        let (phy_i, ch_i) = (phy as usize, ch as usize);
         let temperature = adc_code.into();
         c.shared.temperature.lock(|temp| {
-            temp[idx] = temperature;
+            temp[phy_i][ch_i] = Some(temperature);
         });
         c.shared.statistics_buff.lock(|temp_buff| {
-            temp_buff[idx].update(temperature);
+            if let Some(mut buff) = temp_buff[phy_i][ch_i] {
+                buff.update(temperature);
+            }
         });
         // start processing when the last adc channel has been read out
-        if input_ch == Input::Seven {
+        if phy == AdcPhy::Three {
             process_output_channel::spawn(OutputChannelIdx::Zero).unwrap();
             process_output_channel::spawn(OutputChannelIdx::One).unwrap();
             process_output_channel::spawn(OutputChannelIdx::Two).unwrap();
