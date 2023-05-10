@@ -205,5 +205,5 @@ pub struct Alarm {
     /// # Value
     /// [[[f32, f32]; 4]; 4]
     #[miniconf(defer)]
-    pub temperature_limits: [[[f32; 2]; 4]; 4],
+    pub temperature_limits: [[Option<[f32; 2]>; 4]; 4],
 }

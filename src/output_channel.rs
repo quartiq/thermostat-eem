@@ -57,7 +57,7 @@ impl OutputChannel {
     /// compute weigthed iir input, iir state and return the new output
     pub fn update(
         &mut self,
-        channel_temperatures: &[[f64; 4]; 4],
+        channel_temperatures: &[[Option<f64>; 4]; 4],
         iir_state: &mut iir::Vec5<f64>,
         hold: bool,
     ) -> f32 {
@@ -73,7 +73,7 @@ impl OutputChannel {
             .iter()
             .flatten()
             .zip(self.weights.iter().flatten())
-            .map(|(t, w)| *t * w.unwrap_or(0.) as f64)
+            .map(|(t, w)| t.unwrap_or(0.) * w.unwrap_or(0.) as f64)
             .sum();
         if self.shutdown || self.hold {
             IIR_HOLD.update(iir_state, weighted_temperature, hold) as f32

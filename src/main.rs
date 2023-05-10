@@ -70,7 +70,7 @@ impl Default for Settings {
                 armed: false,
                 target: heapless::String::<128>::default(),
                 period_ms: 1000,
-                temperature_limits: [[[f32::MIN, f32::MAX]; 4]; 4],
+                temperature_limits: [[None; 4]; 4],
             },
         }
     }
@@ -87,7 +87,7 @@ pub struct Monitor {
     output_voltage: [f32; 4],
     poe: PoePower,
     overtemp: bool,
-    alarm: [[bool; 4]; 4], // Alarm status for each input channel
+    alarm: [[Option<bool>; 4]; 4], // Alarm status for each input channel
 }
 
 #[derive(Serialize, Copy, Clone, Default, Debug)]
@@ -99,7 +99,10 @@ pub struct Telemetry {
 
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
 mod app {
-    use crate::hardware::{ad7172::AdcChannel, adc::AdcPhy};
+    use crate::{
+        hardware::{ad7172::AdcChannel, adc::AdcPhy},
+        net::telemetry,
+    };
 
     use super::*;
 
@@ -270,18 +273,22 @@ mod app {
         let alarm = c.shared.settings.lock(|settings| settings.alarm.clone());
         if alarm.armed {
             let temperatures = c.shared.temperature.lock(|temp| *temp);
+            let alarm_tele = c.shared.telemetry.lock(|telemetry| telemetry.monitor.alarm);
             let mut alarm_state = false;
-            for (i, (&temp, limits)) in temperatures
+            for ((&temp, limits), alarm_tele) in temperatures
                 .iter()
                 .flatten()
                 .zip(alarm.temperature_limits.iter().flatten())
-                .enumerate()
+                .zip(alarm_tele.iter_mut().flatten())
             {
-                let t = !(limits[0]..limits[1]).contains(&(temp as f32));
-                c.shared.telemetry.lock(|tele| tele.monitor.alarm[i] = t);
-                if t {
+                // It is OK here to use [f32::MIN, f32::MAX] as limits where there is an enabled channel but no limits.
+                // This should never happen anyways since we set the limits to [f32::MIN, f32::MAX] per default for enabled channels.
+                *alarm_tele = temp.map(|temp| {
+                    let ls = limits.unwrap_or([f32::MIN, f32::MAX]);
+                    !(ls[0]..ls[1]).contains(&(temp as f32))
+                });
+                if *alarm_tele == Some(true) {
                     alarm_state = true;
-                    log::error!("channel {} temperature out of range, Alarm tripped!", i);
                 }
             }
             c.shared
