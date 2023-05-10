@@ -65,8 +65,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
-            output_channel: [output_channel::OutputChannel::new(0., -0., 0., [[0.; 4]; 4]); 4]
-                .into(),
+            output_channel: [output_channel::OutputChannel::new(0., -0., 0.)].into(),
             alarm: Alarm {
                 armed: false,
                 target: heapless::String::<128>::default(),
@@ -273,7 +272,8 @@ mod app {
             let temperatures = c.shared.temperature.lock(|temp| *temp);
             let mut alarm_state = false;
             for (i, (&temp, limits)) in temperatures
-                .iter().flatten()
+                .iter()
+                .flatten()
                 .zip(alarm.temperature_limits.iter().flatten())
                 .enumerate()
             {

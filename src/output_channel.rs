@@ -5,9 +5,8 @@ use crate::hardware::pwm::Pwm;
 use idsp::iir;
 use miniconf::Miniconf;
 use num_traits::Signed;
-use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Debug, Deserialize, Serialize, Miniconf)]
+#[derive(Copy, Clone, Debug, Miniconf)]
 pub struct OutputChannel {
     /// En-/Disables the TEC driver. This implies "hold".
     ///
@@ -38,22 +37,20 @@ pub struct OutputChannel {
     /// Thermostat input channel weights. Each input temperature is multiplied by its weight
     /// and the accumulated output is fed into the IIR.
     /// The weights will be internally normalized to one (sum of the absolute values).
-    ///
-    /// # Value
-    /// [[f32; 4]; 4]
-    pub weights: [[f32; 4]; 4],
+    #[miniconf(defer)]
+    pub weights: miniconf::Array<miniconf::Array<Option<f32>, 4>, 4>,
 }
 
 impl OutputChannel {
     /// idsp https://docs.rs/idsp/latest/idsp/ f64 implementation with input
     /// weights to route and weigh 8 input channels into one IIR.
-    pub fn new(gain: f64, y_min: f64, y_max: f64, weights: [[f32; 4]; 4]) -> Self {
+    pub fn new(gain: f64, y_min: f64, y_max: f64) -> Self {
         OutputChannel {
             shutdown: true,
             hold: false,
             voltage_limit: 1.0,
             iir: iir::IIR::new(gain, y_min, y_max),
-            weights,
+            weights: Default::default(),
         }
     }
 
@@ -71,11 +68,17 @@ impl OutputChannel {
             y_min: f64::MIN,
             y_max: f64::MAX,
         };
+
         let weighted_temperature = channel_temperatures
             .iter()
-            .flatten()
-            .zip(self.weights.iter().flatten())
-            .map(|(temperature, weight)| *temperature * *weight as f64)
+            .zip(self.weights.iter())
+            .map(|(temperature, weight)| {
+                temperature
+                    .iter()
+                    .zip(weight.iter())
+                    .map(|(t, w)| (*t * w.unwrap_or(0.) as f64))
+                    .sum::<f64>()
+            })
             .sum();
         if self.shutdown || self.hold {
             IIR_HOLD.update(iir_state, weighted_temperature, hold) as f32
