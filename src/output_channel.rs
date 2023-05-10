@@ -71,14 +71,9 @@ impl OutputChannel {
 
         let weighted_temperature = channel_temperatures
             .iter()
-            .zip(self.weights.iter())
-            .map(|(temperature, weight)| {
-                temperature
-                    .iter()
-                    .zip(weight.iter())
-                    .map(|(t, w)| (*t * w.unwrap_or(0.) as f64))
-                    .sum::<f64>()
-            })
+            .flatten()
+            .zip(self.weights.iter().flatten())
+            .map(|(t, w)| *t * w.unwrap_or(0.) as f64)
             .sum();
         if self.shutdown || self.hold {
             IIR_HOLD.update(iir_state, weighted_temperature, hold) as f32
@@ -108,12 +103,10 @@ impl OutputChannel {
             .sum();
         // maybe todo: ensure that the weights actually impact an enabled channel
         if divisor != 0.0 {
-            self.weights.iter_mut().map(|w| {
-                w.iter_mut().for_each(|w| {
-                    if let Some(w) = w {
-                        *w /= divisor
-                    }
-                })
+            self.weights.iter_mut().flatten().for_each(|w| {
+                if let Some(w) = w {
+                    *w /= divisor
+                }
             });
         }
         [
