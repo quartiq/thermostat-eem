@@ -65,7 +65,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
-            output_channel: [output_channel::OutputChannel::new(0., -0., 0.)].into(),
+            output_channel: [output_channel::OutputChannel::new(0., -0., 0.); 4].into(),
             alarm: Alarm {
                 armed: false,
                 target: heapless::String::<128>::default(),

@@ -101,13 +101,20 @@ impl OutputChannel {
             .y_min
             .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT);
         self.voltage_limit = self.voltage_limit.clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
-        let divisor: f32 = self.weights.iter().flatten().map(|w| w.abs()).sum();
+        let divisor: f32 = self
+            .weights
+            .iter()
+            .map(|w| w.iter().map(|w| w.unwrap_or(0.).abs()).sum::<f32>())
+            .sum();
         // maybe todo: ensure that the weights actually impact an enabled channel
         if divisor != 0.0 {
-            self.weights
-                .iter_mut()
-                .flatten()
-                .for_each(|w| *w /= divisor)
+            self.weights.iter_mut().map(|w| {
+                w.iter_mut().for_each(|w| {
+                    if let Some(w) = w {
+                        *w /= divisor
+                    }
+                })
+            });
         }
         [
             // [Pwm::MAX_CURRENT_LIMIT] + 5% is still below 100% duty cycle for the PWM limits and therefore OK.
