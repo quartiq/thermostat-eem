@@ -337,8 +337,7 @@ mod app {
     }
 
     // Higher priority than telemetry but lower than adc data readout.
-    // 8 capacity to allow for max. 8 conversions to be queued.
-    #[task(priority = 2, shared=[temperature, statistics_buff], capacity = 8)]
+    #[task(priority = 2, shared=[temperature, statistics_buff], capacity = 4)]
     fn convert_adc_code(
         mut c: convert_adc_code::Context,
         phy: AdcPhy,

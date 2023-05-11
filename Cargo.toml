@@ -13,6 +13,11 @@ exclude = [
 	".gitignore"
 ]
 
+[features]
+default = ["all_differential"]
+all_differential = []
+ai_artiq = []
+
 [dependencies]
 cortex-m = { version = "0.7" }
 cortex-m-rt = { version = "0.7", features = ["device"] }

@@ -344,6 +344,7 @@ pub fn setup(
     // enable MCO 2MHz clock output to ADCs
     gpioa.pa8.into_alternate::<0>();
 
+    #[cfg(feature = "all_differential")]
     let adc_input_config = AdcConfig {
         input_config: [
             [
@@ -372,6 +373,38 @@ pub fn setup(
             ],
         ],
     };
+
+    #[cfg(feature = "ai_artiq")]
+    let adc_input_config = AdcConfig {
+        input_config: [
+            [
+                [Some(AdcInput::Ain0), Some(AdcInput::Ain1)],
+                [Some(AdcInput::Ain2), Some(AdcInput::Ain3)],
+                [None, None],
+                [None, None],
+            ],
+            [
+                [Some(AdcInput::Ain0), Some(AdcInput::Ain1)],
+                [Some(AdcInput::Ain2), Some(AdcInput::Ain3)],
+                [None, None],
+                [None, None],
+            ],
+            [
+                [Some(AdcInput::Ain0), Some(AdcInput::Ain1)],
+                [Some(AdcInput::Ain2), Some(AdcInput::Ain3)],
+                [None, None],
+                [None, None],
+            ],
+            [
+                [Some(AdcInput::Ain0), None],
+                [Some(AdcInput::Ain1), None],
+                [Some(AdcInput::Ain2), None],
+                [Some(AdcInput::Ain3), None],
+            ],
+        ],
+    };
+
+    log::info!("ADC input configuration: {:?}", adc_input_config);
 
     let adc = Adc::new(
         &mut delay,
