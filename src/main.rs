@@ -163,8 +163,6 @@ mod app {
             iir_state: [[0.; 5]; 4],
         };
 
-        log::info!("thermostat.adc_channels: {:?}", thermostat.adc_channels);
-
         // Initialize enabled temperatures and statistics buffers.
         let mut temperature: [[Option<f64>; 4]; 4] = [[None; 4]; 4];
         let mut statistics_buff: [[Option<Buffer>; 4]; 4] = [[None; 4]; 4];
@@ -350,8 +348,8 @@ mod app {
         c.shared.temperature.lock(|temp| {
             temp[phy_i][ch_i] = Some(temperature);
         });
-        c.shared.statistics_buff.lock(|temp_buff| {
-            if let Some(mut buff) = temp_buff[phy_i][ch_i] {
+        c.shared.statistics_buff.lock(|stat_buff| {
+            if let Some(buff) = &mut stat_buff[phy_i][ch_i] {
                 buff.update(temperature);
             }
         });
