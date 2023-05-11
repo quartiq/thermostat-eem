@@ -290,7 +290,7 @@ impl Adc {
                     AdcInput::Ain3 => ad7172::Channel::Ainpos::AIN3,
                     AdcInput::Ain4 => ad7172::Channel::Ainpos::AIN4,
                 });
-            let ainneg = cfg[0]
+            let ainneg = cfg[1]
                 .as_ref()
                 .map_or(ad7172::Channel::Ainneg::AIN4, |a| match a {
                     AdcInput::Ain0 => ad7172::Channel::Ainneg::AIN0,
