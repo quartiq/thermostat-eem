@@ -163,7 +163,8 @@ mod app {
             iir_state: [[0.; 5]; 4],
         };
 
-        // Initialize enabled temperatures and statistics buffers.
+        // Initialize enabled temperatures, statistics buffers and alarm tele.
+        let mut telemetry = Telemetry::default();
         let mut temperature: [[Option<f64>; 4]; 4] = [[None; 4]; 4];
         let mut statistics_buff: [[Option<Buffer>; 4]; 4] = [[None; 4]; 4];
         thermostat
@@ -172,9 +173,10 @@ mod app {
             .flatten()
             .zip(temperature.iter_mut().flatten())
             .zip(statistics_buff.iter_mut().flatten())
-            .for_each(|((ch, temp), buff)| {
+            .zip(telemetry.monitor.alarm.iter_mut().flatten())
+            .for_each(|(((ch, temp), buff), alarm)| {
                 if *ch {
-                    (*temp, *buff) = (Some(0.), Some(Buffer::default()))
+                    (*temp, *buff, *alarm) = (Some(0.), Some(Buffer::default()), Some(false))
                 }
             });
 
@@ -182,7 +184,7 @@ mod app {
             dac: thermostat.dac,
             network,
             settings,
-            telemetry: Telemetry::default(),
+            telemetry,
             gpio: thermostat.gpio,
             temperature,
             statistics_buff,
