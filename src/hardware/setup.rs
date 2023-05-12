@@ -345,6 +345,7 @@ pub fn setup(
     gpioa.pa8.into_alternate::<0>();
 
     #[cfg(feature = "all_differential")]
+    #[allow(unused_variables)]
     let adc_input_config = AdcConfig {
         input_config: [
             [
@@ -396,10 +397,10 @@ pub fn setup(
                 [None, None],
             ],
             [
-                [Some(AdcInput::Ain0), None],
-                [Some(AdcInput::Ain1), None],
-                [Some(AdcInput::Ain2), None],
-                [Some(AdcInput::Ain3), None],
+                [None, Some(AdcInput::Ain0)],
+                [None, Some(AdcInput::Ain1)],
+                [None, Some(AdcInput::Ain2)],
+                [None, Some(AdcInput::Ain3)],
             ],
         ],
     };

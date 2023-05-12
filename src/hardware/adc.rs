@@ -22,7 +22,7 @@ use num_traits::float::Float;
 pub struct AdcCode(u32);
 impl AdcCode {
     const GAIN: f32 = 0x555555 as _; // Default ADC gain from datasheet.
-    const R_REF: f32 = 2.0 * 5000.0; // Ratiometric resistor setup. 5.0K high and low side.
+    const R_REF: f32 = 2.0 * 5000.0; // Ratiometric 5.0K high and low side or single ended 10K.
     const ZERO_C: f32 = 273.15; // 0°C in °K
     const B: f32 = 3988.0; // NTC beta value. TODO: This should probaply be changeable.
     const T_N: f32 = 25.0 + AdcCode::ZERO_C; // Reference Temperature for B-parameter equation.
@@ -59,8 +59,11 @@ impl From<AdcCode> for f32 {
     /// Valid under the following conditions:
     /// * Unipolar ADC input
     /// * Unchanged ADC GAIN and OFFSET registers (default reset values)
-    /// * Resistor setup as on Thermostat-EEM
+    /// * Resistor setup as on Thermostat-EEM breakout board/AI-ARTIQ headboard
+    ///   (either ratiometric 5.0K high and low side or single ended 10K to the side the input is not referenced to)
     /// * Imput values not close to minimum/maximum (~1000 codes difference)
+    ///
+    /// Maybe this will be extended in the future to support more complex temperature sensing configurations.
     fn from(code: AdcCode) -> f32 {
         let relative_voltage = code.0 as f32 * AdcCode::FS_PER_LSB;
         // Voltage divider normalized to V_Ref = 1, inverted to get to NTC resistance.
@@ -135,13 +138,13 @@ pub enum AdcInput {
     Ain4 = 4,
 }
 /// ADC configuration structure.
-/// Maybe this struct will be extended with further configuration options for the ADCs in the future.
+/// Maybe this struct might be extended with further configuration options for the ADCs in the future.
 #[derive(Clone, Copy, Debug)]
 pub struct AdcConfig {
     /// Configuration for all ADC inputs.
     /// If the first AdcInput is assigned to an ADC channel and the second is 'None', it will be single ended and positively referenced to GND.
-    /// If the second AdcInput is assigned to an ADC channel and the first is 'None', it will be single ended and negatively referenced to GND.
-    /// If two AdcInputs are assigned to an ADC channel, they will be differential.
+    /// If the second AdcInput is assigned to an ADC channel and the first is 'None', it will be single ended and negatively referenced to AVDD.
+    /// If two AdcInputs are assigned to an ADC channel, they will be differential with the first input being positively referenced to the second.
     /// If no AdcInput is assigned to an ADC channel, it will be disabled.
     pub input_config: [[[Option<AdcInput>; 2]; 4]; 4],
 }
@@ -279,11 +282,11 @@ impl Adc {
             } else {
                 ad7172::Channel::ChEn::DISABLED
             };
-            // Single ended inputs are always relative to GND which is on AIN4 for Thermostat-EEM.
-            // If the first input of a channel is None and the second is Some(_), it will be negatively reverenced to GND.
+            // If the first input of a channel is None and the second is Some(_), it will be single ended reverenced to GND.
+            // If the second input of a channel is None and the first is Some(_), it will be single ended reverenced to AVDD.
             let ainpos = cfg[0]
                 .as_ref()
-                .map_or(ad7172::Channel::Ainneg::AIN4, |a| match a {
+                .map_or(ad7172::Channel::Ainpos::REF_P, |a| match a {
                     AdcInput::Ain0 => ad7172::Channel::Ainpos::AIN0,
                     AdcInput::Ain1 => ad7172::Channel::Ainpos::AIN1,
                     AdcInput::Ain2 => ad7172::Channel::Ainpos::AIN2,
@@ -292,7 +295,7 @@ impl Adc {
                 });
             let ainneg = cfg[1]
                 .as_ref()
-                .map_or(ad7172::Channel::Ainneg::AIN4, |a| match a {
+                .map_or(ad7172::Channel::Ainneg::REF_N, |a| match a {
                     AdcInput::Ain0 => ad7172::Channel::Ainneg::AIN0,
                     AdcInput::Ain1 => ad7172::Channel::Ainneg::AIN1,
                     AdcInput::Ain2 => ad7172::Channel::Ainneg::AIN2,
