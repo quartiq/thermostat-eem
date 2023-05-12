@@ -146,7 +146,7 @@ pub enum AdcInput {
 }
 
 /// ADC configuration structure.
-/// Maybe this struct might be extended with further configuration options for the ADCs in the future.
+/// Could be extended with further configuration options for the ADCs in the future.
 #[derive(Clone, Copy, Debug)]
 pub struct AdcConfig {
     /// Configuration for all ADC inputs. Four ADCs with four inputs each.
@@ -269,28 +269,30 @@ impl Adc {
         self.adcs
             .write(ad7172::AdcReg::IFMODE, ad7172::Ifmode::DataStat::ENABLED);
 
-        for (channel, data) in input_config.iter().enumerate().map(|(ch, cfg)| {
-            let channel = match ch {
-                0 => ad7172::AdcReg::CH0,
-                1 => ad7172::AdcReg::CH1,
-                2 => ad7172::AdcReg::CH2,
-                3 => ad7172::AdcReg::CH3,
-                _ => unreachable!(),
-            };
-            let en = if cfg.is_some() {
-                ad7172::Channel::ChEn::ENABLED
-            } else {
-                ad7172::Channel::ChEn::DISABLED
-            };
-            let (ainpos, ainneg) = if let Some(cfg) = cfg {
-                ((cfg.0 as u32) << 5, (cfg.1 as u32)) // see datasheet or [ad7172::Channel::Ainpos] and [ad7172::Channel::Ainneg]
-            } else {
-                (0, 0) // Default to zero. Doesn't matter since channel will be disabled.
-            };
+        for (channel, data) in input_config
+            .iter()
+            .zip([
+                ad7172::AdcReg::CH0,
+                ad7172::AdcReg::CH1,
+                ad7172::AdcReg::CH2,
+                ad7172::AdcReg::CH3,
+            ])
+            .map(|(cfg, ch)| {
+                let en = if cfg.is_some() {
+                    ad7172::Channel::ChEn::ENABLED
+                } else {
+                    ad7172::Channel::ChEn::DISABLED
+                };
+                let (ainpos, ainneg) = if let Some(cfg) = cfg {
+                    ((cfg.0 as u32) << 5, (cfg.1 as u32)) // see datasheet or [ad7172::Channel::Ainpos] and [ad7172::Channel::Ainneg]
+                } else {
+                    (0, 0) // Default to zero. Doesn't matter since channel will be disabled.
+                };
 
-            let data = en | ad7172::Channel::SetupSel::SETUP_0 | ainpos | ainneg; // only Setup 0 for now
-            (channel, data)
-        }) {
+                let data = en | ad7172::Channel::SetupSel::SETUP_0 | ainpos | ainneg; // only Setup 0 for now
+                (ch, data)
+            })
+        {
             self.adcs.write(channel, data);
         }
 
