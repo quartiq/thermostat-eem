@@ -405,7 +405,9 @@ pub fn setup(
         ],
     };
 
-    log::info!("ADC input configuration: {:?}", adc_input_config);
+    for (i, config) in adc_input_config.input_config.iter().enumerate() {
+        log::info!("ADC{} input configuration: {:?}", i, config);
+    }
 
     let adc = Adc::new(
         &mut delay,
