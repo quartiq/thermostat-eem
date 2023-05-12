@@ -112,7 +112,7 @@ mod app {
         telemetry: Telemetry,
         gpio: Gpio,
 
-        /// These two can be the same generic datatype for the inputs with one beeing f64 and one buffer
+        /// These two can be the same generic datatype for the inputs with one being f64 and one buffer
         temperature: [[Option<f64>; 4]; 4], // input temperature array in °C. Organized as [Adc_idx,  Channel_idx].
         statistics_buff: [[Option<Buffer>; 4]; 4], // input statistics buffer for processing telemetry. Organized as [Adc_idx,  Channel_idx].Buffer; 4]; 4], // temperature buffer for processing telemetry. Organized as [Adc_idx,  Channel_idx].
         dac: Dac,
@@ -149,7 +149,7 @@ mod app {
                 .unwrap(),
         );
 
-        let settings = Settings::default();
+        let mut settings = Settings::default();
 
         ethernet_link::spawn().unwrap();
         settings_update::spawn(settings.clone()).unwrap();
@@ -179,6 +179,19 @@ mod app {
                     (*temp, *buff, *alarm) = (Some(0.), Some(Buffer::default()), Some(false))
                 }
             });
+
+        // Initialize the output weights.
+        settings.output_channel.iter_mut().for_each(|ch| {
+            ch.weights
+                .iter_mut()
+                .flatten()
+                .zip(thermostat.adc_channels.iter().flatten())
+                .for_each(|(w, en)| {
+                    if *en {
+                        *w = Some(0.0)
+                    }
+                })
+        });
 
         let shared = Shared {
             dac: thermostat.dac,
@@ -245,7 +258,6 @@ mod app {
     #[task(priority = 1, local=[adc_internal], shared=[network, settings, telemetry, gpio, statistics_buff])]
     fn telemetry_task(mut c: telemetry_task::Context) {
         let mut telemetry: Telemetry = c.shared.telemetry.lock(|telemetry| *telemetry);
-
         let adc_int = c.local.adc_internal;
         telemetry.monitor.p3v3_voltage = adc_int.read_p3v3_voltage();
         telemetry.monitor.p5v_voltage = adc_int.read_p5v_voltage();
