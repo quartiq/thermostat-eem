@@ -136,31 +136,21 @@ pub enum AdcInput {
     Ain2 = 2,
     Ain3 = 3,
     Ain4 = 4,
+    TemperaturesensorP = 5,
+    TemperaturesensorN = 6,
+    AvddMinusAvssOver5P = 7,
+    AvddMinusAvssOver5N = 8,
+    RefP = 9,
+    RefN = 10,
 }
 
 /// ADC configuration structure.
 /// Maybe this struct might be extended with further configuration options for the ADCs in the future.
 #[derive(Clone, Copy, Debug)]
 pub struct AdcConfig {
-    /// Configuration for all ADC inputs.
-    /// * If the first AdcInput is assigned to an ADC channel and the second is 'None', it will be single ended and positively referenced to GND.
-    /// * If the second AdcInput is assigned to an ADC channel and the first is 'None', it will be single ended and negatively referenced to AVDD.
-    /// * If two AdcInputs are assigned to an ADC channel, they will be differential with the first input being positively referenced to the second.
-    /// * If no AdcInput is assigned to an ADC channel, it will be disabled.
-    pub input_config: [[[Option<AdcInput>; 2]; 4]; 4],
-}
-
-impl From<AdcConfig> for [[bool; 4]; 4] {
-    fn from(config: AdcConfig) -> Self {
-        let mut result = [[false; 4]; 4];
-        config
-            .input_config
-            .iter()
-            .flatten()
-            .zip(result.iter_mut().flatten())
-            .for_each(|(cfg, ch)| *ch = cfg[0].is_some() || cfg[1].is_some());
-        result
-    }
+    /// Configuration for all ADC inputs. Four ADCs with four inputs each.
+    /// Some(([AdcInput], [AdcInput])) positive and negative channel inputs or None to disable the channel.
+    pub input_config: [[Option<(AdcInput, AdcInput)>; 4]; 4],
 }
 
 /// Full Adc structure which holds all the ADC peripherals and auxillary pins on Thermostat-EEM and the configuration.
@@ -229,7 +219,14 @@ impl Adc {
 
     /// Returns the configuration of which ADC channels are enabled.
     pub fn channels(&self) -> [[bool; 4]; 4] {
-        self.config.into()
+        let mut result = [[false; 4]; 4];
+        self.config
+            .input_config
+            .iter()
+            .flatten()
+            .zip(result.iter_mut().flatten())
+            .for_each(|(cfg, ch)| *ch = cfg.is_some());
+        result
     }
 
     /// Call a closure while the given `AdcPhy` is selected (while its chip
@@ -248,7 +245,7 @@ impl Adc {
     fn setup_adc(
         &mut self,
         delay: &mut impl DelayUs<u16>,
-        input_config: [[Option<AdcInput>; 2]; 4],
+        input_config: [Option<(AdcInput, AdcInput)>; 4],
     ) -> Result<(), Error> {
         self.adcs.reset();
 
@@ -279,31 +276,17 @@ impl Adc {
                 3 => ad7172::AdcReg::CH3,
                 _ => unreachable!(),
             };
-            let en = if cfg[0].is_some() || cfg[1].is_some() {
+            let en = if cfg.is_some() {
                 ad7172::Channel::ChEn::ENABLED
             } else {
                 ad7172::Channel::ChEn::DISABLED
             };
-            // If the first input of a channel is None and the second is Some(_), it will be single ended reverenced to GND.
-            // If the second input of a channel is None and the first is Some(_), it will be single ended reverenced to AVDD.
-            let ainpos = cfg[0]
-                .as_ref()
-                .map_or(ad7172::Channel::Ainpos::REF_P, |a| match a {
-                    AdcInput::Ain0 => ad7172::Channel::Ainpos::AIN0,
-                    AdcInput::Ain1 => ad7172::Channel::Ainpos::AIN1,
-                    AdcInput::Ain2 => ad7172::Channel::Ainpos::AIN2,
-                    AdcInput::Ain3 => ad7172::Channel::Ainpos::AIN3,
-                    AdcInput::Ain4 => ad7172::Channel::Ainpos::AIN4,
-                });
-            let ainneg = cfg[1]
-                .as_ref()
-                .map_or(ad7172::Channel::Ainneg::REF_N, |a| match a {
-                    AdcInput::Ain0 => ad7172::Channel::Ainneg::AIN0,
-                    AdcInput::Ain1 => ad7172::Channel::Ainneg::AIN1,
-                    AdcInput::Ain2 => ad7172::Channel::Ainneg::AIN2,
-                    AdcInput::Ain3 => ad7172::Channel::Ainneg::AIN3,
-                    AdcInput::Ain4 => ad7172::Channel::Ainneg::AIN4,
-                });
+            let (ainpos, ainneg) = if let Some(cfg) = cfg {
+                ((cfg.0 as u32) << 5, (cfg.1 as u32)) // see datasheet or [ad7172::Channel::Ainpos] and [ad7172::Channel::Ainneg]
+            } else {
+                (0, 0) // Default to zero. Doesn't matter since channel will be disabled.
+            };
+
             let data = en | ad7172::Channel::SetupSel::SETUP_0 | ainpos | ainneg; // only Setup 0 for now
             (channel, data)
         }) {
