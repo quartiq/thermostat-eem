@@ -18,13 +18,14 @@ use super::hal::{
 use num_traits::float::Float;
 
 /// A type representing an ADC sample.
+/// Might be extended to support different input types (other NTCs, ref resistors etc.) in the future.
 #[derive(Copy, Clone, Debug)]
 pub struct AdcCode(u32);
 impl AdcCode {
     const GAIN: f32 = 0x555555 as _; // Default ADC gain from datasheet.
     const R_REF: f32 = 2.0 * 5000.0; // Ratiometric 5.0K high and low side or single ended 10K.
     const ZERO_C: f32 = 273.15; // 0°C in °K
-    const B: f32 = 3988.0; // NTC beta value. (Maybe this should probably be changeable)
+    const B: f32 = 3988.0; // NTC beta value.
     const T_N: f32 = 25.0 + AdcCode::ZERO_C; // Reference Temperature for B-parameter equation.
     const R_N: f32 = 10000.0; // TEC resistance at T_N.
 
