@@ -24,7 +24,7 @@ impl AdcCode {
     const GAIN: f32 = 0x555555 as _; // Default ADC gain from datasheet.
     const R_REF: f32 = 2.0 * 5000.0; // Ratiometric 5.0K high and low side or single ended 10K.
     const ZERO_C: f32 = 273.15; // 0°C in °K
-    const B: f32 = 3988.0; // NTC beta value. TODO: This should probaply be changeable.
+    const B: f32 = 3988.0; // NTC beta value. (Maybe this should probably be changeable)
     const T_N: f32 = 25.0 + AdcCode::ZERO_C; // Reference Temperature for B-parameter equation.
     const R_N: f32 = 10000.0; // TEC resistance at T_N.
 
@@ -51,7 +51,7 @@ impl From<AdcCode> for u32 {
 impl From<AdcCode> for f32 {
     /// Convert raw ADC codes to temperature value in °C using the AD7172 input voltage to code
     /// relation, the ratiometric resistor setup and the "B-parameter" equation (a simple form of the
-    /// Steinhart-Hart equation). This is a treadeoff between computation and absolute temperature
+    /// Steinhart-Hart equation). This is a tradeoff between computation and absolute temperature
     /// accuracy. The f32 output dataformat leads to an output quantization of about 31 uK.
     /// Additionally there is some error (in addition to the re-quantization) introduced during the
     /// various computation steps. If the input data has less than about 5 bit RMS noise, f32 should be
@@ -60,8 +60,8 @@ impl From<AdcCode> for f32 {
     /// * Unipolar ADC input
     /// * Unchanged ADC GAIN and OFFSET registers (default reset values)
     /// * Resistor setup as on Thermostat-EEM breakout board/AI-ARTIQ headboard
-    ///   (either ratiometric 5.0K high and low side or single ended 10K to the side the input is not referenced to)
-    /// * Imput values not close to minimum/maximum (~1000 codes difference)
+    ///   (either ratiometric 5.0K high and low side or single ended 10K)
+    /// * Input values not close to minimum/maximum (~1000 codes difference)
     ///
     /// Maybe this will be extended in the future to support more complex temperature sensing configurations.
     fn from(code: AdcCode) -> f32 {
@@ -76,7 +76,7 @@ impl From<AdcCode> for f32 {
 }
 
 impl From<AdcCode> for f64 {
-    /// Like `From<AdcCode> for f32` but for `f64` and correspondingly higher dynamic rande.
+    /// Like `From<AdcCode> for f32` but for `f64` and correspondingly higher dynamic range.
     fn from(code: AdcCode) -> f64 {
         let relative_voltage = (code.0 as f32 * AdcCode::FS_PER_LSB) as f64;
         let relative_resistance =
@@ -137,15 +137,16 @@ pub enum AdcInput {
     Ain3 = 3,
     Ain4 = 4,
 }
+
 /// ADC configuration structure.
 /// Maybe this struct might be extended with further configuration options for the ADCs in the future.
 #[derive(Clone, Copy, Debug)]
 pub struct AdcConfig {
     /// Configuration for all ADC inputs.
-    /// If the first AdcInput is assigned to an ADC channel and the second is 'None', it will be single ended and positively referenced to GND.
-    /// If the second AdcInput is assigned to an ADC channel and the first is 'None', it will be single ended and negatively referenced to AVDD.
-    /// If two AdcInputs are assigned to an ADC channel, they will be differential with the first input being positively referenced to the second.
-    /// If no AdcInput is assigned to an ADC channel, it will be disabled.
+    /// * If the first AdcInput is assigned to an ADC channel and the second is 'None', it will be single ended and positively referenced to GND.
+    /// * If the second AdcInput is assigned to an ADC channel and the first is 'None', it will be single ended and negatively referenced to AVDD.
+    /// * If two AdcInputs are assigned to an ADC channel, they will be differential with the first input being positively referenced to the second.
+    /// * If no AdcInput is assigned to an ADC channel, it will be disabled.
     pub input_config: [[[Option<AdcInput>; 2]; 4]; 4],
 }
 
@@ -162,7 +163,7 @@ impl From<AdcConfig> for [[bool; 4]; 4] {
     }
 }
 
-#[allow(clippy::complexity)]
+/// Full Adc structure which holds all the ADC peripherals and auxillary pins on Thermostat-EEM and the configuration.
 pub struct Adc {
     adcs: ad7172::Ad7172<hal::spi::Spi<hal::stm32::SPI4, hal::spi::Enabled>>,
     cs: [gpio::ErasedPin<gpio::Output>; 4],
@@ -205,6 +206,7 @@ impl Adc {
         Ok(adc)
     }
 
+    /// Setup all ADCs to the specifies [config].
     fn setup(&mut self, delay: &mut impl DelayUs<u16>, config: AdcConfig) -> Result<(), Error> {
         // deassert all CS first
         for pin in self.cs.iter_mut() {
@@ -330,6 +332,7 @@ impl Adc {
         Ok(())
     }
 
+    /// Read the data from the ADC and return the raw data and the status information.
     pub fn read_data(&mut self) -> (AdcCode, Option<ad7172::Status>) {
         let (data, status) = self.adcs.read_data();
         (data.into(), Some(status.into()))
@@ -356,7 +359,7 @@ impl sm::StateMachineContext for Adc {
         AdcPhy::Zero
     }
 
-    /// Clears the interupt pending flag (which does not trigger an interrupt right away since the currently
+    /// Clears the interrupt pending flag (which does not trigger an interrupt right away since the currently
     /// selected ADC does not have new data), deselects the current ADC and selects the next in line.
     /// The next ADC will then trigger the interrupt again once it has finished sampling (or when it is
     /// selected if it is done at this point) and the routine will start again.

@@ -5,7 +5,7 @@ use num_enum::TryFromPrimitive;
 
 use super::hal::hal::blocking::spi::{Transfer, Write};
 
-// ADC Register Adresses
+// ADC Register Addresses
 #[allow(unused)]
 pub enum AdcReg {
     STATUS = 0x00,
