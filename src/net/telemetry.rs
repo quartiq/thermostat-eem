@@ -82,7 +82,7 @@ impl<T: Serialize> TelemetryClient<T> {
         self.mqtt
             .client()
             .publish(
-                minimq::Publication::new(&&serde_json_core::to_vec::<bool, 5>(alarm).unwrap())
+                minimq::Publication::new(&serde_json_core::to_vec::<bool, 5>(alarm).unwrap())
                     .topic(alarm_topic)
                     .finish()
                     .unwrap(),

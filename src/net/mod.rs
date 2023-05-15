@@ -20,7 +20,7 @@ use telemetry::TelemetryClient;
 use core::fmt::Write;
 use heapless::String;
 use miniconf::Miniconf;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 pub type NetworkReference = smoltcp_nal::shared::NetworkStackProxy<'static, NetworkStack>;
 
@@ -200,12 +200,17 @@ pub struct Alarm {
 
     /// Temperature limits for the alarm.
     ///
-    /// Array of lower (0) and (1) limits for the valid temperature range of the alarm.
-    /// The alarm will be enabled if any of the input channels goes below its minimum or above its maximum temperature.
+    /// Array of lower and upper limits for the valid temperature range of the alarm.
+    /// The alarm will be asserted if any of the enabled input channels goes below its minimum or above its maximum temperature.
     /// The alarm is non latching and clears itself once all channels are in their respective limits.
     ///
+    /// # Path
+    /// `temperature_limits/<adc>/<channel>`
+    /// * <adc> specifies which adc to configure. <adc> := [0, 1, 2, 3]
+    /// * <channel> specifies which channel of an ADC to configure. Only the enabled channels for the specific ADC are available.
+    ///
     /// # Value
-    /// [[[f32, f32]; 4]; 4]
+    /// [f32, f32]
     #[miniconf(defer)]
     pub temperature_limits: miniconf::Array<miniconf::Array<Option<[f32; 2]>, 4>, 4>,
 }

@@ -344,6 +344,7 @@ pub fn setup(
     // enable MCO 2MHz clock output to ADCs
     gpioa.pa8.into_alternate::<0>();
 
+    // Each ADC has two differential inputs
     #[cfg(feature = "all_differential")]
     #[allow(unused_variables)]
     let adc_input_config = AdcConfig {
@@ -396,6 +397,7 @@ pub fn setup(
                 None,
                 None,
             ],
+            // last ADC has single ended inputs negatively referenced to the positive reference input
             [
                 Some((AdcInput::RefP, AdcInput::Ain0)),
                 Some((AdcInput::RefP, AdcInput::Ain1)),

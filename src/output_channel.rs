@@ -34,9 +34,17 @@ pub struct OutputChannel {
     /// See [iir::IIR#miniconf]
     pub iir: iir::IIR<f64>,
 
-    /// Thermostat input channel weights. Each input temperature is multiplied by its weight
-    /// and the accumulated output is fed into the IIR.
+    /// Thermostat input channel weights. Each input temperature of an enabled channel
+    /// is multiplied by its weight and the accumulated output is fed into the IIR.
     /// The weights will be internally normalized to one (sum of the absolute values).
+    ///
+    /// # Path
+    /// `weights/<adc>/<channel>`
+    /// * <adc> specifies which adc to configure. <adc> := [0, 1, 2, 3]
+    /// * <channel> specifies which channel of an ADC to configure. Only the enabled channels for the specific ADC are available.
+    ///
+    /// # Value
+    /// f32
     #[miniconf(defer)]
     pub weights: miniconf::Array<miniconf::Array<Option<f32>, 4>, 4>,
 }
@@ -44,12 +52,12 @@ pub struct OutputChannel {
 impl OutputChannel {
     /// idsp https://docs.rs/idsp/latest/idsp/ f64 implementation with input
     /// weights to route and weigh 8 input channels into one IIR.
-    pub fn new(gain: f64, y_min: f64, y_max: f64) -> Self {
+    pub fn new() -> Self {
         OutputChannel {
             shutdown: true,
             hold: false,
             voltage_limit: 1.0,
-            iir: iir::IIR::new(gain, y_min, y_max),
+            iir: iir::IIR::new(0., 0., 0.),
             weights: Default::default(),
         }
     }
@@ -102,7 +110,7 @@ impl OutputChannel {
             .iter()
             .map(|w| w.iter().map(|w| w.unwrap_or(0.).abs()).sum::<f32>())
             .sum();
-        // maybe todo: ensure that the weights actually impact an enabled channel
+        // Note: The weights which are not 'None' should always affect an enabled channel and therefore count for normalization.
         if divisor != 0.0 {
             self.weights.iter_mut().flatten().for_each(|w| {
                 if let Some(w) = w {

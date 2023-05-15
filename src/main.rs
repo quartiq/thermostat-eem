@@ -67,7 +67,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
-            output_channel: [output_channel::OutputChannel::new(0., -0., 0.); 4].into(),
+            output_channel: [output_channel::OutputChannel::new(); 4].into(),
             alarm: Alarm {
                 armed: false,
                 target: heapless::String::<128>::default(),
@@ -111,10 +111,8 @@ mod app {
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
-
-        /// These two can be the same generic datatype for the inputs with one being f64 and one buffer
         temperature: [[Option<f64>; 4]; 4], // input temperature array in °C. Organized as [Adc_idx,  Channel_idx].
-        statistics_buff: [[Option<Buffer>; 4]; 4], // input statistics buffer for processing telemetry. Organized as [Adc_idx,  Channel_idx].Buffer; 4]; 4], // temperature buffer for processing telemetry. Organized as [Adc_idx,  Channel_idx].
+        statistics_buff: [[Option<Buffer>; 4]; 4], // input statistics buffer for processing telemetry. Organized as [Adc_idx,  Channel_idx].
         dac: Dac,
     }
 
@@ -315,7 +313,7 @@ mod app {
                 .zip(alarm_tele.iter_mut().flatten())
             {
                 // It is OK here to use [f32::MIN, f32::MAX] as limits where there is an enabled channel but no limits.
-                // This should never happen anyways since we set the limits to [f32::MIN, f32::MAX] per default for enabled channels.
+                // This should never happen since we set Some(limits) for the enabled channels.
                 *alarm_tele = temp.map(|temp| {
                     let ls = limits.unwrap_or([f32::MIN, f32::MAX]);
                     !(ls[0]..ls[1]).contains(&(temp as f32))
