@@ -6,7 +6,7 @@ use idsp::iir;
 use miniconf::Miniconf;
 use num_traits::Signed;
 
-#[derive(Copy, Clone, Debug, Miniconf)]
+#[derive(Copy, Clone, Debug, Miniconf, Default)]
 pub struct OutputChannel {
     /// En-/Disables the TEC driver. This implies "hold".
     ///
@@ -50,18 +50,6 @@ pub struct OutputChannel {
 }
 
 impl OutputChannel {
-    /// idsp https://docs.rs/idsp/latest/idsp/ f64 implementation with input
-    /// weights to route and weigh 8 input channels into one IIR.
-    pub fn new() -> Self {
-        OutputChannel {
-            shutdown: true,
-            hold: false,
-            voltage_limit: 1.0,
-            iir: iir::IIR::new(0., 0., 0.),
-            weights: Default::default(),
-        }
-    }
-
     /// compute weighted iir input, iir state and return the new output
     pub fn update(
         &mut self,

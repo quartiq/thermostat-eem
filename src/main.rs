@@ -67,7 +67,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
-            output_channel: [output_channel::OutputChannel::new(); 4].into(),
+            output_channel: [output_channel::OutputChannel::default(); 4].into(),
             alarm: Alarm {
                 armed: false,
                 target: heapless::String::<128>::default(),
@@ -78,24 +78,34 @@ impl Default for Settings {
     }
 }
 
+/// Telemetry for various quantities that are continuously monitored by eg. the MCU ADC.
 #[derive(Serialize, Copy, Clone, Default, Debug)]
 pub struct Monitor {
     p3v3_voltage: f32,
     p5v_voltage: f32,
     p12v_voltage: f32,
     p12v_current: f32,
+    /// Measurement of the output reference voltages.
     output_vref: [f32; 4],
+    /// Measurement of the output currents.
     output_current: [f32; 4],
+    /// Measurement of the output voltages.
     output_voltage: [f32; 4],
+    /// See [PoEPower]
     poe: PoePower,
+    /// Overtemperature status.
     overtemp: bool,
-    alarm: [[Option<bool>; 4]; 4], // Alarm status for each input channel
+    /// Alarm status for each enabled input channel. 'None' for disabled channels.
+    alarm: [[Option<bool>; 4]; 4],
 }
-
+/// Thermostat-EEM Telemetry.
 #[derive(Serialize, Copy, Clone, Default, Debug)]
 pub struct Telemetry {
+    /// see [Monitor]
     monitor: Monitor,
+    /// [<adc>][<channel>] array of [Statistics]. 'None' for disabled channels.
     statistics: [[Option<Statistics>; 4]; 4],
+    /// Output current in Amperes for each Thermostat output channel.
     output_current: [f32; 4],
 }
 
