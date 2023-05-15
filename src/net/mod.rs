@@ -60,6 +60,7 @@ where
     /// * `app` - The name of the application.
     /// * `mac` - The MAC address of the network.
     /// * `broker` - The IP address of the MQTT broker to use.
+    /// * `settings` - The initial settings value
     ///
     /// # Returns
     /// A new struct of network users.
@@ -70,6 +71,7 @@ where
         app: &str,
         mac: smoltcp_nal::smoltcp::wire::EthernetAddress,
         broker: IpAddr,
+        settings: S,
     ) -> Self {
         let stack_manager =
             cortex_m::singleton!(: NetworkManager = NetworkManager::new(stack)).unwrap();
@@ -84,7 +86,7 @@ where
             &prefix,
             broker,
             clock,
-            S::default(),
+            settings,
         )
         .unwrap();
 
@@ -172,7 +174,7 @@ pub fn get_device_prefix(
 ///
 /// The alarm is non-latching. If alarm was "true" for a while and the temperatures come within
 /// limits again, alarm will be "false" again.
-#[derive(Clone, Debug, Miniconf, Serialize, Deserialize)]
+#[derive(Clone, Debug, Miniconf)]
 pub struct Alarm {
     /// Set the alarm to armed (true) or disarmed (false).
     /// If the alarm is armed, the device will publish it's alarm state onto the [target].
@@ -205,5 +207,5 @@ pub struct Alarm {
     /// # Value
     /// [[[f32, f32]; 4]; 4]
     #[miniconf(defer)]
-    pub temperature_limits: [[Option<[f32; 2]>; 4]; 4],
+    pub temperature_limits: miniconf::Array<miniconf::Array<Option<[f32; 2]>, 4>, 4>,
 }

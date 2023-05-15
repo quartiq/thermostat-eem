@@ -72,7 +72,7 @@ impl Default for Settings {
                 armed: false,
                 target: heapless::String::<128>::default(),
                 period_ms: 1000,
-                temperature_limits: [[None; 4]; 4],
+                temperature_limits: Default::default(),
             },
         }
     }
@@ -137,25 +137,6 @@ mod app {
 
         let mono = Systick::new(systick, thermostat.clocks.sysclk().to_Hz());
 
-        let network = NetworkUsers::new(
-            thermostat.net.stack,
-            thermostat.net.phy,
-            clock,
-            env!("CARGO_BIN_NAME"),
-            thermostat.net.mac_address,
-            option_env!("BROKER")
-                .unwrap_or("10.42.0.1")
-                .parse()
-                .unwrap(),
-        );
-
-        let mut settings = Settings::default();
-
-        ethernet_link::spawn().unwrap();
-        settings_update::spawn(settings.clone()).unwrap();
-        telemetry_task::spawn().unwrap();
-        mqtt_alarm::spawn().unwrap();
-
         let local = Local {
             adc_sm: thermostat.adc_sm,
             pwm: thermostat.pwm,
@@ -163,7 +144,9 @@ mod app {
             iir_state: [[0.; 5]; 4],
         };
 
-        // Initialize enabled temperatures, statistics buffers and alarm tele.
+        let mut settings = Settings::default();
+
+        // Initialize enabled temperatures, statistics buffers and alarm.
         let mut telemetry = Telemetry::default();
         let mut temperature: [[Option<f64>; 4]; 4] = [[None; 4]; 4];
         let mut statistics_buff: [[Option<Buffer>; 4]; 4] = [[None; 4]; 4];
@@ -174,9 +157,15 @@ mod app {
             .zip(temperature.iter_mut().flatten())
             .zip(statistics_buff.iter_mut().flatten())
             .zip(telemetry.monitor.alarm.iter_mut().flatten())
-            .for_each(|(((ch, temp), buff), alarm)| {
+            .zip(settings.alarm.temperature_limits.iter_mut().flatten())
+            .for_each(|((((ch, temp), buff), alarm), limits)| {
                 if *ch {
-                    (*temp, *buff, *alarm) = (Some(0.), Some(Buffer::default()), Some(false))
+                    (*temp, *buff, *alarm, *limits) = (
+                        Some(0.),
+                        Some(Buffer::default()),
+                        Some(false),
+                        Some([f32::MIN, f32::MAX]),
+                    )
                 }
             });
 
@@ -190,8 +179,26 @@ mod app {
                     if *en {
                         *w = Some(0.0)
                     }
-                })
+                });
         });
+
+        let network = NetworkUsers::new(
+            thermostat.net.stack,
+            thermostat.net.phy,
+            clock,
+            env!("CARGO_BIN_NAME"),
+            thermostat.net.mac_address,
+            option_env!("BROKER")
+                .unwrap_or("10.42.0.1")
+                .parse()
+                .unwrap(),
+            settings.clone(),
+        );
+
+        settings_update::spawn(settings.clone()).unwrap();
+        ethernet_link::spawn().unwrap();
+        telemetry_task::spawn().unwrap();
+        mqtt_alarm::spawn().unwrap();
 
         let shared = Shared {
             dac: thermostat.dac,
@@ -376,6 +383,12 @@ mod app {
         }
     }
 
+    #[task(priority = 3, binds = EXTI15_10, local=[adc_sm])]
+    fn adc_readout(c: adc_readout::Context) {
+        let (phy, ch, adc_code) = c.local.adc_sm.handle_interrupt();
+        convert_adc_code::spawn(phy, ch, adc_code).unwrap();
+    }
+
     #[task(priority = 1, shared=[network])]
     fn ethernet_link(mut c: ethernet_link::Context) {
         c.shared
@@ -387,11 +400,5 @@ mod app {
     #[task(binds = ETH, priority = 1)]
     fn eth(_: eth::Context) {
         unsafe { hal::ethernet::interrupt_handler() }
-    }
-
-    #[task(priority = 3, binds = EXTI15_10, local=[adc_sm])]
-    fn adc_readout(c: adc_readout::Context) {
-        let (phy, ch, adc_code) = c.local.adc_sm.handle_interrupt();
-        convert_adc_code::spawn(phy, ch, adc_code).unwrap();
     }
 }

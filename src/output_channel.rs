@@ -54,7 +54,7 @@ impl OutputChannel {
         }
     }
 
-    /// compute weigthed iir input, iir state and return the new output
+    /// compute weighted iir input, iir state and return the new output
     pub fn update(
         &mut self,
         channel_temperatures: &[[Option<f64>; 4]; 4],
