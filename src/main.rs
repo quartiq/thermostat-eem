@@ -322,10 +322,8 @@ mod app {
                 .zip(alarm.temperature_limits.iter().flatten())
                 .zip(alarm_tele.iter_mut().flatten())
             {
-                // It is OK here to use [f32::MIN, f32::MAX] as limits where there is an enabled channel but no limits.
-                // This should never happen since we set Some(limits) for the enabled channels.
                 *alarm_tele = temp.map(|temp| {
-                    let ls = limits.unwrap_or([f32::MIN, f32::MAX]);
+                    let ls = limits.unwrap();
                     !(ls[0]..ls[1]).contains(&(temp as f32))
                 });
                 if *alarm_tele == Some(true) {
