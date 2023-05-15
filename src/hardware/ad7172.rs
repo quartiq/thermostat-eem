@@ -5,7 +5,7 @@ use num_enum::TryFromPrimitive;
 
 use super::hal::hal::blocking::spi::{Transfer, Write};
 
-// ADC Register Adresses
+// ADC Register Addresses
 #[allow(unused)]
 pub enum AdcReg {
     STATUS = 0x00,
@@ -112,6 +112,7 @@ pub mod Gpiocon {
 pub mod Channel {
     pub mod ChEn {
         pub const ENABLED: u32 = 1 << 15;
+        pub const DISABLED: u32 = 0 << 15;
     }
     pub mod SetupSel {
         pub const SETUP_0: u32 = 0b00 << 12;
@@ -125,6 +126,12 @@ pub mod Channel {
         pub const AIN2: u32 = 0b00010 << 5;
         pub const AIN3: u32 = 0b00011 << 5;
         pub const AIN4: u32 = 0b00100 << 5;
+        pub const TEMPERATURESENSOR_P: u32 = 0b00101 << 5;
+        pub const TEMPERATURESENSOR_N: u32 = 0b00110 << 5;
+        pub const AVDD_MINUS_AVSS_OVER_5_P: u32 = 0b00111 << 5;
+        pub const AVDD_MINUS_AVSS_OVER_5_N: u32 = 0b01000 << 5;
+        pub const REF_P: u32 = 0b01001 << 5;
+        pub const REF_N: u32 = 0b01010 << 5;
     }
     pub mod Ainneg {
         pub const AIN0: u32 = 0b00000;
@@ -132,6 +139,12 @@ pub mod Channel {
         pub const AIN2: u32 = 0b00010;
         pub const AIN3: u32 = 0b00011;
         pub const AIN4: u32 = 0b00100;
+        pub const TEMPERATURESENSOR_P: u32 = 0b00101;
+        pub const TEMPERATURESENSOR_N: u32 = 0b00110;
+        pub const AVDD_MINUS_AVSS_OVER_5_P: u32 = 0b00111;
+        pub const AVDD_MINUS_AVSS_OVER_5_N: u32 = 0b01000;
+        pub const REF_P: u32 = 0b01001;
+        pub const REF_N: u32 = 0b01010;
     }
 }
 

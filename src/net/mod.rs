@@ -20,7 +20,7 @@ use telemetry::TelemetryClient;
 use core::fmt::Write;
 use heapless::String;
 use miniconf::Miniconf;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 pub type NetworkReference = smoltcp_nal::shared::NetworkStackProxy<'static, NetworkStack>;
 
@@ -60,6 +60,7 @@ where
     /// * `app` - The name of the application.
     /// * `mac` - The MAC address of the network.
     /// * `broker` - The IP address of the MQTT broker to use.
+    /// * `settings` - The initial settings value
     ///
     /// # Returns
     /// A new struct of network users.
@@ -70,6 +71,7 @@ where
         app: &str,
         mac: smoltcp_nal::smoltcp::wire::EthernetAddress,
         broker: IpAddr,
+        settings: S,
     ) -> Self {
         let stack_manager =
             cortex_m::singleton!(: NetworkManager = NetworkManager::new(stack)).unwrap();
@@ -84,7 +86,7 @@ where
             &prefix,
             broker,
             clock,
-            S::default(),
+            settings,
         )
         .unwrap();
 
@@ -172,7 +174,7 @@ pub fn get_device_prefix(
 ///
 /// The alarm is non-latching. If alarm was "true" for a while and the temperatures come within
 /// limits again, alarm will be "false" again.
-#[derive(Clone, Debug, Miniconf, Serialize, Deserialize)]
+#[derive(Clone, Debug, Miniconf)]
 pub struct Alarm {
     /// Set the alarm to armed (true) or disarmed (false).
     /// If the alarm is armed, the device will publish it's alarm state onto the [target].
@@ -198,12 +200,17 @@ pub struct Alarm {
 
     /// Temperature limits for the alarm.
     ///
-    /// Array of lower (0) and (1) limits for the valid temperature range of the alarm.
-    /// The alarm will be enabled if any of the input channels goes below its minimum or above its maximum temperature.
+    /// Array of lower and upper limits for the valid temperature range of the alarm.
+    /// The alarm will be asserted if any of the enabled input channels goes below its minimum or above its maximum temperature.
     /// The alarm is non latching and clears itself once all channels are in their respective limits.
     ///
+    /// # Path
+    /// `temperature_limits/<adc>/<channel>`
+    /// * <adc> specifies which adc to configure. <adc> := [0, 1, 2, 3]
+    /// * <channel> specifies which channel of an ADC to configure. Only the enabled channels for the specific ADC are available.
+    ///
     /// # Value
-    /// [[f32, f32]; 8]
+    /// [f32, f32]
     #[miniconf(defer)]
-    pub temperature_limits: [[f32; 2]; 8],
+    pub temperature_limits: miniconf::Array<miniconf::Array<Option<[f32; 2]>, 4>, 4>,
 }

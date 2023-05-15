@@ -5,9 +5,8 @@ use crate::hardware::pwm::Pwm;
 use idsp::iir;
 use miniconf::Miniconf;
 use num_traits::Signed;
-use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Debug, Deserialize, Serialize, Miniconf)]
+#[derive(Copy, Clone, Debug, Miniconf, Default)]
 pub struct OutputChannel {
     /// En-/Disables the TEC driver. This implies "hold".
     ///
@@ -35,32 +34,26 @@ pub struct OutputChannel {
     /// See [iir::IIR#miniconf]
     pub iir: iir::IIR<f64>,
 
-    /// Thermostat input channel weights. Each input temperature is multiplied by its weight
-    /// and the accumulated output is fed into the IIR.
+    /// Thermostat input channel weights. Each input temperature of an enabled channel
+    /// is multiplied by its weight and the accumulated output is fed into the IIR.
     /// The weights will be internally normalized to one (sum of the absolute values).
     ///
+    /// # Path
+    /// `weights/<adc>/<channel>`
+    /// * <adc> specifies which adc to configure. <adc> := [0, 1, 2, 3]
+    /// * <channel> specifies which channel of an ADC to configure. Only the enabled channels for the specific ADC are available.
+    ///
     /// # Value
-    /// [f32; 8]
-    pub weights: [f32; 8],
+    /// f32
+    #[miniconf(defer)]
+    pub weights: miniconf::Array<miniconf::Array<Option<f32>, 4>, 4>,
 }
 
 impl OutputChannel {
-    /// idsp https://docs.rs/idsp/latest/idsp/ f64 implementation with input
-    /// weights to route and weigh 8 input channels into one IIR.
-    pub fn new(gain: f64, y_min: f64, y_max: f64, weights: [f32; 8]) -> Self {
-        OutputChannel {
-            shutdown: true,
-            hold: false,
-            voltage_limit: 1.0,
-            iir: iir::IIR::new(gain, y_min, y_max),
-            weights,
-        }
-    }
-
-    /// compute weigthed iir input, iir state and return the new output
+    /// compute weighted iir input, iir state and return the new output
     pub fn update(
         &mut self,
-        channel_temperatures: &[f64; 8],
+        channel_temperatures: &[[Option<f64>; 4]; 4],
         iir_state: &mut iir::Vec5<f64>,
         hold: bool,
     ) -> f32 {
@@ -71,10 +64,13 @@ impl OutputChannel {
             y_min: f64::MIN,
             y_max: f64::MAX,
         };
+
         let weighted_temperature = channel_temperatures
             .iter()
-            .zip(self.weights.iter())
-            .map(|(temperature, weight)| *temperature * *weight as f64)
+            .flatten()
+            .zip(self.weights.iter().flatten())
+            // zero default for weight and temp is OK here since they should always be 'None' together and then we want to add zero
+            .map(|(t, w)| t.unwrap_or(0.) * w.unwrap_or(0.) as f64)
             .sum();
         if self.shutdown || self.hold {
             IIR_HOLD.update(iir_state, weighted_temperature, hold) as f32
@@ -97,11 +93,18 @@ impl OutputChannel {
             .y_min
             .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT);
         self.voltage_limit = self.voltage_limit.clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
-        let divisor: f32 = self.weights.iter().map(|w| w.abs()).sum();
+        let divisor: f32 = self
+            .weights
+            .iter()
+            .map(|w| w.iter().map(|w| w.unwrap_or(0.).abs()).sum::<f32>())
+            .sum();
+        // Note: The weights which are not 'None' should always affect an enabled channel and therefore count for normalization.
         if divisor != 0.0 {
-            for w in &mut self.weights {
-                *w /= divisor;
-            }
+            self.weights.iter_mut().flatten().for_each(|w| {
+                if let Some(w) = w {
+                    *w /= divisor
+                }
+            });
         }
         [
             // [Pwm::MAX_CURRENT_LIMIT] + 5% is still below 100% duty cycle for the PWM limits and therefore OK.

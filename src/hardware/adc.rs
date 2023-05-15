@@ -1,7 +1,7 @@
 // Thermostat ADC struct.
 
 use enum_iterator::{all, Sequence};
-use num_enum::{TryFromPrimitive, TryFromPrimitiveError};
+use num_enum::TryFromPrimitive;
 use smlang::statemachine;
 
 use super::ad7172::{self, AdcChannel};
@@ -18,13 +18,14 @@ use super::hal::{
 use num_traits::float::Float;
 
 /// A type representing an ADC sample.
+/// Might be extended to support different input types (other NTCs, ref resistors etc.) in the future.
 #[derive(Copy, Clone, Debug)]
 pub struct AdcCode(u32);
 impl AdcCode {
     const GAIN: f32 = 0x555555 as _; // Default ADC gain from datasheet.
-    const R_REF: f32 = 2.0 * 5000.0; // Ratiometric resistor setup. 5.0K high and low side.
+    const R_REF: f32 = 2.0 * 5000.0; // Ratiometric 5.0K high and low side or single ended 10K.
     const ZERO_C: f32 = 273.15; // 0°C in °K
-    const B: f32 = 3988.0; // NTC beta value. TODO: This should probaply be changeable.
+    const B: f32 = 3988.0; // NTC beta value.
     const T_N: f32 = 25.0 + AdcCode::ZERO_C; // Reference Temperature for B-parameter equation.
     const R_N: f32 = 10000.0; // TEC resistance at T_N.
 
@@ -51,7 +52,7 @@ impl From<AdcCode> for u32 {
 impl From<AdcCode> for f32 {
     /// Convert raw ADC codes to temperature value in °C using the AD7172 input voltage to code
     /// relation, the ratiometric resistor setup and the "B-parameter" equation (a simple form of the
-    /// Steinhart-Hart equation). This is a treadeoff between computation and absolute temperature
+    /// Steinhart-Hart equation). This is a tradeoff between computation and absolute temperature
     /// accuracy. The f32 output dataformat leads to an output quantization of about 31 uK.
     /// Additionally there is some error (in addition to the re-quantization) introduced during the
     /// various computation steps. If the input data has less than about 5 bit RMS noise, f32 should be
@@ -59,8 +60,11 @@ impl From<AdcCode> for f32 {
     /// Valid under the following conditions:
     /// * Unipolar ADC input
     /// * Unchanged ADC GAIN and OFFSET registers (default reset values)
-    /// * Resistor setup as on Thermostat-EEM
-    /// * Imput values not close to minimum/maximum (~1000 codes difference)
+    /// * Resistor setup as on Thermostat-EEM breakout board/AI-ARTIQ headboard
+    ///   (either ratiometric 5.0K high and low side or single ended 10K)
+    /// * Input values not close to minimum/maximum (~1000 codes difference)
+    ///
+    /// Maybe this will be extended in the future to support more complex temperature sensing configurations.
     fn from(code: AdcCode) -> f32 {
         let relative_voltage = code.0 as f32 * AdcCode::FS_PER_LSB;
         // Voltage divider normalized to V_Ref = 1, inverted to get to NTC resistance.
@@ -73,7 +77,7 @@ impl From<AdcCode> for f32 {
 }
 
 impl From<AdcCode> for f64 {
-    /// Like `From<AdcCode> for f32` but for `f64` and correspondingly higher dynamic rande.
+    /// Like `From<AdcCode> for f32` but for `f64` and correspondingly higher dynamic range.
     fn from(code: AdcCode) -> f64 {
         let relative_voltage = (code.0 as f32 * AdcCode::FS_PER_LSB) as f64;
         let relative_resistance =
@@ -84,30 +88,7 @@ impl From<AdcCode> for f64 {
     }
 }
 
-#[derive(Clone, Copy, TryFromPrimitive, Debug, PartialEq, Eq, Sequence)]
-#[repr(usize)]
-pub enum InputChannel {
-    Zero = 0,
-    One = 1,
-    Two = 2,
-    Three = 3,
-    Four = 4,
-    Five = 5,
-    Six = 6,
-    Seven = 7,
-}
-
-/// Decode a tuple of `(AdcPhy, AdcChannel)` to a homogeneous Thermostat input channel index.
-/// This is not the sampling schedule but merely the mapping between thermostat
-/// channel and ADC phy/channel. It would change if fewer or single-ended channels would be used.
-impl TryFrom<(AdcPhy, AdcChannel)> for InputChannel {
-    type Error = TryFromPrimitiveError<Self>;
-    fn try_from((phy, ch): (AdcPhy, AdcChannel)) -> Result<Self, Self::Error> {
-        Self::try_from(((phy as usize) << 1) + ch as usize)
-    }
-}
-
-#[derive(Clone, Copy, TryFromPrimitive, Debug, Sequence)]
+#[derive(Clone, Copy, TryFromPrimitive, Debug, Sequence, PartialEq, Eq)]
 #[repr(usize)]
 pub enum AdcPhy {
     Zero = 0,
@@ -119,18 +100,10 @@ pub enum AdcPhy {
 impl AdcPhy {
     /// ADC phy readout schedule.
     /// There are 4 physical ADCs present on Thermostat-EEM. Each of them has up to
-    /// four individual input channels. To allow flexibility in the configuration of the
-    /// channels, this readout schedule defines the ordering of readout of the channels.
-    ///
-    /// *Note*: The schedule has to  correspond to the configuration of the individual ADCs.
-    /// For this specific schedule all the ADCs are configured the same and are synced so they
-    /// all start sampling at the same time. The schedule now reads out each phy
-    /// round-robin.
-    /// This corresponds to the sequence of Thermostat channels 0,2,4,6,1,3,5,7.
-    ///
-    /// The schedule would change if the incoming sample sequence changes (heterogeneous
-    /// channel/adc configuration).
-    pub fn next(&self, _ch: &AdcChannel) -> Self {
+    /// four individual input channels. The ADCs all share the same clock and sample rate
+    /// and read out one after the other in a round-robin fashion. Therefore the sample rate
+    /// of a channel depends on how many channels are enabled on an ADC.
+    pub fn next(&self) -> Self {
         // Round-robin
         Self::try_from((*self as usize + 1) & 0x3).unwrap()
     }
@@ -157,12 +130,37 @@ pub struct AdcPins {
     pub sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
 
-#[allow(clippy::complexity)]
+#[derive(Clone, Copy, Debug)]
+pub enum AdcInput {
+    Ain0 = 0,
+    Ain1 = 1,
+    Ain2 = 2,
+    Ain3 = 3,
+    Ain4 = 4,
+    TemperaturesensorP = 5,
+    TemperaturesensorN = 6,
+    AvddMinusAvssOver5P = 7,
+    AvddMinusAvssOver5N = 8,
+    RefP = 9,
+    RefN = 10,
+}
+
+/// ADC configuration structure.
+/// Could be extended with further configuration options for the ADCs in the future.
+#[derive(Clone, Copy, Debug)]
+pub struct AdcConfig {
+    /// Configuration for all ADC inputs. Four ADCs with four inputs each.
+    /// Some(([AdcInput], [AdcInput])) positive and negative channel inputs or None to disable the channel.
+    pub input_config: [[Option<(AdcInput, AdcInput)>; 4]; 4],
+}
+
+/// Full Adc structure which holds all the ADC peripherals and auxillary pins on Thermostat-EEM and the configuration.
 pub struct Adc {
     adcs: ad7172::Ad7172<hal::spi::Spi<hal::stm32::SPI4, hal::spi::Enabled>>,
     cs: [gpio::ErasedPin<gpio::Output>; 4],
     rdyn: gpioc::PC11<gpio::Input>,
     sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
+    config: AdcConfig,
 }
 
 impl Adc {
@@ -180,6 +178,7 @@ impl Adc {
         spi4_rec: rcc::rec::Spi4,
         spi4: stm32::SPI4,
         pins: AdcPins,
+        config: AdcConfig,
     ) -> Result<Self, Error> {
         let rdyn_pullup = pins.rdyn.internal_pull_up(true);
         // SPI MODE_3: idle high, capture on second transition
@@ -191,13 +190,15 @@ impl Adc {
             cs: pins.cs,
             rdyn: rdyn_pullup,
             sync: pins.sync,
+            config,
         };
 
-        adc.setup(delay)?;
+        adc.setup(delay, config)?;
         Ok(adc)
     }
 
-    fn setup(&mut self, delay: &mut impl DelayUs<u16>) -> Result<(), Error> {
+    /// Setup all ADCs to the specifies [config].
+    fn setup(&mut self, delay: &mut impl DelayUs<u16>, config: AdcConfig) -> Result<(), Error> {
         // deassert all CS first
         for pin in self.cs.iter_mut() {
             pin.set_state(PinState::High);
@@ -207,12 +208,26 @@ impl Adc {
         self.sync.set_low();
 
         for phy in all::<AdcPhy>() {
-            self.selected(phy, |adc| adc.setup_adc(delay))?;
+            self.selected(phy, |adc| {
+                adc.setup_adc(delay, config.input_config[phy as usize])
+            })?;
         }
 
         // set sync high after initialization of all ADCs
         self.sync.set_high();
         Ok(())
+    }
+
+    /// Returns the configuration of which ADC channels are enabled.
+    pub fn channels(&self) -> [[bool; 4]; 4] {
+        let mut result = [[false; 4]; 4];
+        self.config
+            .input_config
+            .iter()
+            .flatten()
+            .zip(result.iter_mut().flatten())
+            .for_each(|(cfg, ch)| *ch = cfg.is_some());
+        result
     }
 
     /// Call a closure while the given `AdcPhy` is selected (while its chip
@@ -228,7 +243,11 @@ impl Adc {
     }
 
     /// Setup an ADC on Thermostat-EEM.
-    fn setup_adc(&mut self, delay: &mut impl DelayUs<u16>) -> Result<(), Error> {
+    fn setup_adc(
+        &mut self,
+        delay: &mut impl DelayUs<u16>,
+        input_config: [Option<(AdcInput, AdcInput)>; 4],
+    ) -> Result<(), Error> {
         self.adcs.reset();
 
         delay.delay_us(500u16);
@@ -250,21 +269,32 @@ impl Adc {
         self.adcs
             .write(ad7172::AdcReg::IFMODE, ad7172::Ifmode::DataStat::ENABLED);
 
-        self.adcs.write(
-            ad7172::AdcReg::CH0,
-            ad7172::Channel::ChEn::ENABLED
-                | ad7172::Channel::SetupSel::SETUP_0
-                | ad7172::Channel::Ainpos::AIN0
-                | ad7172::Channel::Ainneg::AIN1,
-        );
+        for (channel, data) in input_config
+            .iter()
+            .zip([
+                ad7172::AdcReg::CH0,
+                ad7172::AdcReg::CH1,
+                ad7172::AdcReg::CH2,
+                ad7172::AdcReg::CH3,
+            ])
+            .map(|(cfg, ch)| {
+                let en = if cfg.is_some() {
+                    ad7172::Channel::ChEn::ENABLED
+                } else {
+                    ad7172::Channel::ChEn::DISABLED
+                };
+                let (ainpos, ainneg) = if let Some(cfg) = cfg {
+                    ((cfg.0 as u32) << 5, (cfg.1 as u32)) // see datasheet or [ad7172::Channel::Ainpos] and [ad7172::Channel::Ainneg]
+                } else {
+                    (0, 0) // Default to zero. Doesn't matter since channel will be disabled.
+                };
 
-        self.adcs.write(
-            ad7172::AdcReg::CH1,
-            ad7172::Channel::ChEn::ENABLED
-                | ad7172::Channel::SetupSel::SETUP_0
-                | ad7172::Channel::Ainpos::AIN2
-                | ad7172::Channel::Ainneg::AIN3,
-        );
+                let data = en | ad7172::Channel::SetupSel::SETUP_0 | ainpos | ainneg; // only Setup 0 for now
+                (ch, data)
+            })
+        {
+            self.adcs.write(channel, data);
+        }
 
         self.adcs.write(
             ad7172::AdcReg::SETUPCON0,
@@ -288,6 +318,7 @@ impl Adc {
         Ok(())
     }
 
+    /// Read the data from the ADC and return the raw data and the status information.
     pub fn read_data(&mut self) -> (AdcCode, Option<ad7172::Status>) {
         let (data, status) = self.adcs.read_data();
         (data.into(), Some(status.into()))
@@ -299,7 +330,7 @@ pub mod sm {
     statemachine! {
         transitions: {
             *Stopped + Start / start = Selected(AdcPhy),
-            Selected(AdcPhy) + Read(AdcChannel) / next = Selected(AdcPhy),
+            Selected(AdcPhy) + Read / next = Selected(AdcPhy),
             Selected(AdcPhy) + Stop / stop = Stopped,
         }
     }
@@ -314,16 +345,14 @@ impl sm::StateMachineContext for Adc {
         AdcPhy::Zero
     }
 
-    /// Uses the schedule implemented in `AdcPhy::next()` to decide which ADC will have data ready next.
-    /// It clears the interupt pending flag
-    /// (which does not trigger an interrupt right away since the currently selected ADC does not have new data),
-    /// deselects the current ADC and selects the next in line. The next ADC will then trigger the interrupt
-    /// again once it has finished
-    /// sampling (or when it is selected if it is done at this point) and the routine will start again.
-    fn next(&mut self, phy: &AdcPhy, ch: &AdcChannel) -> AdcPhy {
+    /// Clears the interrupt pending flag (which does not trigger an interrupt right away since the currently
+    /// selected ADC does not have new data), deselects the current ADC and selects the next in line.
+    /// The next ADC will then trigger the interrupt again once it has finished sampling (or when it is
+    /// selected if it is done at this point) and the routine will start again.
+    fn next(&mut self, phy: &AdcPhy) -> AdcPhy {
         self.cs[*phy as usize].set_state(PinState::High);
         self.rdyn.clear_interrupt_pending_bit();
-        let next = phy.next(ch);
+        let next = phy.next();
         self.cs[next as usize].set_state(PinState::Low);
         next
     }
@@ -348,13 +377,12 @@ impl sm::StateMachine<Adc> {
     ///
     /// This routine is called every time the currently selected ADC on Thermostat reports that it has data ready
     /// to be read out by pulling the dout line low. It then reads out the ADC data via SPI.
-    pub fn handle_interrupt(&mut self) -> (InputChannel, AdcCode) {
+    pub fn handle_interrupt(&mut self) -> (AdcPhy, AdcChannel, AdcCode) {
         if let sm::States::Selected(phy) = *self.state() {
             let (code, status) = self.context_mut().read_data();
             let adc_ch = status.unwrap().channel();
-            self.process_event(sm::Events::Read(adc_ch)).unwrap();
-            let input_ch = InputChannel::try_from((phy, adc_ch)).unwrap();
-            (input_ch, code)
+            self.process_event(sm::Events::Read).unwrap();
+            (phy, adc_ch, code)
         } else {
             panic!("Unexpected State")
         }

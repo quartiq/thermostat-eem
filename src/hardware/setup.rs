@@ -1,6 +1,9 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::hardware::system_timer;
+use crate::hardware::{
+    adc::{AdcConfig, AdcInput},
+    system_timer,
+};
 use smoltcp_nal::smoltcp;
 
 use super::hal::{
@@ -104,6 +107,7 @@ pub struct ThermostatDevices {
     pub fan: Fan,
     pub adc_internal: AdcInternal,
     pub adc_sm: StateMachine<Adc>,
+    pub adc_channels: [[bool; 4]; 4],
 }
 
 #[link_section = ".sram3.eth"]
@@ -340,30 +344,100 @@ pub fn setup(
     // enable MCO 2MHz clock output to ADCs
     gpioa.pa8.into_alternate::<0>();
 
-    let mut adc_sm = StateMachine::new(
-        Adc::new(
-            &mut delay,
-            &ccdr.clocks,
-            ccdr.peripheral.SPI4,
-            device.SPI4,
-            AdcPins {
-                spi: (
-                    gpioe.pe2.into_alternate(),
-                    gpioe.pe5.into_alternate(),
-                    gpioe.pe6.into_alternate(),
-                ),
-                cs: [
-                    gpioe.pe0.into_push_pull_output().erase(),
-                    gpioe.pe1.into_push_pull_output().erase(),
-                    gpioe.pe3.into_push_pull_output().erase(),
-                    gpioe.pe4.into_push_pull_output().erase(),
-                ],
-                rdyn: gpioc.pc11.into_pull_up_input(),
-                sync: gpiob.pb11.into_push_pull_output(),
-            },
-        )
-        .unwrap(),
-    );
+    // Each ADC has two differential inputs
+    #[cfg(feature = "all_differential")]
+    #[allow(unused_variables)]
+    let adc_input_config = AdcConfig {
+        input_config: [
+            [
+                Some((AdcInput::Ain0, AdcInput::Ain1)),
+                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                None,
+                None,
+            ],
+            [
+                Some((AdcInput::Ain0, AdcInput::Ain1)),
+                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                None,
+                None,
+            ],
+            [
+                Some((AdcInput::Ain0, AdcInput::Ain1)),
+                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                None,
+                None,
+            ],
+            [
+                Some((AdcInput::Ain0, AdcInput::Ain1)),
+                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                None,
+                None,
+            ],
+        ],
+    };
+
+    #[cfg(feature = "ai_artiq")]
+    let adc_input_config = AdcConfig {
+        input_config: [
+            [
+                Some((AdcInput::Ain0, AdcInput::Ain1)),
+                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                None,
+                None,
+            ],
+            [
+                Some((AdcInput::Ain0, AdcInput::Ain1)),
+                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                None,
+                None,
+            ],
+            [
+                Some((AdcInput::Ain0, AdcInput::Ain1)),
+                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                None,
+                None,
+            ],
+            // last ADC has single ended inputs negatively referenced to the positive reference input
+            [
+                Some((AdcInput::RefP, AdcInput::Ain0)),
+                Some((AdcInput::RefP, AdcInput::Ain1)),
+                Some((AdcInput::RefP, AdcInput::Ain2)),
+                Some((AdcInput::RefP, AdcInput::Ain3)),
+            ],
+        ],
+    };
+
+    for (i, config) in adc_input_config.input_config.iter().enumerate() {
+        log::info!("ADC{} input configuration: {:?}", i, config);
+    }
+
+    let adc = Adc::new(
+        &mut delay,
+        &ccdr.clocks,
+        ccdr.peripheral.SPI4,
+        device.SPI4,
+        AdcPins {
+            spi: (
+                gpioe.pe2.into_alternate(),
+                gpioe.pe5.into_alternate(),
+                gpioe.pe6.into_alternate(),
+            ),
+            cs: [
+                gpioe.pe0.into_push_pull_output().erase(),
+                gpioe.pe1.into_push_pull_output().erase(),
+                gpioe.pe3.into_push_pull_output().erase(),
+                gpioe.pe4.into_push_pull_output().erase(),
+            ],
+            rdyn: gpioc.pc11.into_pull_up_input(),
+            sync: gpiob.pb11.into_push_pull_output(),
+        },
+        adc_input_config,
+    )
+    .unwrap();
+
+    let adc_channels = adc.channels();
+
+    let mut adc_sm = StateMachine::new(adc);
     adc_sm.start(&mut device.EXTI, &mut device.SYSCFG);
 
     let mut eeprom_i2c = {
@@ -515,5 +589,6 @@ pub fn setup(
         fan,
         adc_internal,
         adc_sm,
+        adc_channels,
     }
 }

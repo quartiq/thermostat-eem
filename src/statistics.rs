@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-/// Statistics telemetry struct.
+/// Statistics telemetry struct. Contains the mean, min and max temperature in the last telemetry period.
 #[derive(Serialize, Copy, Clone, Default, Debug)]
 pub struct Statistics {
     mean: f32,
