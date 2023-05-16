@@ -13,7 +13,7 @@ setup(
     author="QUARTIQ GmbH",
     license="MIT",
     install_requires=[
-        "stabilizer@git+https://github.com/quartiq/stabilizer#egg=pkg&subdirectory=py",
-        "miniconf-mqtt@git+https://github.com/quartiq/miniconf@v0.6.3#subdirectory=py/miniconf-mqtt",
+        "stabilizer@git+https://github.com/quartiq/stabilizer@f4055aa#subdirectory=py",
+        "miniconf-mqtt@git+https://github.com/quartiq/miniconf@8be449d#subdirectory=py/miniconf-mqtt",
     ],
 )
