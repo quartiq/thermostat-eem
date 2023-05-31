@@ -6,7 +6,7 @@ use idsp::iir;
 use miniconf::Miniconf;
 use num_traits::Signed;
 
-#[derive(Copy, Clone, Debug, Miniconf, Default)]
+#[derive(Copy, Clone, Debug, Miniconf)]
 pub struct OutputChannel {
     /// En-/Disables the TEC driver. This implies "hold".
     ///
@@ -47,6 +47,18 @@ pub struct OutputChannel {
     /// f32
     #[miniconf(defer)]
     pub weights: miniconf::Array<miniconf::Array<Option<f32>, 4>, 4>,
+}
+
+impl Default for OutputChannel {
+    fn default() -> Self {
+        Self {
+            shutdown: true,
+            hold: false,
+            voltage_limit: 0.0,
+            iir: iir::IIR::default(),
+            weights: miniconf::Array::default(),
+        }
+    }
 }
 
 impl OutputChannel {
