@@ -61,28 +61,28 @@ impl Default for OutputChannel {
     }
 }
 
+// Global "hold" IIR to apply to a channel iir state [x0,x1,x2,y0,y1] when the output should hold.
+const IIR_HOLD: iir::IIR<f64> = iir::IIR {
+    ba: [0., 0., 0., 1., 0.],
+    y_offset: 0.,
+    y_min: f64::MIN,
+    y_max: f64::MAX,
+};
+
 impl OutputChannel {
     /// compute weighted iir input, iir state and return the new output
     pub fn update(
         &mut self,
-        channel_temperatures: &[[Option<f64>; 4]; 4],
+        channel_temperatures: &[[f64; 4]; 4],
         iir_state: &mut iir::Vec5<f64>,
         hold: bool,
     ) -> f32 {
-        // Global "hold" IIR to apply to a channel iir state [x0,x1,x2,y0,y1] when the output should hold.
-        const IIR_HOLD: iir::IIR<f64> = iir::IIR {
-            ba: [0., 0., 0., 1., 0.],
-            y_offset: 0.,
-            y_min: f64::MIN,
-            y_max: f64::MAX,
-        };
-
         let weighted_temperature = channel_temperatures
             .iter()
             .flatten()
             .zip(self.weights.iter().flatten())
-            // zero default for weight and temp is OK here since they should always be 'None' together and then we want to add zero
-            .map(|(t, w)| t.unwrap_or(0.) * w.unwrap_or(0.) as f64)
+            // weight is `None` if temperature is invalid (phy cfg absent)
+            .map(|(t, w)| t * w.unwrap_or(0.) as f64)
             .sum();
         if self.shutdown || self.hold {
             IIR_HOLD.update(iir_state, weighted_temperature, hold) as f32

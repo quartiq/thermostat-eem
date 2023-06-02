@@ -28,7 +28,7 @@ use hardware::{
 use idsp::iir;
 use net::{miniconf::Miniconf, serde::Serialize, Alarm, NetworkState, NetworkUsers};
 use statistics::{Buffer, Statistics};
-use systick_monotonic::*;
+use systick_monotonic::{ExtU64, Systick};
 
 #[derive(Clone, Debug, Miniconf)]
 pub struct Settings {
@@ -67,12 +67,10 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
-            output_channel: [output_channel::OutputChannel::default(); 4].into(),
+            output_channel: [Default::default(); 4].into(),
             alarm: Alarm {
-                armed: false,
-                target: heapless::String::<128>::default(),
-                period_ms: 1000,
-                temperature_limits: Default::default(),
+                period: 1.0,
+                ..Default::default()
             },
         }
     }
@@ -95,9 +93,8 @@ pub struct Monitor {
     poe: PoePower,
     /// Overtemperature status.
     overtemp: bool,
-    /// Alarm status for each enabled input channel. 'None' for disabled channels.
-    alarm: [[Option<bool>; 4]; 4],
 }
+
 /// Thermostat-EEM Telemetry.
 #[derive(Serialize, Copy, Clone, Default, Debug)]
 pub struct Telemetry {
@@ -105,6 +102,8 @@ pub struct Telemetry {
     monitor: Monitor,
     /// [<adc>][<channel>] array of [Statistics]. 'None' for disabled channels.
     statistics: [[Option<Statistics>; 4]; 4],
+    /// Alarm status for each enabled input channel. 'None' for disabled channels.
+    alarm: [[Option<bool>; 4]; 4],
     /// Output current in Amperes for each Thermostat output channel.
     output_current: [f32; 4],
 }
@@ -121,14 +120,14 @@ mod app {
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
-        temperature: [[Option<f64>; 4]; 4], // input temperature array in °C. Organized as [Adc_idx,  Channel_idx].
-        statistics_buff: [[Option<Buffer>; 4]; 4], // input statistics buffer for processing telemetry. Organized as [Adc_idx,  Channel_idx].
-        dac: Dac,
+        temperature: [[f64; 4]; 4], // input temperature array in °C. Organized as [Adc_idx,  Channel_idx].
+        statistics_buff: [[Buffer; 4]; 4], // input statistics buffer for processing telemetry. Organized as [Adc_idx,  Channel_idx].
     }
 
     #[local]
     struct Local {
         adc_sm: StateMachine<Adc>,
+        dac: Dac,
         pwm: Pwm,
         adc_internal: AdcInternal,
         iir_state: [iir::Vec5<f64>; 4],
@@ -149,46 +148,27 @@ mod app {
             adc_sm: thermostat.adc_sm,
             pwm: thermostat.pwm,
             adc_internal: thermostat.adc_internal,
-            iir_state: [[0.; 5]; 4],
+            iir_state: Default::default(),
+            dac: thermostat.dac,
         };
 
         let mut settings = Settings::default();
 
         // Initialize enabled temperatures, statistics buffers and alarm.
         let mut telemetry = Telemetry::default();
-        let mut temperature: [[Option<f64>; 4]; 4] = [[None; 4]; 4];
-        let mut statistics_buff: [[Option<Buffer>; 4]; 4] = [[None; 4]; 4];
-        thermostat
-            .adc_channels
-            .iter()
-            .flatten()
-            .zip(temperature.iter_mut().flatten())
-            .zip(statistics_buff.iter_mut().flatten())
-            .zip(telemetry.monitor.alarm.iter_mut().flatten())
-            .zip(settings.alarm.temperature_limits.iter_mut().flatten())
-            .for_each(|((((ch, temp), buff), alarm), limits)| {
-                if *ch {
-                    (*temp, *buff, *alarm, *limits) = (
-                        Some(0.),
-                        Some(Buffer::default()),
-                        Some(false),
-                        Some([f32::MIN, f32::MAX]),
-                    )
-                }
-            });
-
-        // Initialize the output weights.
-        settings.output_channel.iter_mut().for_each(|ch| {
-            ch.weights
-                .iter_mut()
-                .flatten()
-                .zip(thermostat.adc_channels.iter().flatten())
-                .for_each(|(w, en)| {
-                    if *en {
-                        *w = Some(0.0)
+        for phy_i in 0..4 {
+            for ch_i in 0..4 {
+                if thermostat.adc_channels[phy_i][ch_i] {
+                    telemetry.alarm[phy_i][ch_i] = Some(false);
+                    telemetry.statistics[phy_i][ch_i] = Some(Default::default());
+                    settings.alarm.temperature_limits[phy_i][ch_i] = Some([f32::MIN, f32::MAX]);
+                    // Initialize the output weights.
+                    for ch in settings.output_channel.iter_mut() {
+                        ch.weights[phy_i][ch_i] = Some(0.);
                     }
-                });
-        });
+                }
+            }
+        }
 
         let network = NetworkUsers::new(
             thermostat.net.stack,
@@ -209,13 +189,12 @@ mod app {
         mqtt_alarm::spawn().unwrap();
 
         let shared = Shared {
-            dac: thermostat.dac,
             network,
             settings,
             telemetry,
             gpio: thermostat.gpio,
-            temperature,
-            statistics_buff,
+            temperature: Default::default(),
+            statistics_buff: Default::default(),
         };
 
         (shared, local, init::Monotonics(mono))
@@ -234,10 +213,10 @@ mod app {
         }
     }
 
-    #[task(priority = 1, local=[pwm], shared=[dac, settings, gpio], capacity=1)]
+    #[task(priority = 1, local=[pwm], shared=[settings, gpio], capacity=1)]
     fn settings_update(mut c: settings_update::Context, mut settings: Settings) {
         // Limit y_min and y_max values here. Will be incorporated into miniconf response later.
-        settings.output_channel.iter_mut().for_each(|ch| {
+        for ch in settings.output_channel.iter_mut() {
             ch.iir.y_max = ch
                 .iir
                 .y_max
@@ -246,7 +225,7 @@ mod app {
                 .iir
                 .y_min
                 .clamp(-DacCode::MAX_CURRENT as _, DacCode::MAX_CURRENT as _);
-        });
+        }
 
         let pwm = c.local.pwm;
         for ch in all::<OutputChannelIdx>() {
@@ -289,16 +268,18 @@ mod app {
             telemetry.monitor.poe = gpio.poe();
         });
 
-        // finalize temperature telemetry and reset buffer
-        c.shared.statistics_buff.lock(|buff| {
-            buff.iter_mut()
-                .flatten()
-                .zip(telemetry.statistics.iter_mut().flatten())
-                .for_each(|(buff, stat)| {
-                    *stat = buff.map(|b| b.into());
-                    *buff = buff.map(|_| Buffer::default());
-                })
-        });
+        // Finalize temperature telemetry and reset buffer
+        for phy_i in 0..4 {
+            for cfg_i in 0..4 {
+                let stat = &mut telemetry.statistics[phy_i][cfg_i];
+                if stat.is_some() {
+                    c.shared.statistics_buff.lock(|buff| {
+                        *stat = Some(buff[phy_i][cfg_i].into());
+                        buff[phy_i][cfg_i] = Default::default();
+                    });
+                }
+            }
+        }
 
         c.shared
             .network
@@ -314,55 +295,52 @@ mod app {
         let alarm = c.shared.settings.lock(|settings| settings.alarm.clone());
         if alarm.armed {
             let temperatures = c.shared.temperature.lock(|temp| *temp);
-            let mut alarm_tele = c.shared.telemetry.lock(|telemetry| telemetry.monitor.alarm);
+            let mut alarms: [[Option<bool>; 4]; 4] = Default::default();
             let mut alarm_state = false;
-            for ((&temp, limits), alarm_tele) in temperatures
-                .iter()
-                .flatten()
-                .zip(alarm.temperature_limits.iter().flatten())
-                .zip(alarm_tele.iter_mut().flatten())
-            {
-                *alarm_tele = temp.map(|temp| {
-                    let ls = limits.unwrap();
-                    !(ls[0]..ls[1]).contains(&(temp as f32))
-                });
-                if *alarm_tele == Some(true) {
-                    alarm_state = true;
+            for phy_i in 0..4 {
+                for cfg_i in 0..4 {
+                    if let Some(l) = alarm.temperature_limits[phy_i][cfg_i] {
+                        let a = !(l[0]..l[1]).contains(&(temperatures[phy_i][cfg_i] as _));
+                        alarms[phy_i][cfg_i] = Some(a);
+                        alarm_state |= a;
+                    }
                 }
             }
+            c.shared
+                .telemetry
+                .lock(|telemetry| telemetry.alarm = alarms);
             c.shared
                 .network
                 .lock(|net| net.telemetry.publish_alarm(&alarm.target, &alarm_state));
         }
         // Note that you have to wait for a full period of the previous setting first for a change of period to take affect.
-        mqtt_alarm::spawn_after(alarm.period_ms.millis()).unwrap();
+        mqtt_alarm::spawn_after(((alarm.period * 1000.0) as u64).millis()).unwrap();
     }
 
-    #[task(priority = 2, shared=[dac], capacity = 4)]
+    #[task(priority = 2, local=[dac], capacity=4)]
     fn convert_current_and_set_dac(
-        mut c: convert_current_and_set_dac::Context,
+        c: convert_current_and_set_dac::Context,
         output_ch: OutputChannelIdx,
         current: f32,
     ) {
         let dac_code = DacCode::try_from(current).unwrap();
-        c.shared.dac.lock(|dac| dac.set(output_ch, dac_code));
+        c.local.dac.set(output_ch, dac_code);
     }
 
     #[task(priority = 2, shared=[temperature, settings, telemetry], local=[iir_state], capacity = 4)]
     fn process_output_channel(mut c: process_output_channel::Context, output_ch: OutputChannelIdx) {
         let idx = output_ch as usize;
-        let output_current =
-            (c.shared.settings, c.shared.temperature).lock(|settings, temperature| {
-                settings.output_channel[idx].update(temperature, &mut c.local.iir_state[idx], false)
-            });
+        let current = (c.shared.settings, c.shared.temperature).lock(|settings, temperature| {
+            settings.output_channel[idx].update(temperature, &mut c.local.iir_state[idx], false)
+        });
         c.shared
             .telemetry
-            .lock(|tele| tele.output_current[idx] = output_current);
-        convert_current_and_set_dac::spawn(output_ch, output_current).unwrap();
+            .lock(|tele| tele.output_current[idx] = current);
+        convert_current_and_set_dac::spawn(output_ch, current).unwrap();
     }
 
     // Higher priority than telemetry but lower than adc data readout.
-    #[task(priority = 2, shared=[temperature, statistics_buff], capacity = 4)]
+    #[task(priority = 2, shared=[temperature, statistics_buff], capacity=4)]
     fn convert_adc_code(
         mut c: convert_adc_code::Context,
         phy: AdcPhy,
@@ -372,20 +350,17 @@ mod app {
         let (phy_i, ch_i) = (phy as usize, ch as usize);
         let temperature = adc_code.into();
         c.shared.temperature.lock(|temp| {
-            temp[phy_i][ch_i] = Some(temperature);
+            temp[phy_i][ch_i] = temperature;
         });
         c.shared.statistics_buff.lock(|stat_buff| {
-            if let Some(buff) = &mut stat_buff[phy_i][ch_i] {
-                buff.update(temperature);
-            }
+            stat_buff[phy_i][ch_i].update(temperature);
         });
         // Start processing when the last ADC has been read out.
         // This implies a zero-order hold (aka the input sample will not be updated at every signal processing step) if more than one channel is enabled on an ADC.
         if phy == AdcPhy::Three {
-            process_output_channel::spawn(OutputChannelIdx::Zero).unwrap();
-            process_output_channel::spawn(OutputChannelIdx::One).unwrap();
-            process_output_channel::spawn(OutputChannelIdx::Two).unwrap();
-            process_output_channel::spawn(OutputChannelIdx::Three).unwrap();
+            for ch in all::<OutputChannelIdx>() {
+                process_output_channel::spawn(ch).unwrap();
+            }
         }
     }
 
