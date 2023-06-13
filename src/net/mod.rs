@@ -174,7 +174,7 @@ pub fn get_device_prefix(
 ///
 /// The alarm is non-latching. If alarm was "true" for a while and the temperatures come within
 /// limits again, alarm will be "false" again.
-#[derive(Clone, Debug, Miniconf)]
+#[derive(Clone, Debug, Miniconf, Default)]
 pub struct Alarm {
     /// Set the alarm to armed (true) or disarmed (false).
     /// If the alarm is armed, the device will publish it's alarm state onto the [target].
@@ -195,8 +195,8 @@ pub struct Alarm {
     /// The alarm will publish its state with this period.
     ///
     /// # Value
-    /// u64
-    pub period_ms: u64,
+    /// f32
+    pub period: f32,
 
     /// Temperature limits for the alarm.
     ///
