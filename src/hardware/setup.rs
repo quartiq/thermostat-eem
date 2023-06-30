@@ -397,12 +397,15 @@ pub fn setup(
                 None,
                 None,
             ],
-            // last ADC has single ended inputs negatively referenced to the positive reference input
+            // This is a hack to get the single ended inputs to work. Somehow the ADC sometimes went
+            // into an error state and did not recover if the single ended channels were referenced to the positive reference input.
+            // The workaround is to connect the positive reference to an unused single ended input (Ain2) and
+            // reference the single ended input to this input. The ADC seems to not have a problem recovering here.
             [
-                Some((AdcInput::RefP, AdcInput::Ain0)),
-                Some((AdcInput::RefP, AdcInput::Ain1)),
-                Some((AdcInput::RefP, AdcInput::Ain2)),
-                Some((AdcInput::RefP, AdcInput::Ain3)),
+                Some((AdcInput::Ain2, AdcInput::Ain0)),
+                Some((AdcInput::Ain2, AdcInput::Ain1)),
+                Some((AdcInput::Ain0, AdcInput::Ain2)),
+                Some((AdcInput::Ain2, AdcInput::Ain3)),
             ],
         ],
     };
