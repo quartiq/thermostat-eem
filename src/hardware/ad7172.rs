@@ -126,12 +126,12 @@ pub mod Channel {
         pub const AIN2: u32 = 0b00010 << 5;
         pub const AIN3: u32 = 0b00011 << 5;
         pub const AIN4: u32 = 0b00100 << 5;
-        pub const TEMPERATURESENSOR_P: u32 = 0b00101 << 5;
-        pub const TEMPERATURESENSOR_N: u32 = 0b00110 << 5;
-        pub const AVDD_MINUS_AVSS_OVER_5_P: u32 = 0b00111 << 5;
-        pub const AVDD_MINUS_AVSS_OVER_5_N: u32 = 0b01000 << 5;
-        pub const REF_P: u32 = 0b01001 << 5;
-        pub const REF_N: u32 = 0b01010 << 5;
+        pub const TEMPERATURESENSOR_P: u32 = 0b10001 << 5;
+        pub const TEMPERATURESENSOR_N: u32 = 0b10010 << 5;
+        pub const AVDD_MINUS_AVSS_OVER_5_P: u32 = 0b10011 << 5;
+        pub const AVDD_MINUS_AVSS_OVER_5_N: u32 = 0b10100 << 5;
+        pub const REF_P: u32 = 0b10101 << 5;
+        pub const REF_N: u32 = 0b10110 << 5;
     }
     pub mod Ainneg {
         pub const AIN0: u32 = 0b00000;
@@ -139,12 +139,12 @@ pub mod Channel {
         pub const AIN2: u32 = 0b00010;
         pub const AIN3: u32 = 0b00011;
         pub const AIN4: u32 = 0b00100;
-        pub const TEMPERATURESENSOR_P: u32 = 0b00101;
-        pub const TEMPERATURESENSOR_N: u32 = 0b00110;
-        pub const AVDD_MINUS_AVSS_OVER_5_P: u32 = 0b00111;
-        pub const AVDD_MINUS_AVSS_OVER_5_N: u32 = 0b01000;
-        pub const REF_P: u32 = 0b01001;
-        pub const REF_N: u32 = 0b01010;
+        pub const TEMPERATURESENSOR_P: u32 = 0b10001 << 5;
+        pub const TEMPERATURESENSOR_N: u32 = 0b10010 << 5;
+        pub const AVDD_MINUS_AVSS_OVER_5_P: u32 = 0b10011 << 5;
+        pub const AVDD_MINUS_AVSS_OVER_5_N: u32 = 0b10100 << 5;
+        pub const REF_P: u32 = 0b10101 << 5;
+        pub const REF_N: u32 = 0b10110 << 5;
     }
 }
 
@@ -169,8 +169,8 @@ pub mod Setupcon {
     }
     pub mod Refsel {
         pub const EXTERNAL: u32 = 0b00 << 4;
-        pub const INTERNAL: u32 = 0b10 << 4;
-        pub const DIAGNOSTIC: u32 = 0b11 << 4;
+        pub const INTERNAL2V5: u32 = 0b10 << 4;
+        pub const AVDD_AVSS: u32 = 0b11 << 4;
     }
 }
 
