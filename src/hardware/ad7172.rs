@@ -133,19 +133,7 @@ pub mod Channel {
         pub const REF_P: u32 = 0b10101 << 5;
         pub const REF_N: u32 = 0b10110 << 5;
     }
-    pub mod Ainneg {
-        pub const AIN0: u32 = 0b00000;
-        pub const AIN1: u32 = 0b00001;
-        pub const AIN2: u32 = 0b00010;
-        pub const AIN3: u32 = 0b00011;
-        pub const AIN4: u32 = 0b00100;
-        pub const TEMPERATURESENSOR_P: u32 = 0b10001 << 5;
-        pub const TEMPERATURESENSOR_N: u32 = 0b10010 << 5;
-        pub const AVDD_MINUS_AVSS_OVER_5_P: u32 = 0b10011 << 5;
-        pub const AVDD_MINUS_AVSS_OVER_5_N: u32 = 0b10100 << 5;
-        pub const REF_P: u32 = 0b10101 << 5;
-        pub const REF_N: u32 = 0b10110 << 5;
-    }
+    pub use Ainpos as Ainneg;
 }
 
 /// ADC SETUPCON register settings. Valid for registers SETUPCON0-SETUPCON3.
