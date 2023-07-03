@@ -157,7 +157,7 @@ pub mod Setupcon {
     }
     pub mod Refsel {
         pub const EXTERNAL: u32 = 0b00 << 4;
-        pub const INTERNAL2V5: u32 = 0b10 << 4;
+        pub const INTERNAL_2V5: u32 = 0b10 << 4;
         pub const AVDD_AVSS: u32 = 0b11 << 4;
     }
 }
