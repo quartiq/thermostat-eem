@@ -3,10 +3,10 @@
 
 use crate::hardware::pwm::Pwm;
 use idsp::iir;
-use miniconf::Miniconf;
+use miniconf::Tree;
 use num_traits::Signed;
 
-#[derive(Copy, Clone, Debug, Miniconf)]
+#[derive(Copy, Clone, Debug, Tree)]
 pub struct OutputChannel {
     /// En-/Disables the TEC driver. This implies "hold".
     ///
@@ -31,7 +31,7 @@ pub struct OutputChannel {
     /// The y limits will be clamped to the maximum output current of +-3 A.
     ///
     /// # Value
-    /// See [iir::IIR#miniconf]
+    /// See [iir::IIR#tree]
     pub iir: iir::IIR<f64>,
 
     /// Thermostat input channel weights. Each input temperature of an enabled channel
@@ -45,8 +45,8 @@ pub struct OutputChannel {
     ///
     /// # Value
     /// f32
-    #[miniconf(defer)]
-    pub weights: miniconf::Array<miniconf::Array<Option<f32>, 4>, 4>,
+    #[tree(depth(3))]
+    pub weights: [[Option<f32>; 4]; 4],
 }
 
 impl Default for OutputChannel {
@@ -56,7 +56,7 @@ impl Default for OutputChannel {
             hold: false,
             voltage_limit: 0.0,
             iir: iir::IIR::default(),
-            weights: miniconf::Array::default(),
+            weights: [[None; 4]; 4],
         }
     }
 }

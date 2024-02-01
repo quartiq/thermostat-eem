@@ -21,17 +21,16 @@ ai_artiq = []
 [dependencies]
 cortex-m = { version = "0.7" }
 cortex-m-rt = { version = "0.7", features = ["device"] }
-stm32h7xx-hal =  { version = "0.13.1", features = ["stm32h743v", "rt", "ethernet"]}
+stm32h7xx-hal =  { version = "0.15.1", features = ["stm32h743v", "rt", "ethernet", "xspi"]}
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
 panic-probe = { version = "0.3.0", features = ["print-rtt"] }
 asm-delay = "0.9.0"
-smoltcp-nal = { version = "0.2", features = ["shared-stack"] }
+smoltcp-nal = { version = "0.4", features = ["shared-stack"] }
 cortex-m-rtic = "1.1.4"
 embedded-time = "0.12.1"
-miniconf = "0.6.3"
 systick-monotonic = "1.0.1"
 heapless = { version = "0.7", features = ["serde"] }
-minimq = "0.6.2"
+minimq = "0.8"
 serde = { version = "1.0.158", features = ["derive"], default-features = false }
 serde-json-core = "0.5"
 num_enum = { version = "0.5.11", default-features = false }
@@ -43,6 +42,7 @@ byteorder = { version = "1", default-features = false }
 smlang = "0.6.0"
 enum-iterator = "1.4.0"
 idsp = "0.9.2"
+miniconf = "0.9"
 
 [profile.dev]
 opt-level = 3
@@ -52,5 +52,3 @@ opt-level = 3
 lto = true
 codegen-units = 1
 
-[patch.crates-io]
-miniconf = { git = "https://github.com/quartiq/miniconf" }

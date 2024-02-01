@@ -13,18 +13,33 @@ pub mod network_processor;
 pub mod telemetry;
 
 use crate::hardware::{system_timer::SystemTimer, EthernetPhy, NetworkManager, NetworkStack};
-use minimq::embedded_nal::IpAddr;
 use network_processor::NetworkProcessor;
 use telemetry::TelemetryClient;
 
 use core::fmt::Write;
 use heapless::String;
-use miniconf::Miniconf;
+use miniconf::{JsonCoreSlash, Tree};
 use serde::Serialize;
 
 pub type NetworkReference = smoltcp_nal::shared::NetworkStackProxy<'static, NetworkStack>;
 
+// TODO: Check buffer sizes.
+pub struct MqttStorage {
+    telemetry: [u8; 2048],
+    settings: [u8; 1024],
+}
+
+impl Default for MqttStorage {
+    fn default() -> Self {
+        Self {
+            telemetry: [0u8; 2048],
+            settings: [0u8; 1024],
+        }
+    }
+}
+
 /// The default MQTT broker IP address if unspecified.
+/// TODO: Figure out how to use this?
 pub const DEFAULT_MQTT_BROKER: [u8; 4] = [10, 34, 16, 10];
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -33,22 +48,32 @@ pub enum UpdateState {
     Updated,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum NetworkState {
-    SettingsChanged,
+    SettingsChanged(String<128>),
     Updated,
     NoChange,
 }
 /// A structure of Stabilizer's default network users.
-pub struct NetworkUsers<S: Default + Miniconf + Clone, T: Serialize> {
-    pub miniconf: miniconf::MqttClient<S, NetworkReference, SystemTimer, 512>,
+pub struct NetworkUsers<S, T, const Y: usize>
+where
+    for<'de> S: Default + JsonCoreSlash<'de, Y> + Clone,
+    T: Serialize,
+{
+    pub miniconf: miniconf::MqttClient<
+        'static,
+        S,
+        NetworkReference,
+        SystemTimer,
+        miniconf::minimq::broker::NamedBroker<NetworkReference>,
+        Y,
+    >,
     pub processor: NetworkProcessor,
     pub telemetry: TelemetryClient<T>,
 }
 
-impl<S, T> NetworkUsers<S, T>
+impl<S, T, const Y: usize> NetworkUsers<S, T, Y>
 where
-    S: Default + Miniconf + Clone,
+    for<'de> S: Default + JsonCoreSlash<'de, Y> + Clone,
     T: Serialize,
 {
     /// Construct Stabilizer's default network users.
@@ -60,6 +85,7 @@ where
     /// * `app` - The name of the application.
     /// * `mac` - The MAC address of the network.
     /// * `broker` - The IP address of the MQTT broker to use.
+    /// * `id` - The MQTT client ID base to use.
     /// * `settings` - The initial settings value
     ///
     /// # Returns
@@ -69,8 +95,8 @@ where
         phy: EthernetPhy,
         clock: SystemTimer,
         app: &str,
-        mac: smoltcp_nal::smoltcp::wire::EthernetAddress,
-        broker: IpAddr,
+        id: &str,
+        broker: &str,
         settings: S,
     ) -> Self {
         let stack_manager =
@@ -78,25 +104,43 @@ where
 
         let processor = NetworkProcessor::new(stack_manager.acquire_stack(), phy);
 
-        let prefix = get_device_prefix(app, mac);
+        let prefix = get_device_prefix(app, id);
+
+        let store = cortex_m::singleton!(: MqttStorage = MqttStorage::default()).unwrap();
+
+        let named_broker =
+            miniconf::minimq::broker::NamedBroker::new(broker, stack_manager.acquire_stack())
+                .unwrap();
 
         let settings = miniconf::MqttClient::new(
             stack_manager.acquire_stack(),
-            &get_client_id(app, "settings", mac),
             &prefix,
-            broker,
             clock,
             settings,
+            miniconf::minimq::ConfigBuilder::new(named_broker, &mut store.settings)
+                .client_id(&get_client_id(id, "settings"))
+                .unwrap(),
         )
         .unwrap();
 
-        let telemetry = TelemetryClient::new(
-            stack_manager.acquire_stack(),
-            clock,
-            &get_client_id(app, "tlm", mac),
-            &prefix,
-            broker,
-        );
+        let telemetry = {
+            let named_broker =
+                miniconf::minimq::broker::NamedBroker::new(broker, stack_manager.acquire_stack())
+                    .unwrap();
+
+            let mqtt = minimq::Minimq::new(
+                stack_manager.acquire_stack(),
+                clock,
+                minimq::ConfigBuilder::new(named_broker, &mut store.telemetry)
+                    // The telemetry client doesn't receive any messages except MQTT control packets.
+                    // As such, we don't need much of the buffer for RX.
+                    .rx_buffer(minimq::config::BufferConfig::Maximum(100))
+                    .client_id(&get_client_id(id, "tlm"))
+                    .unwrap(),
+            );
+
+            TelemetryClient::new(mqtt, &prefix)
+        };
 
         NetworkUsers {
             miniconf: settings,
@@ -119,8 +163,13 @@ where
             UpdateState::Updated => NetworkState::Updated,
         };
 
-        match self.miniconf.update() {
-            Ok(true) => NetworkState::SettingsChanged,
+        let mut settings_path: String<128> = String::new();
+        match self.miniconf.handled_update(|path, old, new| {
+            settings_path = path.into();
+            *old = new.clone();
+            Result::<(), &'static str>::Ok(())
+        }) {
+            Ok(true) => NetworkState::SettingsChanged(settings_path),
             _ => poll_result,
         }
     }
@@ -129,19 +178,14 @@ where
 /// Get an MQTT client ID for a client.
 ///
 /// # Args
-/// * `app` - The name of the application
-/// * `client` - The unique tag of the client
-/// * `mac` - The MAC address of the device.
+/// * `id` - The base client ID
+/// * `mode` - The operating mode of the client. (i.e. tlm, settings)
 ///
 /// # Returns
 /// A client ID that may be used for MQTT client identification.
-fn get_client_id(
-    app: &str,
-    client: &str,
-    mac: smoltcp_nal::smoltcp::wire::EthernetAddress,
-) -> String<64> {
+fn get_client_id(id: &str, mode: &str) -> String<64> {
     let mut identifier = String::new();
-    write!(&mut identifier, "{}-{}-{}", app, mac, client).unwrap();
+    write!(&mut identifier, "{id}-{mode}").unwrap();
     identifier
 }
 
@@ -149,18 +193,15 @@ fn get_client_id(
 ///
 /// # Args
 /// * `app` - The name of the application that is executing.
-/// * `mac` - The ethernet MAC address of the device.
+/// * `id` - The MQTT ID of the device.
 ///
 /// # Returns
 /// The MQTT prefix used for this device.
-pub fn get_device_prefix(
-    app: &str,
-    mac: smoltcp_nal::smoltcp::wire::EthernetAddress,
-) -> String<128> {
+pub fn get_device_prefix(app: &str, id: &str) -> String<128> {
     // Note(unwrap): The mac address + binary name must be short enough to fit into this string. If
     // they are defined too long, this will panic and the device will fail to boot.
     let mut prefix: String<128> = String::new();
-    write!(&mut prefix, "dt/sinara/{}/{}", app, mac).unwrap();
+    write!(&mut prefix, "dt/sinara/{app}/{id}").unwrap();
 
     prefix
 }
@@ -174,7 +215,7 @@ pub fn get_device_prefix(
 ///
 /// The alarm is non-latching. If alarm was "true" for a while and the temperatures come within
 /// limits again, alarm will be "false" again.
-#[derive(Clone, Debug, Miniconf, Default)]
+#[derive(Clone, Debug, Tree, Default)]
 pub struct Alarm {
     /// Set the alarm to armed (true) or disarmed (false).
     /// If the alarm is armed, the device will publish it's alarm state onto the [target].
@@ -211,6 +252,6 @@ pub struct Alarm {
     ///
     /// # Value
     /// [f32, f32]
-    #[miniconf(defer)]
-    pub temperature_limits: miniconf::Array<miniconf::Array<Option<[f32; 2]>, 4>, 4>,
+    #[tree(depth(2))]
+    pub temperature_limits: [[Option<[f32; 2]>; 4]; 4],
 }

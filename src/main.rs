@@ -5,6 +5,8 @@
 #![no_std]
 #![no_main]
 
+use core::fmt::Write;
+
 pub mod hardware;
 pub mod net;
 pub mod output_channel;
@@ -26,11 +28,13 @@ use hardware::{
     OutputChannelIdx,
 };
 use idsp::iir;
-use net::{miniconf::Miniconf, serde::Serialize, Alarm, NetworkState, NetworkUsers};
+use miniconf::Tree;
+use net::{Alarm, NetworkState, NetworkUsers};
+use serde::Serialize;
 use statistics::{Buffer, Statistics};
 use systick_monotonic::{ExtU64, Systick};
 
-#[derive(Clone, Debug, Miniconf)]
+#[derive(Clone, Debug, Tree)]
 pub struct Settings {
     /// Specifies the telemetry output period in seconds.
     ///
@@ -49,8 +53,8 @@ pub struct Settings {
     ///
     /// # Value
     /// See [output_channel::OutputChannel]
-    #[miniconf(defer)]
-    output_channel: miniconf::Array<output_channel::OutputChannel, 4>,
+    #[tree(depth(5))]
+    output_channel: [output_channel::OutputChannel; 4],
 
     /// Alarm settings.
     ///
@@ -59,7 +63,7 @@ pub struct Settings {
     ///
     /// # Value
     /// See [Alarm]
-    #[miniconf(defer)]
+    #[tree(depth(3))]
     alarm: Alarm,
 }
 
@@ -116,7 +120,7 @@ mod app {
     type Mono = Systick<1_000>; // 1ms resolution
     #[shared]
     struct Shared {
-        network: NetworkUsers<Settings, Telemetry>,
+        network: NetworkUsers<Settings, Telemetry, 6>,
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
@@ -170,16 +174,25 @@ mod app {
             }
         }
 
+        let id = {
+            let mut mac_addr = heapless::String::<64>::new();
+            write!(
+                &mut mac_addr,
+                "{}-{}",
+                env!("CARGO_BIN_NAME"),
+                thermostat.net.mac_address
+            )
+            .unwrap();
+            mac_addr
+        };
+
         let network = NetworkUsers::new(
             thermostat.net.stack,
             thermostat.net.phy,
             clock,
             env!("CARGO_BIN_NAME"),
-            thermostat.net.mac_address,
-            option_env!("BROKER")
-                .unwrap_or("10.42.0.1")
-                .parse()
-                .unwrap(),
+            &id,
+            option_env!("BROKER").unwrap_or("mqtt"),
             settings.clone(),
         );
 
@@ -204,7 +217,7 @@ mod app {
     fn idle(mut c: idle::Context) -> ! {
         loop {
             c.shared.network.lock(|net| match net.update() {
-                NetworkState::SettingsChanged => {
+                NetworkState::SettingsChanged(_path) => {
                     settings_update::spawn(net.miniconf.settings().clone()).unwrap()
                 }
                 NetworkState::Updated => {}
