@@ -168,9 +168,9 @@ def _main():
             f"/output_channel/{args.channel}/iir",
             {
                 "ba": coefficients,
-                "y_offset": args.y_offset + forward_gain * args.x_offset,
-                "y_min": args.y_min,
-                "y_max": args.y_max,
+                "u": args.y_offset + forward_gain * args.x_offset,
+                "min": args.y_min,
+                "max": args.y_max,
             },
         )
         for i, weight in enumerate(args.input_weights):

@@ -27,7 +27,6 @@ use hardware::{
     system_timer::SystemTimer,
     OutputChannelIdx,
 };
-use idsp::iir;
 use miniconf::Tree;
 use net::{Alarm, NetworkState, NetworkUsers};
 use serde::Serialize;
@@ -134,7 +133,7 @@ mod app {
         dac: Dac,
         pwm: Pwm,
         adc_internal: AdcInternal,
-        iir_state: [iir::Vec5<f64>; 4],
+        iir_state: [[f64; 4]; 4],
     }
 
     #[init]
@@ -231,14 +230,16 @@ mod app {
     fn settings_update(mut c: settings_update::Context, mut settings: Settings) {
         // Limit y_min and y_max values here. Will be incorporated into miniconf response later.
         for ch in settings.output_channel.iter_mut() {
-            ch.iir.y_max = ch
-                .iir
-                .y_max
-                .clamp(-DacCode::MAX_CURRENT as _, DacCode::MAX_CURRENT as _);
-            ch.iir.y_min = ch
-                .iir
-                .y_min
-                .clamp(-DacCode::MAX_CURRENT as _, DacCode::MAX_CURRENT as _);
+            ch.iir.set_max(
+                ch.iir
+                    .max()
+                    .clamp(-DacCode::MAX_CURRENT as _, DacCode::MAX_CURRENT as _),
+            );
+            ch.iir.set_min(
+                ch.iir
+                    .min()
+                    .clamp(-DacCode::MAX_CURRENT as _, DacCode::MAX_CURRENT as _),
+            );
         }
 
         let pwm = c.local.pwm;
@@ -345,7 +346,7 @@ mod app {
     fn process_output_channel(mut c: process_output_channel::Context, output_ch: OutputChannelIdx) {
         let idx = output_ch as usize;
         let current = (c.shared.settings, c.shared.temperature).lock(|settings, temperature| {
-            settings.output_channel[idx].update(temperature, &mut c.local.iir_state[idx], false)
+            settings.output_channel[idx].update(temperature, &mut c.local.iir_state[idx])
         });
         c.shared
             .telemetry

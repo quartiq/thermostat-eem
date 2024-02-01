@@ -32,7 +32,7 @@ pub struct OutputChannel {
     ///
     /// # Value
     /// See [iir::IIR#tree]
-    pub iir: iir::IIR<f64>,
+    pub iir: iir::Biquad<f64>,
 
     /// Thermostat input channel weights. Each input temperature of an enabled channel
     /// is multiplied by its weight and the accumulated output is fed into the IIR.
@@ -55,27 +55,18 @@ impl Default for OutputChannel {
             shutdown: true,
             hold: false,
             voltage_limit: 0.0,
-            iir: iir::IIR::default(),
+            iir: iir::Biquad::default(),
             weights: [[None; 4]; 4],
         }
     }
 }
-
-// Global "hold" IIR to apply to a channel iir state [x0,x1,x2,y0,y1] when the output should hold.
-const IIR_HOLD: iir::IIR<f64> = iir::IIR {
-    ba: [0., 0., 0., 1., 0.],
-    y_offset: 0.,
-    y_min: f64::MIN,
-    y_max: f64::MAX,
-};
 
 impl OutputChannel {
     /// compute weighted iir input, iir state and return the new output
     pub fn update(
         &mut self,
         channel_temperatures: &[[f64; 4]; 4],
-        iir_state: &mut iir::Vec5<f64>,
-        hold: bool,
+        iir_state: &mut [f64; 4],
     ) -> f32 {
         let weighted_temperature = channel_temperatures
             .iter()
@@ -85,9 +76,9 @@ impl OutputChannel {
             .map(|(t, w)| t * w.unwrap_or(0.) as f64)
             .sum();
         if self.shutdown || self.hold {
-            IIR_HOLD.update(iir_state, weighted_temperature, hold) as f32
+            iir::Biquad::HOLD.update(iir_state, weighted_temperature) as f32
         } else {
-            self.iir.update(iir_state, weighted_temperature, hold) as f32
+            self.iir.update(iir_state, weighted_temperature) as f32
         }
     }
 
@@ -96,14 +87,16 @@ impl OutputChannel {
     /// - Normalization of the weights
     /// Returns the current limits.
     pub fn finalize_settings(&mut self) -> [f32; 2] {
-        self.iir.y_max = self
-            .iir
-            .y_max
-            .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT);
-        self.iir.y_min = self
-            .iir
-            .y_min
-            .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT);
+        self.iir.set_max(
+            self.iir
+                .max()
+                .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT),
+        );
+        self.iir.set_min(
+            self.iir
+                .min()
+                .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT),
+        );
         self.voltage_limit = self.voltage_limit.clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
         let divisor: f32 = self
             .weights
@@ -121,8 +114,8 @@ impl OutputChannel {
         [
             // [Pwm::MAX_CURRENT_LIMIT] + 5% is still below 100% duty cycle for the PWM limits and therefore OK.
             // Might not be OK for a different shunt resistor or different PWM setup.
-            (self.iir.y_max + 0.05 * Pwm::MAX_CURRENT_LIMIT).max(0.) as f32,
-            (self.iir.y_min - 0.05 * Pwm::MAX_CURRENT_LIMIT).min(0.) as f32,
+            (self.iir.max() + 0.05 * Pwm::MAX_CURRENT_LIMIT).max(0.) as f32,
+            (self.iir.min() - 0.05 * Pwm::MAX_CURRENT_LIMIT).min(0.) as f32,
         ]
     }
 }
