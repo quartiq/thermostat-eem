@@ -71,7 +71,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
-            output_channel: [Default::default(); 4].into(),
+            output_channel: [Default::default(); 4],
             alarm: Alarm {
                 period: 1.0,
                 ..Default::default()

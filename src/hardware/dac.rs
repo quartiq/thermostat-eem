@@ -1,15 +1,14 @@
-///! Thermostat DAC driver
-///!
-///! This file contains the driver for the 4 Thermostat DAC output channels.
-///! To convert a 18 bit word into an analog current Thermostat uses a DAC to
-///! convert the word into a voltage and a subsequent TEC driver IC that produces
-///! a current proportional to the DAC voltage.
-///!
-///! The 4 channel DAC ICs share an SPI bus and are addressed using individual "sync"
-///! signals, similar to a chip select signal.
-///! DAC datasheet: https://www.analog.com/media/en/technical-documentation/data-sheets/AD5680.pdf
-///! TEC driver datasheet: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
-///!
+/// Thermostat DAC driver
+///
+/// This file contains the driver for the 4 Thermostat DAC output channels.
+/// To convert a 18 bit word into an analog current Thermostat uses a DAC to
+/// convert the word into a voltage and a subsequent TEC driver IC that produces
+/// a current proportional to the DAC voltage.
+///
+/// The 4 channel DAC ICs share an SPI bus and are addressed using individual "sync"
+/// signals, similar to a chip select signal.
+/// DAC datasheet: https://www.analog.com/media/en/technical-documentation/data-sheets/AD5680.pdf
+/// TEC driver datasheet: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
 use super::hal::{
     gpio::{self, gpioc},
     hal::blocking::spi::Write,
