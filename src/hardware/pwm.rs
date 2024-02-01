@@ -1,7 +1,8 @@
-/// Thermostat TEC driver IC voltage/current limits PWM driver.
-///
-/// The Thermostat TEC driver ICs feature current limits controlled by an analog voltage input.
-/// This voltage is controlled by the MCU using low-pass filtered PWM outputs.
+//! Thermostat TEC driver IC voltage/current limits PWM driver.
+//!
+//! The Thermostat TEC driver ICs feature current limits controlled by an analog voltage input.
+//! This voltage is controlled by the MCU using low-pass filtered PWM outputs.
+//!
 use super::{
     dac::{R_SENSE, VREF_TEC},
     hal::{

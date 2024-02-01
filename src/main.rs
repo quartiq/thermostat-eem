@@ -53,7 +53,7 @@ pub struct Settings {
     ///
     /// # Value
     /// See [output_channel::OutputChannel]
-    #[tree(depth(5))]
+    #[tree(depth(4))]
     output_channel: [output_channel::OutputChannel; 4],
 
     /// Alarm settings.
@@ -63,7 +63,7 @@ pub struct Settings {
     ///
     /// # Value
     /// See [Alarm]
-    #[tree(depth(3))]
+    #[tree(depth(5))]
     alarm: Alarm,
 }
 

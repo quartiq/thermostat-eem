@@ -45,7 +45,7 @@ pub struct OutputChannel {
     ///
     /// # Value
     /// f32
-    #[tree(depth(3))]
+    #[tree(depth(2))]
     pub weights: [[Option<f32>; 4]; 4],
 }
 

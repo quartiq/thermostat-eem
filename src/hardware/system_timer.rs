@@ -1,8 +1,8 @@
-/// System timer used for non-RTIC compatibility
-///
-/// # Design
-///  `Clock` is implemented using the RTIC `app::monotonics::now()` default `Monotonic`.
-///  That `Monotonic` must tick at 1 kHz.
+//! System timer used for non-RTIC compatibility
+//!
+//! # Design
+//!  `Clock` is implemented using the RTIC `app::monotonics::now()` default `Monotonic`.
+//!  That `Monotonic` must tick at 1 kHz.
 use minimq::embedded_time::{clock::Error, fraction::Fraction, Clock, Instant};
 
 #[derive(Copy, Clone, Debug)]
