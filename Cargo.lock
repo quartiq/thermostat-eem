@@ -33,17 +33,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "asm-delay"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9a69a963b70ddacfcd382524f72a4576f359af9334b3bf48a79566590bb8bfa"
-dependencies = [
- "bitrate",
- "cortex-m 0.7.7",
- "embedded-hal",
-]
-
-[[package]]
 name = "atomic-polyfill"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -96,12 +85,6 @@ name = "bitflags"
 version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed570934406eb16438a4e976b1b4500774099c13b8cb96eec99f620f05090ddf"
-
-[[package]]
-name = "bitrate"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c147d86912d04bef727828fda769a76ca81629a46d8ba311a8d58a26aa91473d"
 
 [[package]]
 name = "built"
@@ -951,17 +934,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shared-bus-rtic"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb1899470d03c5728db375f63be8f2bbfb93d8c35ec932061f3b593434c2273b"
-dependencies = [
- "cortex-m 0.6.7",
- "embedded-hal",
- "nb 1.0.0",
-]
-
-[[package]]
 name = "smlang"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1092,7 +1064,6 @@ dependencies = [
 name = "thermostat-eem"
 version = "0.1.0"
 dependencies = [
- "asm-delay",
  "built",
  "byteorder",
  "cortex-m 0.7.7",
@@ -1112,7 +1083,6 @@ dependencies = [
  "rtt-target",
  "serde",
  "serde-json-core",
- "shared-bus-rtic",
  "smlang",
  "smoltcp-nal",
  "stm32h7xx-hal",
