@@ -13,6 +13,7 @@ pub mod dac;
 pub mod delay;
 pub mod fan;
 pub mod gpio;
+pub mod metadata;
 pub mod pwm;
 pub mod setup;
 pub mod system_timer;

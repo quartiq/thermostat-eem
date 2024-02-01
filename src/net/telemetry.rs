@@ -1,20 +1,23 @@
-///! Thermostat Telemetry Capabilities
-///!
-///! # Design
-///! Telemetry is reported regularly using an MQTT client. All telemetry is reported in SI units
-///! using standard JSON format.
-///!
-///! In order to report ADC/DAC codes generated during the DSP routines, a telemetry buffer is
-///! employed to track the latest codes. Converting these codes to SI units would result in
-///! repetitive and unnecessary calculations within the DSP routine, slowing it down and limiting
-///! sampling frequency. Instead, the raw codes are stored and the telemetry is generated as
-///! required immediately before transmission. This ensures that any slower computation required
-///! for unit conversion can be off-loaded to lower priority tasks.
+/// Thermostat Telemetry Capabilities
+///
+/// # Design
+/// Telemetry is reported regularly using an MQTT client. All telemetry is reported in SI units
+/// using standard JSON format.
+///
+/// In order to report ADC/DAC codes generated during the DSP routines, a telemetry buffer is
+/// employed to track the latest codes. Converting these codes to SI units would result in
+/// repetitive and unnecessary calculations within the DSP routine, slowing it down and limiting
+/// sampling frequency. Instead, the raw codes are stored and the telemetry is generated as
+/// required immediately before transmission. This ensures that any slower computation required
+/// for unit conversion can be off-loaded to lower priority tasks.
 use heapless::String;
 use serde::Serialize;
 
 use super::NetworkReference;
-use crate::hardware::system_timer::SystemTimer;
+use crate::hardware::{metadata::ApplicationMetadata, system_timer::SystemTimer};
+
+/// Default metadata message if formatting errors occur.
+const DEFAULT_METADATA: &str = "{\"message\":\"Truncated\"}";
 
 /// The telemetry client for reporting telemetry data over MQTT.
 pub struct TelemetryClient<T: Serialize> {
@@ -25,6 +28,8 @@ pub struct TelemetryClient<T: Serialize> {
         minimq::broker::NamedBroker<NetworkReference>,
     >,
     prefix: String<128>,
+    meta_published: bool,
+    metadata: &'static ApplicationMetadata,
     _telemetry: core::marker::PhantomData<T>,
 }
 
@@ -45,11 +50,14 @@ impl<T: Serialize> TelemetryClient<T> {
             minimq::broker::NamedBroker<NetworkReference>,
         >,
         prefix: &str,
+        metadata: &'static ApplicationMetadata,
     ) -> Self {
         Self {
             mqtt,
             prefix: String::from(prefix),
-            _telemetry: core::marker::PhantomData::default(),
+            metadata,
+            meta_published: false,
+            _telemetry: core::marker::PhantomData,
         }
     }
 
@@ -104,6 +112,49 @@ impl<T: Serialize> TelemetryClient<T> {
 
             Err(error) => log::info!("Unexpected error: {:?}", error),
             _ => {}
+        }
+
+        if !self.mqtt.client().is_connected() {
+            self.meta_published = false;
+            return;
+        }
+
+        // Publish application metadata
+        if !self.meta_published && self.mqtt.client().can_publish(minimq::QoS::AtMostOnce) {
+            let Self {
+                ref mut mqtt,
+                metadata,
+                ..
+            } = self;
+
+            let mut topic = self.prefix.clone();
+            topic.push_str("/meta").unwrap();
+
+            if mqtt
+                .client()
+                .publish(
+                    minimq::DeferredPublication::new(|buf| {
+                        serde_json_core::to_slice(&metadata, buf)
+                    })
+                    .topic(&topic)
+                    .finish()
+                    .unwrap(),
+                )
+                .is_err()
+            {
+                // Note(unwrap): We can guarantee that this message will be sent because we checked
+                // for ability to publish above.
+                mqtt.client()
+                    .publish(
+                        minimq::Publication::new(DEFAULT_METADATA.as_bytes())
+                            .topic(&topic)
+                            .finish()
+                            .unwrap(),
+                    )
+                    .unwrap();
+            }
+
+            self.meta_published = true;
         }
     }
 }

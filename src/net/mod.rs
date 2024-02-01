@@ -1,10 +1,10 @@
-///! Stabilizer network management module
-///!
-///! # Design
-///! The stabilizer network architecture supports numerous layers to permit transmission of
-///! telemetry (via MQTT), configuration of run-time settings (via MQTT + Miniconf), and live data
-///! streaming over raw UDP/TCP sockets. This module encompasses the main processing routines
-///! related to Stabilizer networking operations.
+/// Stabilizer network management module
+///
+/// # Design
+/// The stabilizer network architecture supports numerous layers to permit transmission of
+/// telemetry (via MQTT), configuration of run-time settings (via MQTT + Miniconf), and live data
+/// streaming over raw UDP/TCP sockets. This module encompasses the main processing routines
+/// related to Stabilizer networking operations.
 pub use heapless;
 pub use miniconf;
 pub use serde;
@@ -12,7 +12,10 @@ pub use serde;
 pub mod network_processor;
 pub mod telemetry;
 
-use crate::hardware::{system_timer::SystemTimer, EthernetPhy, NetworkManager, NetworkStack};
+use crate::hardware::{
+    metadata::ApplicationMetadata, system_timer::SystemTimer, EthernetPhy, NetworkManager,
+    NetworkStack,
+};
 use network_processor::NetworkProcessor;
 use telemetry::TelemetryClient;
 
@@ -23,7 +26,6 @@ use serde::Serialize;
 
 pub type NetworkReference = smoltcp_nal::shared::NetworkStackProxy<'static, NetworkStack>;
 
-// TODO: Check buffer sizes.
 pub struct MqttStorage {
     telemetry: [u8; 2048],
     settings: [u8; 1024],
@@ -37,10 +39,6 @@ impl Default for MqttStorage {
         }
     }
 }
-
-/// The default MQTT broker IP address if unspecified.
-/// TODO: Figure out how to use this?
-pub const DEFAULT_MQTT_BROKER: [u8; 4] = [10, 34, 16, 10];
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum UpdateState {
@@ -87,6 +85,7 @@ where
     /// * `broker` - The IP address of the MQTT broker to use.
     /// * `id` - The MQTT client ID base to use.
     /// * `settings` - The initial settings value
+    /// * `metadata` - The metadata associated with the app.
     ///
     /// # Returns
     /// A new struct of network users.
@@ -98,6 +97,7 @@ where
         id: &str,
         broker: &str,
         settings: S,
+        metadata: &'static ApplicationMetadata,
     ) -> Self {
         let stack_manager =
             cortex_m::singleton!(: NetworkManager = NetworkManager::new(stack)).unwrap();
@@ -139,7 +139,7 @@ where
                     .unwrap(),
             );
 
-            TelemetryClient::new(mqtt, &prefix)
+            TelemetryClient::new(mqtt, &prefix, metadata)
         };
 
         NetworkUsers {

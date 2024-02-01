@@ -194,6 +194,7 @@ mod app {
             &id,
             option_env!("BROKER").unwrap_or("mqtt"),
             settings.clone(),
+            thermostat.metadata,
         );
 
         settings_update::spawn(settings.clone()).unwrap();

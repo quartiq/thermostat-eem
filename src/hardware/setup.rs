@@ -20,6 +20,7 @@ use super::{
     delay,
     fan::{Fan, FanPins},
     gpio::{Gpio, GpioPins},
+    metadata::ApplicationMetadata,
     pwm::{Pwm, PwmPins},
     EthernetPhy, NetworkStack,
 };
@@ -107,6 +108,7 @@ pub struct ThermostatDevices {
     pub adc_internal: AdcInternal,
     pub adc_sm: StateMachine<Adc>,
     pub adc_channels: [[bool; 4]; 4],
+    pub metadata: &'static ApplicationMetadata,
 }
 
 #[link_section = ".sram3.eth"]
@@ -612,5 +614,6 @@ pub fn setup(
         adc_internal,
         adc_sm,
         adc_channels,
+        metadata: ApplicationMetadata::new(),
     }
 }
