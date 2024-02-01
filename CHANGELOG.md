@@ -13,3 +13,4 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 * A static IP can be assigned to Thermostat using the `STATIC_IP` environment variable at build
   time. If one is not specified, DHCP is used automatically.
 * Miniconf versions have been updated to v0.9.0
+* Application metadata is now published to the `<prefix>/meta` topic on MQTT connections
