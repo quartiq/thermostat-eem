@@ -1,3 +1,4 @@
+use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::hardware::{
@@ -113,8 +114,9 @@ pub struct ThermostatDevices {
 
 #[link_section = ".sram3.eth"]
 /// Static storage for the ethernet DMA descriptor ring.
-static mut DES_RING: ethernet::DesRing<{ super::TX_DESRING_CNT }, { super::RX_DESRING_CNT }> =
-    ethernet::DesRing::new();
+static mut DES_RING: MaybeUninit<
+    ethernet::DesRing<{ super::TX_DESRING_CNT }, { super::RX_DESRING_CNT }>,
+> = MaybeUninit::uninit();
 
 pub fn setup(
     mut device: stm32h7xx_hal::stm32::Peripherals,
@@ -487,6 +489,8 @@ pub fn setup(
             (ref_clk, mdio, mdc, crs_dv, rxd0, rxd1, tx_en, txd0, txd1)
         };
 
+        unsafe { DES_RING.write(ethernet::DesRing::new()) };
+
         // Configure the ethernet controller
         let (mut eth_dma, eth_mac) = ethernet::new(
             device.ETHERNET_MAC,
@@ -495,7 +499,7 @@ pub fn setup(
             ethernet_pins,
             // Note(unsafe): We only call this function once to take ownership of the
             // descriptor ring.
-            unsafe { &mut DES_RING },
+            unsafe { DES_RING.assume_init_mut() },
             mac_addr,
             ccdr.peripheral.ETH1MAC,
             &ccdr.clocks,
