@@ -23,7 +23,7 @@ def _main():
         "--broker",
         "-b",
         type=str,
-        default="10.42.0.1",
+        default="mqtt",
         help="The MQTT broker to use to communicate with "
         "Thermostat-EEM (%(default)s)",
     )
@@ -152,19 +152,19 @@ def _main():
         interface = await miniconf.Miniconf.create(prefix, args.broker)
 
         # Set the filter coefficients.
-        await interface.command(
+        await interface.set(
             f"output_channel/{args.channel}/shutdown",
             args.shutdown,
         )
-        await interface.command(
+        await interface.set(
             f"output_channel/{args.channel}/hold",
             args.hold,
         )
-        await interface.command(
+        await interface.set(
             f"output_channel/{args.channel}/voltage_limit",
             args.voltage_limit,
         )
-        await interface.command(
+        await interface.set(
             f"output_channel/{args.channel}/iir",
             {
                 "ba": coefficients,
@@ -174,7 +174,7 @@ def _main():
             },
         )
         for i, weight in enumerate(args.input_weights):
-            await interface.command(
+            await interface.set(
                 f"output_channel/{args.channel}/weights/{i}",
                 weight,
             )
