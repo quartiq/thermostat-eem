@@ -153,19 +153,19 @@ def _main():
 
         # Set the filter coefficients.
         await interface.set(
-            f"output_channel/{args.channel}/shutdown",
+            f"/output_channel/{args.channel}/shutdown",
             args.shutdown,
         )
         await interface.set(
-            f"output_channel/{args.channel}/hold",
+            f"/output_channel/{args.channel}/hold",
             args.hold,
         )
         await interface.set(
-            f"output_channel/{args.channel}/voltage_limit",
+            f"/output_channel/{args.channel}/voltage_limit",
             args.voltage_limit,
         )
         await interface.set(
-            f"output_channel/{args.channel}/iir",
+            f"/output_channel/{args.channel}/iir",
             {
                 "ba": coefficients,
                 "y_offset": args.y_offset + forward_gain * args.x_offset,
@@ -175,7 +175,7 @@ def _main():
         )
         for i, weight in enumerate(args.input_weights):
             await interface.set(
-                f"output_channel/{args.channel}/weights/{i}",
+                f"/output_channel/{args.channel}/weights/{i}",
                 weight,
             )
 
