@@ -164,10 +164,11 @@ mod app {
                 if thermostat.adc_channels[phy_i][ch_i] {
                     telemetry.alarm[phy_i][ch_i] = Some(false);
                     telemetry.statistics[phy_i][ch_i] = Some(Default::default());
-                    settings.alarm.temperature_limits[phy_i][ch_i] = Some([f32::MIN, f32::MAX]);
+                    settings.alarm.temperature_limits[phy_i][ch_i] =
+                        Some([f32::NEG_INFINITY, f32::INFINITY]);
                     // Initialize the output weights.
                     for ch in settings.output_channel.iter_mut() {
-                        ch.weights[phy_i][ch_i] = Some(0.);
+                        ch.weights[phy_i][ch_i] = 0.;
                     }
                 }
             }

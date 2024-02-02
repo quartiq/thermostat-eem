@@ -46,7 +46,7 @@ pub struct OutputChannel {
     /// # Value
     /// f32
     #[tree(depth(2))]
-    pub weights: [[Option<f32>; 4]; 4],
+    pub weights: [[f32; 4]; 4],
 }
 
 impl Default for OutputChannel {
@@ -56,7 +56,7 @@ impl Default for OutputChannel {
             hold: false,
             voltage_limit: 0.0,
             iir: iir::Biquad::default(),
-            weights: [[None; 4]; 4],
+            weights: [[0.0; 4]; 4],
         }
     }
 }
@@ -73,7 +73,7 @@ impl OutputChannel {
             .flatten()
             .zip(self.weights.iter().flatten())
             // weight is `None` if temperature is invalid (phy cfg absent)
-            .map(|(t, w)| t * w.unwrap_or(0.) as f64)
+            .map(|(t, w)| t * *w as f64)
             .sum();
         if self.shutdown || self.hold {
             iir::Biquad::HOLD.update(iir_state, weighted_temperature) as f32
@@ -101,15 +101,13 @@ impl OutputChannel {
         let divisor: f32 = self
             .weights
             .iter()
-            .map(|w| w.iter().map(|w| w.unwrap_or(0.).abs()).sum::<f32>())
+            .map(|w| w.iter().map(|w| w.abs()).sum::<f32>())
             .sum();
         // Note: The weights which are not 'None' should always affect an enabled channel and therefore count for normalization.
         if divisor != 0.0 {
-            self.weights.iter_mut().flatten().for_each(|w| {
-                if let Some(w) = w {
-                    *w /= divisor
-                }
-            });
+            for w in self.weights.iter_mut().flatten() {
+                *w /= divisor;
+            }
         }
         [
             // [Pwm::MAX_CURRENT_LIMIT] + 5% is still below 100% duty cycle for the PWM limits and therefore OK.
