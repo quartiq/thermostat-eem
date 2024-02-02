@@ -80,7 +80,6 @@ where
     /// * `stack` - The network stack that will be used to share with all network users.
     /// * `phy` - The ethernet PHY connecting the network.
     /// * `clock` - System timer clock.
-    /// * `app` - The name of the application.
     /// * `mac` - The MAC address of the network.
     /// * `broker` - The IP address of the MQTT broker to use.
     /// * `id` - The MQTT client ID base to use.
@@ -93,7 +92,6 @@ where
         stack: NetworkStack,
         phy: EthernetPhy,
         clock: SystemTimer,
-        app: &str,
         id: &str,
         broker: &str,
         settings: S,
@@ -104,7 +102,7 @@ where
 
         let processor = NetworkProcessor::new(stack_manager.acquire_stack(), phy);
 
-        let prefix = get_device_prefix(app, id);
+        let prefix = get_device_prefix(metadata.app, id);
 
         let store = cortex_m::singleton!(: MqttStorage = MqttStorage::default()).unwrap();
 
@@ -215,7 +213,7 @@ pub fn get_device_prefix(app: &str, id: &str) -> String<128> {
 ///
 /// The alarm is non-latching. If alarm was "true" for a while and the temperatures come within
 /// limits again, alarm will be "false" again.
-#[derive(Clone, Debug, Tree, Default)]
+#[derive(Clone, Debug, Tree)]
 pub struct Alarm {
     /// Set the alarm to armed (true) or disarmed (false).
     /// If the alarm is armed, the device will publish it's alarm state onto the [target].
@@ -254,4 +252,15 @@ pub struct Alarm {
     /// [f32, f32]
     #[tree(depth(4))]
     pub temperature_limits: [[Option<[f32; 2]>; 4]; 4],
+}
+
+impl Default for Alarm {
+    fn default() -> Self {
+        Self {
+            armed: false,
+            target: Default::default(),
+            period: 1.0,
+            temperature_limits: [[Some([f32::NEG_INFINITY, f32::INFINITY]); 4]; 4],
+        }
+    }
 }

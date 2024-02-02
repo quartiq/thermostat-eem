@@ -70,11 +70,8 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
-            output_channel: [Default::default(); 4],
-            alarm: Alarm {
-                period: 1.0,
-                ..Default::default()
-            },
+            output_channel: Default::default(),
+            alarm: Default::default(),
         }
     }
 }
@@ -99,7 +96,7 @@ pub struct Monitor {
 }
 
 /// Thermostat-EEM Telemetry.
-#[derive(Serialize, Copy, Clone, Default, Debug)]
+#[derive(Serialize, Copy, Clone, Debug, Default)]
 pub struct Telemetry {
     /// see [Monitor]
     monitor: Monitor,
@@ -117,6 +114,7 @@ mod app {
 
     #[monotonic(binds = SysTick, default = true)]
     type Mono = Systick<1_000>; // 1ms resolution
+
     #[shared]
     struct Shared {
         network: NetworkUsers<Settings, Telemetry, 6>,
@@ -139,13 +137,30 @@ mod app {
     #[init]
     fn init(c: init::Context) -> (Shared, Local, init::Monotonics) {
         // Initialize monotonic
-        let systick = c.core.SYST;
         let clock = SystemTimer::new(|| monotonics::now().ticks());
 
         // setup Thermostat hardware
         let thermostat = hardware::setup::setup(c.device, clock);
 
-        let mono = Systick::new(systick, thermostat.clocks.sysclk().to_Hz());
+        let settings = Settings::default();
+
+        let mut id = heapless::String::<64>::new();
+        write!(
+            &mut id,
+            "{}-{}",
+            thermostat.metadata.app, thermostat.net.mac_address
+        )
+        .unwrap();
+
+        let network = NetworkUsers::new(
+            thermostat.net.stack,
+            thermostat.net.phy,
+            clock,
+            &id,
+            option_env!("BROKER").unwrap_or("mqtt"),
+            settings.clone(),
+            thermostat.metadata,
+        );
 
         let local = Local {
             adc_sm: thermostat.adc_sm,
@@ -155,63 +170,29 @@ mod app {
             dac: thermostat.dac,
         };
 
-        let mut settings = Settings::default();
-
-        // Initialize enabled temperatures, statistics buffers and alarm.
-        let mut telemetry = Telemetry::default();
-        for phy_i in 0..4 {
-            for ch_i in 0..4 {
-                if thermostat.adc_channels[phy_i][ch_i] {
-                    telemetry.alarm[phy_i][ch_i] = Some(false);
-                    telemetry.statistics[phy_i][ch_i] = Some(Default::default());
-                    settings.alarm.temperature_limits[phy_i][ch_i] =
-                        Some([f32::NEG_INFINITY, f32::INFINITY]);
-                    // Initialize the output weights.
-                    for ch in settings.output_channel.iter_mut() {
-                        ch.weights[phy_i][ch_i] = 0.;
-                    }
-                }
-            }
-        }
-
-        let id = {
-            let mut mac_addr = heapless::String::<64>::new();
-            write!(
-                &mut mac_addr,
-                "{}-{}",
-                env!("CARGO_BIN_NAME"),
-                thermostat.net.mac_address
-            )
-            .unwrap();
-            mac_addr
-        };
-
-        let network = NetworkUsers::new(
-            thermostat.net.stack,
-            thermostat.net.phy,
-            clock,
-            env!("CARGO_BIN_NAME"),
-            &id,
-            option_env!("BROKER").unwrap_or("mqtt"),
-            settings.clone(),
-            thermostat.metadata,
-        );
-
-        settings_update::spawn(settings.clone()).unwrap();
-        ethernet_link::spawn().unwrap();
-        telemetry_task::spawn().unwrap();
-        mqtt_alarm::spawn().unwrap();
-
         let shared = Shared {
             network,
-            settings,
-            telemetry,
+            settings: settings.clone(),
+            telemetry: Default::default(),
             gpio: thermostat.gpio,
             temperature: Default::default(),
             statistics_buff: Default::default(),
         };
 
-        (shared, local, init::Monotonics(mono))
+        // Apply initial settings
+        settings_update::spawn(settings).unwrap();
+        ethernet_link::spawn().unwrap();
+        telemetry_task::spawn().unwrap();
+        mqtt_alarm::spawn().unwrap();
+
+        (
+            shared,
+            local,
+            init::Monotonics(Systick::new(
+                c.core.SYST,
+                thermostat.clocks.sysclk().to_Hz(),
+            )),
+        )
     }
 
     #[idle(shared=[network])]
@@ -287,10 +268,9 @@ mod app {
         // Finalize temperature telemetry and reset buffer
         for phy_i in 0..4 {
             for cfg_i in 0..4 {
-                let stat = &mut telemetry.statistics[phy_i][cfg_i];
-                if stat.is_some() {
+                if let Some(stat) = &mut telemetry.statistics[phy_i][cfg_i] {
                     c.shared.statistics_buff.lock(|buff| {
-                        *stat = Some(buff[phy_i][cfg_i].into());
+                        *stat = buff[phy_i][cfg_i].into();
                         buff[phy_i][cfg_i] = Default::default();
                     });
                 }
@@ -311,11 +291,11 @@ mod app {
         let alarm = c.shared.settings.lock(|settings| settings.alarm.clone());
         if alarm.armed {
             let temperatures = c.shared.temperature.lock(|temp| *temp);
-            let mut alarms: [[Option<bool>; 4]; 4] = Default::default();
+            let mut alarms = [[None; 4]; 4];
             let mut alarm_state = false;
             for phy_i in 0..4 {
                 for cfg_i in 0..4 {
-                    if let Some(l) = alarm.temperature_limits[phy_i][cfg_i] {
+                    if let Some(l) = &alarm.temperature_limits[phy_i][cfg_i] {
                         let a = !(l[0]..l[1]).contains(&(temperatures[phy_i][cfg_i] as _));
                         alarms[phy_i][cfg_i] = Some(a);
                         alarm_state |= a;

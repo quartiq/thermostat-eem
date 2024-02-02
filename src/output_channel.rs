@@ -55,7 +55,7 @@ impl Default for OutputChannel {
             shutdown: true,
             hold: false,
             voltage_limit: 0.0,
-            iir: iir::Biquad::default(),
+            iir: Default::default(),
             weights: [[0.0; 4]; 4],
         }
     }
