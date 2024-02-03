@@ -21,7 +21,7 @@ ai_artiq = []
 [dependencies]
 cortex-m = { version = "0.7" }
 cortex-m-rt = { version = "0.7", features = ["device"] }
-stm32h7xx-hal =  { version = "0.13.1", features = ["stm32h743v", "rt", "ethernet"]}
+stm32h7xx-hal =  { version = "0.15.1", features = ["stm32h743v", "rt", "ethernet"]}
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
 panic-probe = { version = "0.3.0", features = ["print-rtt"] }
 asm-delay = "0.9.0"
