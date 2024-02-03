@@ -227,7 +227,18 @@ checksum = "db9efecb57ab54fa918730f2874d7d37647169c50fa1357fecb81abee840b113"
 dependencies = [
  "heapless",
  "nb 1.0.0",
- "no-std-net",
+ "no-std-net 0.5.0",
+]
+
+[[package]]
+name = "embedded-nal"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "447416d161ba378782c13e82b11b267d6d2104b4913679a7c5640e7e94f96ea7"
+dependencies = [
+ "heapless",
+ "nb 1.0.0",
+ "no-std-net 0.6.0",
 ]
 
 [[package]]
@@ -413,7 +424,7 @@ dependencies = [
  "itoa",
  "log",
  "miniconf_derive",
- "minimq",
+ "minimq 0.6.2",
  "serde",
  "serde-json-core",
  "smlang",
@@ -436,10 +447,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b222dbc2667cc69a2d9acdf5c24280c49233295eda3a767f6ddfb4040f5cc80c"
 dependencies = [
  "bit_field",
- "embedded-nal",
+ "embedded-nal 0.6.0",
  "embedded-time",
  "heapless",
- "num_enum",
+ "num_enum 0.5.11",
+ "serde",
+ "smlang",
+ "varint-rs",
+]
+
+[[package]]
+name = "minimq"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b561c2c86a3509f7c514f546fb24755753a30fdcf67cce8d5f2f38688483cd31"
+dependencies = [
+ "bit_field",
+ "embedded-nal 0.7.0",
+ "embedded-time",
+ "heapless",
+ "num_enum 0.7.2",
  "serde",
  "smlang",
  "varint-rs",
@@ -471,6 +498,12 @@ name = "no-std-net"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1bcece43b12349917e096cddfa66107277f123e6c96a5aea78711dc601a47152"
+
+[[package]]
+name = "no-std-net"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43794a0ace135be66a25d3ae77d41b91615fb68ae937f904090203e81f755b65"
 
 [[package]]
 name = "num"
@@ -552,7 +585,16 @@ version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f646caf906c20226733ed5b1374287eb97e3c2a5c227ce668c1f2ce20ae57c9"
 dependencies = [
- "num_enum_derive",
+ "num_enum_derive 0.5.11",
+]
+
+[[package]]
+name = "num_enum"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02339744ee7253741199f897151b38e72257d13802d4ee837285cc2990a90845"
+dependencies = [
+ "num_enum_derive 0.7.2",
 ]
 
 [[package]]
@@ -564,6 +606,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.107",
+]
+
+[[package]]
+name = "num_enum_derive"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "681030a937600a36906c185595136d26abfebb4aa9c65701cefcaf8578bb982b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.4",
 ]
 
 [[package]]
@@ -608,9 +661,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.52"
+version = "1.0.78"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d0e1ae9e836cc3beddd63db0df682593d7e2d3d891ae8c9083d2113e1744224"
+checksum = "e2422ad645d89c99f8f3e6b88a9fdeca7fabeac836b1002371c4367c8f984aae"
 dependencies = [
  "unicode-ident",
 ]
@@ -848,7 +901,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a63a94229e438f53c83757c51b346a09409064f6d18723e0393e11d829b09640"
 dependencies = [
- "embedded-nal",
+ "embedded-nal 0.6.0",
  "embedded-time",
  "heapless",
  "nanorand",
@@ -951,9 +1004,9 @@ dependencies = [
  "idsp",
  "log",
  "miniconf",
- "minimq",
+ "minimq 0.8.0",
  "num-traits",
- "num_enum",
+ "num_enum 0.5.11",
  "panic-probe",
  "rtt-logger",
  "rtt-target",
