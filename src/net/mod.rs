@@ -205,18 +205,18 @@ pub fn get_device_prefix(app: &str, id: &str) -> String<128> {
 }
 
 /// Miniconf settings for the MQTT alarm.
-/// The alarm simply publishes "false" onto its [target] as long as all the channels are
-/// within their [temperature_limits] (aka logical OR of all channels).
+/// The alarm simply publishes "false" onto its `target` as long as all the channels are
+/// within their `temperature_limits`` (aka logical OR of all channels).
 /// Otherwise it publishes "true" (aka true, there is an alarm).
 ///
-/// The publishing interval is given by [period_ms].
+/// The publishing interval is given by `period_ms`.
 ///
 /// The alarm is non-latching. If alarm was "true" for a while and the temperatures come within
 /// limits again, alarm will be "false" again.
 #[derive(Clone, Debug, Tree)]
 pub struct Alarm {
     /// Set the alarm to armed (true) or disarmed (false).
-    /// If the alarm is armed, the device will publish it's alarm state onto the [target].
+    /// If the alarm is armed, the device will publish it's alarm state onto the `target`.
     ///
     /// # Value
     /// True to arm, false to disarm.
@@ -245,12 +245,12 @@ pub struct Alarm {
     ///
     /// # Path
     /// `temperature_limits/<adc>/<channel>`
-    /// * <adc> specifies which adc to configure. <adc> := [0, 1, 2, 3]
-    /// * <channel> specifies which channel of an ADC to configure. Only the enabled channels for the specific ADC are available.
+    /// * `<adc> := [0, 1, 2, 3]` specifies which adc to configure.
+    /// * `<channel>` specifies which channel of an ADC to configure. Only the enabled channels for the specific ADC are available.
     ///
     /// # Value
-    /// [f32, f32]
-    #[tree(depth(4))]
+    /// `[f32, f32]` or `None`
+    #[tree(depth(2))]
     pub temperature_limits: [[Option<[f32; 2]>; 4]; 4],
 }
 
@@ -260,7 +260,7 @@ impl Default for Alarm {
             armed: false,
             target: Default::default(),
             period: 1.0,
-            temperature_limits: [[Some([f32::NEG_INFINITY, f32::INFINITY]); 4]; 4],
+            temperature_limits: Default::default(),
         }
     }
 }

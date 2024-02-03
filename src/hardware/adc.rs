@@ -197,7 +197,7 @@ impl Adc {
         Ok(adc)
     }
 
-    /// Setup all ADCs to the specifies [config].
+    /// Setup all ADCs to the specifies [AdcConfig].
     fn setup(&mut self, delay: &mut impl DelayUs<u16>, config: AdcConfig) -> Result<(), Error> {
         // deassert all CS first
         for pin in self.cs.iter_mut() {

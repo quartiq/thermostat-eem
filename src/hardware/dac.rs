@@ -7,8 +7,8 @@
 //!
 //! The 4 channel DAC ICs share an SPI bus and are addressed using individual "sync"
 //! signals, similar to a chip select signal.
-//! DAC datasheet: https://www.analog.com/media/en/technical-documentation/data-sheets/AD5680.pdf
-//! TEC driver datasheet: https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf
+//! DAC datasheet: `<https://www.analog.com/media/en/technical-documentation/data-sheets/AD5680.pdf>`
+//! TEC driver datasheet: `<https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf>`
 //!
 
 use super::hal::{
@@ -71,8 +71,8 @@ impl From<DacCode> for u32 {
 
 /// DAC gpio pins.
 ///
-/// sync[<n>] - DAC IC adressing signals
-/// * <n> specifies Thermostat output channel
+/// `sync[n]` - DAC IC adressing signals
+///   where `n` specifies Thermostat output channel
 pub struct DacPins {
     pub sync: [gpio::ErasedPin<gpio::Output>; 4],
 }

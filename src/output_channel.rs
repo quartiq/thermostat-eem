@@ -31,7 +31,7 @@ pub struct OutputChannel {
     /// The y limits will be clamped to the maximum output current of +-3 A.
     ///
     /// # Value
-    /// See [iir::IIR#tree]
+    /// See [iir::Biquad]
     pub iir: iir::Biquad<f64>,
 
     /// Thermostat input channel weights. Each input temperature of an enabled channel
@@ -40,8 +40,8 @@ pub struct OutputChannel {
     ///
     /// # Path
     /// `weights/<adc>/<channel>`
-    /// * <adc> specifies which adc to configure. <adc> := [0, 1, 2, 3]
-    /// * <channel> specifies which channel of an ADC to configure. Only the enabled channels for the specific ADC are available.
+    /// * `<adc> := [0, 1, 2, 3]` specifies which adc to configure.
+    /// * `<channel>` specifies which channel of an ADC to configure. Only the enabled channels for the specific ADC are available.
     ///
     /// # Value
     /// f32

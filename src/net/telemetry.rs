@@ -85,7 +85,7 @@ impl<T: Serialize> TelemetryClient<T> {
     }
 
     /// A secondary functionality tugged onto the telemetry client that publishes onto another
-    /// [alarm_topic].
+    /// `alarm_topic`.
     pub fn publish_alarm(&mut self, alarm_topic: &String<128>, alarm: &bool) {
         self.mqtt
             .client()

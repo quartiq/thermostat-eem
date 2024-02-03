@@ -36,10 +36,10 @@ pub enum Error {
 
 /// Pwm pins.
 ///
-/// voltage<n> - voltage limit pin
-/// positive_current<n> - positive current limit pin
-/// negative_current<n> - negative current limit pin
-/// * <n> specifies Thermostat output channel
+/// `voltage.<n>` - voltage limit pin
+/// `positive_current.<n>` - positive current limit pin
+/// `negative_current.<n>` - negative current limit pin
+/// * `<n>` specifies Thermostat output channel
 #[allow(clippy::type_complexity)]
 pub struct PwmPins {
     pub voltage: (

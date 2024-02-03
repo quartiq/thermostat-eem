@@ -48,7 +48,7 @@ pub struct Settings {
     ///
     /// # Path
     /// `output_channel/<n>`
-    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
+    /// * `<n> := [0, 1, 2, 3]` specifies which channel to configure.
     ///
     /// # Value
     /// See [output_channel::OutputChannel]
@@ -62,7 +62,7 @@ pub struct Settings {
     ///
     /// # Value
     /// See [Alarm]
-    #[tree(depth(5))]
+    #[tree(depth(3))]
     alarm: Alarm,
 }
 
@@ -89,7 +89,7 @@ pub struct Monitor {
     output_current: [f32; 4],
     /// Measurement of the output voltages.
     output_voltage: [f32; 4],
-    /// See [PoEPower]
+    /// See [PoePower]
     poe: PoePower,
     /// Overtemperature status.
     overtemp: bool,
@@ -100,9 +100,9 @@ pub struct Monitor {
 pub struct Telemetry {
     /// see [Monitor]
     monitor: Monitor,
-    /// [<adc>][<channel>] array of [Statistics]. 'None' for disabled channels.
+    /// `[<adc>][<channel>]` array of [Statistics]. `None` for disabled channels.
     statistics: [[Option<Statistics>; 4]; 4],
-    /// Alarm status for each enabled input channel. 'None' for disabled channels.
+    /// Alarm status for each enabled input channel. `None` for disabled channels.
     alarm: [[Option<bool>; 4]; 4],
     /// Output current in Amperes for each Thermostat output channel.
     output_current: [f32; 4],
@@ -117,7 +117,7 @@ mod app {
 
     #[shared]
     struct Shared {
-        network: NetworkUsers<Settings, Telemetry, 6>,
+        network: NetworkUsers<Settings, Telemetry, 5>,
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
