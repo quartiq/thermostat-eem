@@ -2,16 +2,18 @@
 name = "thermostat-eem"
 version = "0.1.0"
 edition = "2021"
-authors = ["Norman Krackow <nk@quartiq.de>", "Robert Jördens", "Ryan Summers"]
+authors = ["Norman Krackow <nk@quartiq.de>", "Robert Jördens <rj@quartiq.de>", "Ryan Summers"]
 description = "Firmware for the Sinara Thermostat-EEM temperature controller."
 categories = ["embedded", "no-std", "hardware-support", "science"]
 license = "MIT OR Apache-2.0"
-keywords = ["stm32h7", "physics", "adc", "dac", "dsp", "control systems"]
+keywords = ["ethernet", "stm32h7", "adc", "dac", "physics"]
 repository = "https://github.com/quartiq/thermostat-eem"
 readme = "README.md"
 exclude = [
 	".gitignore"
 ]
+# keep MSRV in sync in ci.yaml and Cargo.toml
+rust-version = "1.66.1"
 
 [features]
 default = ["all_differential"]
