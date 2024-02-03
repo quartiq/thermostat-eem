@@ -1,10 +1,13 @@
 name: Continuous Integration
-
 on:
+  merge_group:
   push:
-    
+    branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # UTC
+    - cron: '48 4 * * *'
 env:
   CARGO_TERM_COLOR: always
 
@@ -33,6 +36,7 @@ jobs:
         with:
           command: check
           args: --verbose
+
       - uses: actions/setup-python@v1
         with:
           python-version: 3.8
@@ -47,17 +51,62 @@ jobs:
 
   compile:
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.continue-on-error }}
     strategy:
       matrix:
-        toolchain: [stable]
+        # keep MSRV in sync in ci.yaml and Cargo.toml
+        toolchain: [stable, '1.66.1']
+        features: ['']
+        continue-on-error: [false]
+        include:
+          - toolchain: beta
+            features: ''
+            continue-on-error: true
+          - toolchain: nightly
+            features: nightly
+            continue-on-error: true
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: ${{ matrix.toolchain }}
           target: thumbv7em-none-eabihf
           override: true
       - uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release
+          args: --release --features "${{ matrix.features }}"
+
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: thumbv7em-none-eabihf
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: Install Deadlinks
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: |
+            cargo-deadlinks
+
+      - name: cargo doc
+        uses: actions-rs/cargo@v1
+        with:
+          command: doc
+          args: --no-deps -p miniconf -p idsp -p thermostat-eem
+
+      - name: cargo deadlinks
+        uses: actions-rs/cargo@v1
+        with:
+          command: deadlinks
+          # We intentionally ignore fragments, as RTIC may generate fragments for various
+          # auto-generated code.
+          args: --dir target/thumbv7em-none-eabihf/doc --ignore-fragments --check-intra-doc-links

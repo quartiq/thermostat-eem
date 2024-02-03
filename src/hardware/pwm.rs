@@ -1,8 +1,8 @@
-///! Thermostat TEC driver IC voltage/current limits PWM driver.
-///!
-///! The Thermostat TEC driver ICs feature current limits controlled by an analog voltage input.
-///! This voltage is controlled by the MCU using low-pass filtered PWM outputs.
-///!
+//! Thermostat TEC driver IC voltage/current limits PWM driver.
+//!
+//! The Thermostat TEC driver ICs feature current limits controlled by an analog voltage input.
+//! This voltage is controlled by the MCU using low-pass filtered PWM outputs.
+//!
 use super::{
     dac::{R_SENSE, VREF_TEC},
     hal::{
@@ -36,10 +36,10 @@ pub enum Error {
 
 /// Pwm pins.
 ///
-/// voltage<n> - voltage limit pin
-/// positive_current<n> - positive current limit pin
-/// negative_current<n> - negative current limit pin
-/// * <n> specifies Thermostat output channel
+/// `voltage.<n>` - voltage limit pin
+/// `positive_current.<n>` - positive current limit pin
+/// `negative_current.<n>` - negative current limit pin
+/// * `<n>` specifies Thermostat output channel
 #[allow(clippy::type_complexity)]
 pub struct PwmPins {
     pub voltage: (

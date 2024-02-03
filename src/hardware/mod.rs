@@ -13,6 +13,7 @@ pub mod dac;
 pub mod delay;
 pub mod fan;
 pub mod gpio;
+pub mod metadata;
 pub mod pwm;
 pub mod setup;
 pub mod system_timer;
@@ -25,13 +26,13 @@ const RX_DESRING_CNT: usize = 4;
 
 pub type NetworkStack = smoltcp_nal::NetworkStack<
     'static,
-    hal::ethernet::EthernetDMA<'static, TX_DESRING_CNT, RX_DESRING_CNT>,
+    hal::ethernet::EthernetDMA<TX_DESRING_CNT, RX_DESRING_CNT>,
     system_timer::SystemTimer,
 >;
 
 pub type NetworkManager = smoltcp_nal::shared::NetworkManager<
     'static,
-    hal::ethernet::EthernetDMA<'static, TX_DESRING_CNT, RX_DESRING_CNT>,
+    hal::ethernet::EthernetDMA<TX_DESRING_CNT, RX_DESRING_CNT>,
     system_timer::SystemTimer,
 >;
 

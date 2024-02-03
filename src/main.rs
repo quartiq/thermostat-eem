@@ -5,6 +5,8 @@
 #![no_std]
 #![no_main]
 
+use core::fmt::Write;
+
 pub mod hardware;
 pub mod net;
 pub mod output_channel;
@@ -25,12 +27,13 @@ use hardware::{
     system_timer::SystemTimer,
     OutputChannelIdx,
 };
-use idsp::iir;
-use net::{miniconf::Miniconf, serde::Serialize, Alarm, NetworkState, NetworkUsers};
+use miniconf::Tree;
+use net::{Alarm, NetworkState, NetworkUsers};
+use serde::Serialize;
 use statistics::{Buffer, Statistics};
 use systick_monotonic::{ExtU64, Systick};
 
-#[derive(Clone, Debug, Miniconf)]
+#[derive(Clone, Debug, Tree)]
 pub struct Settings {
     /// Specifies the telemetry output period in seconds.
     ///
@@ -45,12 +48,12 @@ pub struct Settings {
     ///
     /// # Path
     /// `output_channel/<n>`
-    /// * <n> specifies which channel to configure. <n> := [0, 1, 2, 3]
+    /// * `<n> := [0, 1, 2, 3]` specifies which channel to configure.
     ///
     /// # Value
     /// See [output_channel::OutputChannel]
-    #[miniconf(defer)]
-    output_channel: miniconf::Array<output_channel::OutputChannel, 4>,
+    #[tree(depth(4))]
+    output_channel: [output_channel::OutputChannel; 4],
 
     /// Alarm settings.
     ///
@@ -59,7 +62,7 @@ pub struct Settings {
     ///
     /// # Value
     /// See [Alarm]
-    #[miniconf(defer)]
+    #[tree(depth(3))]
     alarm: Alarm,
 }
 
@@ -67,11 +70,8 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
-            output_channel: [Default::default(); 4].into(),
-            alarm: Alarm {
-                period: 1.0,
-                ..Default::default()
-            },
+            output_channel: Default::default(),
+            alarm: Default::default(),
         }
     }
 }
@@ -89,20 +89,20 @@ pub struct Monitor {
     output_current: [f32; 4],
     /// Measurement of the output voltages.
     output_voltage: [f32; 4],
-    /// See [PoEPower]
+    /// See [PoePower]
     poe: PoePower,
     /// Overtemperature status.
     overtemp: bool,
 }
 
 /// Thermostat-EEM Telemetry.
-#[derive(Serialize, Copy, Clone, Default, Debug)]
+#[derive(Serialize, Copy, Clone, Debug, Default)]
 pub struct Telemetry {
     /// see [Monitor]
     monitor: Monitor,
-    /// [<adc>][<channel>] array of [Statistics]. 'None' for disabled channels.
+    /// `[<adc>][<channel>]` array of [Statistics]. `None` for disabled channels.
     statistics: [[Option<Statistics>; 4]; 4],
-    /// Alarm status for each enabled input channel. 'None' for disabled channels.
+    /// Alarm status for each enabled input channel. `None` for disabled channels.
     alarm: [[Option<bool>; 4]; 4],
     /// Output current in Amperes for each Thermostat output channel.
     output_current: [f32; 4],
@@ -114,9 +114,10 @@ mod app {
 
     #[monotonic(binds = SysTick, default = true)]
     type Mono = Systick<1_000>; // 1ms resolution
+
     #[shared]
     struct Shared {
-        network: NetworkUsers<Settings, Telemetry>,
+        network: NetworkUsers<Settings, Telemetry, 5>,
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
@@ -130,19 +131,36 @@ mod app {
         dac: Dac,
         pwm: Pwm,
         adc_internal: AdcInternal,
-        iir_state: [iir::Vec5<f64>; 4],
+        iir_state: [[f64; 4]; 4],
     }
 
     #[init]
     fn init(c: init::Context) -> (Shared, Local, init::Monotonics) {
         // Initialize monotonic
-        let systick = c.core.SYST;
         let clock = SystemTimer::new(|| monotonics::now().ticks());
 
         // setup Thermostat hardware
         let thermostat = hardware::setup::setup(c.device, clock);
 
-        let mono = Systick::new(systick, thermostat.clocks.sysclk().to_Hz());
+        let settings = Settings::default();
+
+        let mut id = heapless::String::<64>::new();
+        write!(
+            &mut id,
+            "{}-{}",
+            thermostat.metadata.app, thermostat.net.mac_address
+        )
+        .unwrap();
+
+        let network = NetworkUsers::new(
+            thermostat.net.stack,
+            thermostat.net.phy,
+            clock,
+            &id,
+            option_env!("BROKER").unwrap_or("mqtt"),
+            settings.clone(),
+            thermostat.metadata,
+        );
 
         let local = Local {
             adc_sm: thermostat.adc_sm,
@@ -152,59 +170,36 @@ mod app {
             dac: thermostat.dac,
         };
 
-        let mut settings = Settings::default();
-
-        // Initialize enabled temperatures, statistics buffers and alarm.
-        let mut telemetry = Telemetry::default();
-        for phy_i in 0..4 {
-            for ch_i in 0..4 {
-                if thermostat.adc_channels[phy_i][ch_i] {
-                    telemetry.alarm[phy_i][ch_i] = Some(false);
-                    telemetry.statistics[phy_i][ch_i] = Some(Default::default());
-                    settings.alarm.temperature_limits[phy_i][ch_i] = Some([f32::MIN, f32::MAX]);
-                    // Initialize the output weights.
-                    for ch in settings.output_channel.iter_mut() {
-                        ch.weights[phy_i][ch_i] = Some(0.);
-                    }
-                }
-            }
-        }
-
-        let network = NetworkUsers::new(
-            thermostat.net.stack,
-            thermostat.net.phy,
-            clock,
-            env!("CARGO_BIN_NAME"),
-            thermostat.net.mac_address,
-            option_env!("BROKER")
-                .unwrap_or("10.42.0.1")
-                .parse()
-                .unwrap(),
-            settings.clone(),
-        );
-
-        settings_update::spawn(settings.clone()).unwrap();
-        ethernet_link::spawn().unwrap();
-        telemetry_task::spawn().unwrap();
-        mqtt_alarm::spawn().unwrap();
-
         let shared = Shared {
             network,
-            settings,
-            telemetry,
+            settings: settings.clone(),
+            telemetry: Default::default(),
             gpio: thermostat.gpio,
             temperature: Default::default(),
             statistics_buff: Default::default(),
         };
 
-        (shared, local, init::Monotonics(mono))
+        // Apply initial settings
+        settings_update::spawn(settings).unwrap();
+        ethernet_link::spawn().unwrap();
+        telemetry_task::spawn().unwrap();
+        mqtt_alarm::spawn().unwrap();
+
+        (
+            shared,
+            local,
+            init::Monotonics(Systick::new(
+                c.core.SYST,
+                thermostat.clocks.sysclk().to_Hz(),
+            )),
+        )
     }
 
     #[idle(shared=[network])]
     fn idle(mut c: idle::Context) -> ! {
         loop {
             c.shared.network.lock(|net| match net.update() {
-                NetworkState::SettingsChanged => {
+                NetworkState::SettingsChanged(_path) => {
                     settings_update::spawn(net.miniconf.settings().clone()).unwrap()
                 }
                 NetworkState::Updated => {}
@@ -217,14 +212,16 @@ mod app {
     fn settings_update(mut c: settings_update::Context, mut settings: Settings) {
         // Limit y_min and y_max values here. Will be incorporated into miniconf response later.
         for ch in settings.output_channel.iter_mut() {
-            ch.iir.y_max = ch
-                .iir
-                .y_max
-                .clamp(-DacCode::MAX_CURRENT as _, DacCode::MAX_CURRENT as _);
-            ch.iir.y_min = ch
-                .iir
-                .y_min
-                .clamp(-DacCode::MAX_CURRENT as _, DacCode::MAX_CURRENT as _);
+            ch.iir.set_max(
+                ch.iir
+                    .max()
+                    .clamp(-DacCode::MAX_CURRENT as _, DacCode::MAX_CURRENT as _),
+            );
+            ch.iir.set_min(
+                ch.iir
+                    .min()
+                    .clamp(-DacCode::MAX_CURRENT as _, DacCode::MAX_CURRENT as _),
+            );
         }
 
         let pwm = c.local.pwm;
@@ -271,10 +268,9 @@ mod app {
         // Finalize temperature telemetry and reset buffer
         for phy_i in 0..4 {
             for cfg_i in 0..4 {
-                let stat = &mut telemetry.statistics[phy_i][cfg_i];
-                if stat.is_some() {
+                if let Some(stat) = &mut telemetry.statistics[phy_i][cfg_i] {
                     c.shared.statistics_buff.lock(|buff| {
-                        *stat = Some(buff[phy_i][cfg_i].into());
+                        *stat = buff[phy_i][cfg_i].into();
                         buff[phy_i][cfg_i] = Default::default();
                     });
                 }
@@ -295,11 +291,11 @@ mod app {
         let alarm = c.shared.settings.lock(|settings| settings.alarm.clone());
         if alarm.armed {
             let temperatures = c.shared.temperature.lock(|temp| *temp);
-            let mut alarms: [[Option<bool>; 4]; 4] = Default::default();
+            let mut alarms = [[None; 4]; 4];
             let mut alarm_state = false;
             for phy_i in 0..4 {
                 for cfg_i in 0..4 {
-                    if let Some(l) = alarm.temperature_limits[phy_i][cfg_i] {
+                    if let Some(l) = &alarm.temperature_limits[phy_i][cfg_i] {
                         let a = !(l[0]..l[1]).contains(&(temperatures[phy_i][cfg_i] as _));
                         alarms[phy_i][cfg_i] = Some(a);
                         alarm_state |= a;
@@ -331,7 +327,7 @@ mod app {
     fn process_output_channel(mut c: process_output_channel::Context, output_ch: OutputChannelIdx) {
         let idx = output_ch as usize;
         let current = (c.shared.settings, c.shared.temperature).lock(|settings, temperature| {
-            settings.output_channel[idx].update(temperature, &mut c.local.iir_state[idx], false)
+            settings.output_channel[idx].update(temperature, &mut c.local.iir_state[idx])
         });
         c.shared
             .telemetry
