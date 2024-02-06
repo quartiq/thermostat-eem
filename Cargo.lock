@@ -1046,6 +1046,7 @@ dependencies = [
  "cortex-m 0.7.7",
  "cortex-m-rt",
  "cortex-m-rtic",
+ "embedded-hal",
  "embedded-time",
  "enum-iterator",
  "heapless",

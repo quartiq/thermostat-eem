@@ -451,16 +451,8 @@ pub fn setup(
             .i2c((scl, sda), 100.kHz(), ccdr.peripheral.I2C1, &ccdr.clocks)
     };
 
-    // The EEPROM is a variant without address bits, so the 3 LSB of this word are "dont-cares".
-    const I2C_ADDR: u8 = 0x50;
-    // The MAC address is stored in the last 6 bytes of the 256 byte address space.
-    const MAC_POINTER: u8 = 0xFA;
-
-    let mut buffer = [0u8; 6];
-    eeprom_i2c
-        .write_read(I2C_ADDR, &[MAC_POINTER], &mut buffer)
-        .unwrap();
-    let mac_addr = smoltcp::wire::EthernetAddress(buffer);
+    let mac_addr =
+        smoltcp::wire::EthernetAddress(super::eeprom::read_eui48(&mut eeprom_i2c, &mut delay));
     log::info!("EUI48: {}", mac_addr);
 
     info!("Setup Ethernet");

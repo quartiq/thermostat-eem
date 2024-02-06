@@ -42,6 +42,7 @@ byteorder = { version = "1", default-features = false }
 smlang = "0.6.0"
 enum-iterator = "1.5.0"
 idsp = "0.14.1"
+embedded-hal = "0.2.7"
 
 # Note: Keep in-sync with `py/setup.py`
 miniconf = "0.9"
