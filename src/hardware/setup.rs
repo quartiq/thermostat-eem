@@ -36,7 +36,7 @@ pub struct NetStorage {
     pub ip_addrs: [smoltcp::wire::IpCidr; 1],
 
     // Note: There is an additional socket set item required for the DHCP socket.
-    pub sockets: [smoltcp::iface::SocketStorage<'static>; NUM_SOCKETS + 1],
+    pub sockets: [smoltcp::iface::SocketStorage<'static>; NUM_SOCKETS + 2],
     pub tcp_socket_storage: [TcpSocketStorage; NUM_TCP_SOCKETS],
     pub udp_socket_storage: [UdpSocketStorage; NUM_UDP_SOCKETS],
     pub dns_storage: [Option<smoltcp::socket::dns::DnsQuery>; 1],
@@ -83,7 +83,7 @@ impl Default for NetStorage {
                 smoltcp::wire::Ipv6Cidr::SOLICITED_NODE_PREFIX,
             )],
             // Placeholder for the real IP address, which is initialized at runtime.
-            sockets: [smoltcp::iface::SocketStorage::EMPTY; NUM_SOCKETS + 1],
+            sockets: [smoltcp::iface::SocketStorage::EMPTY; NUM_SOCKETS + 2],
             tcp_socket_storage: [TcpSocketStorage::new(); NUM_TCP_SOCKETS],
             udp_socket_storage: [UdpSocketStorage::new(); NUM_UDP_SOCKETS],
             dns_storage: [None; 1],
