@@ -52,7 +52,7 @@ pub struct Settings {
     ///
     /// # Value
     /// See [output_channel::OutputChannel]
-    #[tree(depth(4))]
+    #[tree(depth(2))]
     output_channel: [output_channel::OutputChannel; 4],
 
     /// Alarm settings.
@@ -117,7 +117,7 @@ mod app {
 
     #[shared]
     struct Shared {
-        network: NetworkUsers<Settings, Telemetry, 5>,
+        network: NetworkUsers<Settings, Telemetry, 4>,
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
