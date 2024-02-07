@@ -137,12 +137,12 @@ pub enum AdcInput {
     Ain2 = 2,
     Ain3 = 3,
     Ain4 = 4,
-    TemperaturesensorP = 5,
-    TemperaturesensorN = 6,
-    AvddMinusAvssOver5P = 7,
-    AvddMinusAvssOver5N = 8,
-    RefP = 9,
-    RefN = 10,
+    TemperaturesensorP = 17,
+    TemperaturesensorN = 18,
+    AvddMinusAvssOver5P = 19,
+    AvddMinusAvssOver5N = 20,
+    RefP = 21,
+    RefN = 22,
 }
 
 /// ADC configuration structure.
@@ -185,7 +185,7 @@ impl Adc {
         let spi: spi::Spi<_, _, u8> =
             spi4.spi(pins.spi, spi::MODE_3, 12500.kHz(), spi4_rec, clocks);
 
-        let mut adc = Adc {
+        let mut adc = Self {
             adcs: ad7172::Ad7172::new(spi),
             cs: pins.cs,
             rdyn: rdyn_pullup,
@@ -221,12 +221,15 @@ impl Adc {
     /// Returns the configuration of which ADC channels are enabled.
     pub fn channels(&self) -> [[bool; 4]; 4] {
         let mut result = [[false; 4]; 4];
-        self.config
+        for (cfg, ch) in self
+            .config
             .input_config
             .iter()
             .flatten()
             .zip(result.iter_mut().flatten())
-            .for_each(|(cfg, ch)| *ch = cfg.is_some());
+        {
+            *ch = cfg.is_some();
+        }
         result
     }
 
@@ -269,30 +272,19 @@ impl Adc {
         self.adcs
             .write(ad7172::AdcReg::IFMODE, ad7172::Ifmode::DataStat::ENABLED);
 
-        for (channel, data) in input_config
-            .iter()
-            .zip([
-                ad7172::AdcReg::CH0,
-                ad7172::AdcReg::CH1,
-                ad7172::AdcReg::CH2,
-                ad7172::AdcReg::CH3,
-            ])
-            .map(|(cfg, ch)| {
-                let en = if cfg.is_some() {
-                    ad7172::Channel::ChEn::ENABLED
-                } else {
-                    ad7172::Channel::ChEn::DISABLED
-                };
-                let (ainpos, ainneg) = if let Some(cfg) = cfg {
-                    ((cfg.0 as u32) << 5, (cfg.1 as u32)) // see datasheet or [ad7172::Channel::Ainpos] and [ad7172::Channel::Ainneg]
-                } else {
-                    (0, 0) // Default to zero. Doesn't matter since channel will be disabled.
-                };
+        for (cfg, channel) in input_config.iter().zip([
+            ad7172::AdcReg::CH0,
+            ad7172::AdcReg::CH1,
+            ad7172::AdcReg::CH2,
+            ad7172::AdcReg::CH3,
+        ]) {
+            let (en, ainpos, ainneg) = if let Some(cfg) = cfg {
+                (ad7172::Channel::ChEn::ENABLED, (cfg.0 as u32) << 5, cfg.1 as u32) // see datasheet or [ad7172::Channel::Ainpos] and [ad7172::Channel::Ainneg]
+            } else {
+                (ad7172::Channel::ChEn::DISABLED, 0, 0) // Default to zero. Doesn't matter since channel will be disabled.
+            };
 
-                let data = en | ad7172::Channel::SetupSel::SETUP_0 | ainpos | ainneg; // only Setup 0 for now
-                (ch, data)
-            })
-        {
+            let data = en | ad7172::Channel::SetupSel::SETUP_0 | ainpos | ainneg; // only Setup 0 for now
             self.adcs.write(channel, data);
         }
 

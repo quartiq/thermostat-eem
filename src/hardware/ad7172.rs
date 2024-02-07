@@ -81,6 +81,7 @@ pub mod Adcmode {
     }
     pub mod Mode {
         pub const CONTINOUS_CONVERSION: u32 = 0b000 << 4;
+        pub const SINGLE_CONVERSION: u32 = 0b001 << 4;
     }
     pub mod Clocksel {
         pub const INTERNAL_OSC: u32 = 0b00 << 2;
