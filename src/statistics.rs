@@ -14,9 +14,7 @@ impl From<Buffer> for Option<Statistics> {
     fn from(buff: Buffer) -> Self {
         if buff.counter > 0 {
             let mean = buff.accumulator / buff.counter as f64;
-            Some(Statistics {
-                mean: mean as f32,
-            })
+            Some(Statistics { mean: mean as f32 })
         } else {
             None
         }

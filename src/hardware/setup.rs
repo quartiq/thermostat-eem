@@ -1,10 +1,7 @@
 use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::hardware::{
-    adc::{AdcConfig, AdcInput},
-    system_timer,
-};
+use crate::hardware::{ad7172::Mux, adc::AdcConfig, system_timer};
 use smoltcp_nal::smoltcp;
 
 use super::hal::{
@@ -353,26 +350,26 @@ pub fn setup(
     let adc_input_config = AdcConfig {
         input_config: [
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
@@ -383,36 +380,32 @@ pub fn setup(
     let adc_input_config = AdcConfig {
         input_config: [
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
             // last ADC has single ended inputs negatively referenced to the positive reference input
             [
-                Some((AdcInput::RefP, AdcInput::Ain0)),
-                Some((AdcInput::RefP, AdcInput::Ain1)),
-                Some((AdcInput::RefP, AdcInput::Ain2)),
-                Some((AdcInput::RefP, AdcInput::Ain3)),
+                Some((Mux::RefP, Mux::Ain0)),
+                Some((Mux::RefP, Mux::Ain1)),
+                Some((Mux::RefP, Mux::Ain2)),
+                Some((Mux::RefP, Mux::Ain3)),
             ],
         ],
     };
-
-    for (i, config) in adc_input_config.input_config.iter().enumerate() {
-        log::info!("ADC{} input configuration: {:?}", i, config);
-    }
 
     let adc = Adc::new(
         &mut delay,

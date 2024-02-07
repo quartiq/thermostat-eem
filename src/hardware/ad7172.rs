@@ -150,20 +150,20 @@ pub struct GpioCon {
 #[bitenum(u5)]
 #[derive(Debug, PartialEq)]
 pub enum Mux {
-    Ain0 = 0,
-    Ain1 = 1,
-    Ain2 = 2,
-    Ain3 = 3,
-    Ain4 = 4,
-    TempP = 17,
-    TempN = 18,
-    AvddAvss5P = 19,
-    AvddAvss5N = 20,
-    RefP = 21,
-    RefN = 22,
+    Ain0 = 0b00000,
+    Ain1 = 0b00001,
+    Ain2 = 0b00010,
+    Ain3 = 0b00011,
+    Ain4 = 0b00100,
+    TempP = 0b10001,
+    TempN = 0b10010,
+    AvddAvss5P = 0b10011,
+    AvddAvss5N = 0b10100,
+    RefP = 0b10101,
+    RefN = 0b10110,
 }
 
-#[bitfield(u16, default = 0x0000)] // deviate default for simplicity
+#[bitfield(u16, default = 0x0001)] // deviate default for simplicity
 #[derive(Debug, PartialEq)]
 pub struct Channel {
     #[bits(0..=4, rw)]
@@ -206,7 +206,14 @@ pub struct SetupCon {
 #[bitenum(u5)]
 #[derive(Debug, PartialEq)]
 pub enum Odr {
+    _31250a = 0b00000,
+    _31250f = 0b00101,
+    _10417 = 0b00111,
+    _5208 = 0b01000,
+    _2597 = 0b01001,
     _1007 = 0b01010,
+    _200 = 0b01101,
+    _100 = 0b01110,
     _20 = 0b10001,
     _10 = 0b10011,
     _1_25 = 0b10110,
@@ -224,9 +231,9 @@ pub enum Order {
 #[derive(Debug, PartialEq)]
 pub enum Enhfilt {
     _27 = 2,
-    _21 = 3,
+    _21_25 = 3,
     _20 = 5,
-    _17 = 6,
+    _16_67 = 6,
 }
 
 #[bitfield(u16, default = 0x0500)]
@@ -279,7 +286,7 @@ where
             .with_read(true)
             .with_ignore(false)
             .build()
-            .raw_value(); // addr with read flag
+            .raw_value();
         self.spi.transfer(&mut buf[7 - size..]).unwrap();
         (u64::from_be_bytes(buf) & ((1 << (size * 8)) - 1)) as u32
     }
@@ -302,8 +309,7 @@ where
     /// If DATA_STAT bit is not set, the content of status is undefined but data is still valid.
     pub fn read_data(&mut self) -> (u32, Status) {
         let res = self.read(Register::DATA);
-        let data = res >> 8;
-        (data, Status::new_with_raw_value(res as _))
+        (res >> 8, Status::new_with_raw_value(res as _))
     }
 
     fn reg_width(reg: &Register) -> usize {
