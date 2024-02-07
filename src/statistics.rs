@@ -6,8 +6,6 @@ use serde::Serialize;
 #[derive(Serialize, Copy, Clone, Default, Debug)]
 pub struct Statistics {
     mean: f32,
-    min: f32,
-    max: f32,
 }
 
 impl From<Buffer> for Option<Statistics> {
@@ -18,8 +16,6 @@ impl From<Buffer> for Option<Statistics> {
             let mean = buff.accumulator / buff.counter as f64;
             Some(Statistics {
                 mean: mean as f32,
-                max: buff.max,
-                min: buff.min,
             })
         } else {
             None

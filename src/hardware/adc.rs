@@ -1,9 +1,9 @@
 // Thermostat ADC struct.
 
+use arbitrary_int::{u2, u3, u5};
 use enum_iterator::{all, Sequence};
 use num_enum::TryFromPrimitive;
 use smlang::statemachine;
-use bilge::prelude::*;
 
 use super::ad7172;
 
@@ -265,20 +265,30 @@ impl Adc {
 
         self.adcs.write(
             ad7172::Register::ADCMODE,
-            ad7172::AdcMode::new(
-                ad7172::ClockSel::ExternalClock,
-                ad7172::Mode::Continuous,
-                u3::new(0),
-                false,
-                false,
-                true,
-            )
-            .into() as _,
+            ad7172::AdcMode::builder()
+                .with_clocksel(ad7172::ClockSel::ExternalClock)
+                .with_mode(ad7172::Mode::Continuous)
+                .with_delay(u3::new(0))
+                .with_single_cycle(false)
+                .with_show_delay(false)
+                .with_ref_en(true)
+                .build()
+                .raw_value() as _,
         );
 
         self.adcs.write(
             ad7172::Register::IFMODE,
-            ad7172::IfMode::new(u2::new(0), false, true, false, false, false, false).into() as _,
+            ad7172::IfMode::builder()
+                .with_wl16(false)
+                .with_crc_en(u2::new(0))
+                .with_reg_check(false)
+                .with_data_stat(true)
+                .with_contread(false)
+                .with_dout_reset(false)
+                .with_iostrength(false)
+                .with_alt_sync(false)
+                .build()
+                .raw_value() as _,
         );
 
         for (cfg, channel) in input_config.iter().zip([
@@ -293,55 +303,63 @@ impl Adc {
                 (true, 0, 0) // Default to zero. Doesn't matter since channel will be disabled.
             };
 
-            let data = ad7172::Channel::new(
-                ad7172::Mux::from(ainneg.into()),
-                ad7172::Mux::from(ainpos.into()),
-                u2::new(0),
-                en,
-            ); // only Setup 0 for now
-            self.adcs.write(channel, data.into() as _);
+            let data = ad7172::Channel::builder()
+                .with_ainneg(ad7172::Mux::new_with_raw_value(u5::new(ainneg as _)).unwrap())
+                .with_ainpos(ad7172::Mux::new_with_raw_value(u5::new(ainpos as _)).unwrap())
+                .with_setup_sel(u2::new(0)) // only Setup 0 for now
+                .with_en(en)
+                .build();
+            self.adcs.write(channel, data.raw_value() as _);
         }
 
         self.adcs.write(
             ad7172::Register::SETUPCON0,
-            ad7172::SetupCon::new(
-                ad7172::RefSel::External,
-                false,
-                true,
-                true,
-                true,
-                true,
-                ad7172::Coding::Unipolar,
-            )
-            .into() as _,
+            ad7172::SetupCon::builder()
+                .with_ref_sel(ad7172::RefSel::External)
+                .with_burnout_en(false)
+                .with_ainbufn(true)
+                .with_ainbufp(true)
+                .with_refbufn(true)
+                .with_refbufp(true)
+                .with_bipolar(false)
+                .build()
+                .raw_value() as _,
         );
 
         self.adcs.write(
             ad7172::Register::FILTCON0,
-            ad7172::FiltCon::new(
-                ad7172::Odr::_1007,
-                ad7172::Order::Sinc5Sinc1,
-                ad7172::Enhfilt::_20,
-                false,
-                false,
-            )
-            .into() as _,
+            ad7172::FiltCon::builder()
+                .with_odr(ad7172::Odr::_1007)
+                .with_order(ad7172::Order::Sinc5Sinc1)
+                .with_enhfilt(ad7172::Enhfilt::_20)
+                .with_enhfilt_en(false)
+                .with_sinc3_map(false)
+                .build()
+                .raw_value() as _,
         );
 
         // Re-apply (also set after ADC reset) SYNC_EN flag in gpio register for standard synchronization
         self.adcs.write(
             ad7172::Register::GPIOCON,
-            ad7172::GpioCon::new(u2::new(0), u2::new(0), u2::new(0),  false, u2::new(0), true, false).into()
-                as _,
+            ad7172::GpioCon::builder()
+                .with_gp_data(u2::new(0))
+                .with_op_en(u2::new(0))
+                .with_ip_en(u2::new(0))
+                .with_err_dat(false)
+                .with_err_en(u2::new(0))
+                .with_sync_en(true)
+                .with_mux_io(false)
+                .build()
+                .raw_value() as _,
         );
 
         Ok(())
     }
 
     /// Read the data from the ADC and return the raw data and the status information.
-    pub fn read_data(&mut self) -> (AdcCode, Option<ad7172::Status>) {
+    pub fn read_data(&mut self) -> (AdcCode, ad7172::Status) {
         let (data, status) = self.adcs.read_data();
-        (data.into(), Some(status.into()))
+        (data.into(), status)
     }
 }
 
@@ -400,7 +418,7 @@ impl sm::StateMachine<Adc> {
     pub fn handle_interrupt(&mut self) -> (AdcPhy, usize, AdcCode) {
         if let sm::States::Selected(phy) = *self.state() {
             let (code, status) = self.context_mut().read_data();
-            let adc_ch = status.unwrap().channel().value() as _;
+            let adc_ch = status.channel().value() as _;
             self.process_event(sm::Events::Read).unwrap();
             (phy, adc_ch, code)
         } else {

@@ -20,7 +20,7 @@ use crate::hardware::{metadata::ApplicationMetadata, system_timer::SystemTimer};
 const DEFAULT_METADATA: &str = "{\"message\":\"Truncated\"}";
 
 /// The telemetry client for reporting telemetry data over MQTT.
-pub struct TelemetryClient<T: Serialize> {
+pub struct TelemetryClient {
     mqtt: minimq::Minimq<
         'static,
         NetworkReference,
@@ -30,10 +30,9 @@ pub struct TelemetryClient<T: Serialize> {
     prefix: String<128>,
     meta_published: bool,
     metadata: &'static ApplicationMetadata,
-    _telemetry: core::marker::PhantomData<T>,
 }
 
-impl<T: Serialize> TelemetryClient<T> {
+impl TelemetryClient {
     /// Construct a new telemetry client.
     ///
     /// # Args
@@ -57,7 +56,6 @@ impl<T: Serialize> TelemetryClient<T> {
             prefix: String::from(prefix),
             meta_published: false,
             metadata,
-            _telemetry: core::marker::PhantomData,
         }
     }
 
@@ -69,7 +67,7 @@ impl<T: Serialize> TelemetryClient<T> {
     ///
     /// # Args
     /// * `telemetry` - The telemetry to report
-    pub fn publish(&mut self, telemetry: &T) {
+    pub fn publish<T: Serialize>(&mut self, telemetry: &T) {
         let mut topic = self.prefix.clone();
         topic.push_str("/telemetry").unwrap();
 

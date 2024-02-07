@@ -1,13 +1,14 @@
 // (AD7172 https://www.analog.com/media/en/technical-documentation/data-sheets/AD7172-2.pdf)
 
+use arbitrary_int::{u2, u3};
+use bitbybit::{bitenum, bitfield};
 use core::fmt::Debug;
-use bilge::prelude::*;
 
 use super::hal::hal::blocking::spi::{Transfer, Write};
 
 // ADC Register Addresses
-#[bitsize(6)]
-#[derive(FromBits, PartialEq, Debug)]
+#[bitenum(u6)]
+#[derive(PartialEq, Debug)]
 pub enum Register {
     STATUS = 0x00,
     ADCMODE = 0x1,
@@ -36,34 +37,39 @@ pub enum Register {
     GAIN1 = 0x39,
     GAIN2 = 0x3a,
     GAIN3 = 0x3b,
-    #[fallback]
-    Reserved,
 }
 
-#[bitsize(8)]
-#[derive(FromBits, DebugBits, PartialEq)]
+#[bitfield(u8, default = 0x00)]
+#[derive(Debug, PartialEq)]
 pub struct Comms {
-    register: Register,
-    #[doc(alias="RW")]
+    #[bits(0..=5, w)]
+    pub register: Option<Register>,
+    #[bit(6, w)]
+    #[doc(alias = "RW")]
     read: bool,
-    #[doc(alias="WEN_N")]
+    #[bit(7, w)]
+    #[doc(alias = "WEN_N")]
     ignore: bool,
 }
 
-#[bitsize(8)]
-#[derive(FromBits, DebugBits, PartialEq)]
+#[bitfield(u8, default = 0x80)]
+#[derive(Debug, PartialEq)]
 pub struct Status {
-    pub channel: u2,
-    reserved: u2,
+    #[bits(0..=1, r)]
+    channel: u2,
+    #[bit(4, r)]
     reg_error: bool,
+    #[bit(5, r)]
     crc_error: bool,
+    #[bit(6, r)]
     adc_error: bool,
+    #[bit(7, r)]
     #[doc(alias("RDY_N"))]
     busy: bool,
 }
 
-#[bitsize(2)]
-#[derive(FromBits, Debug, PartialEq)]
+#[bitenum(u2, exhaustive = true)]
+#[derive(Debug, PartialEq)]
 pub enum ClockSel {
     InternalOsc = 0,
     InternalOscOut = 1,
@@ -71,67 +77,78 @@ pub enum ClockSel {
     ExternalOsc = 3,
 }
 
-#[bitsize(3)]
-#[derive(FromBits, Debug, PartialEq)]
+#[bitenum(u3)]
+#[derive(Debug, PartialEq)]
 pub enum Mode {
     Continuous = 0,
     Single = 1,
     Standby = 2,
     PowerDown = 3,
     InternalOffset = 4,
-    Reserved = 5,
     SystemOffset = 6,
     SystemGain = 7,
 }
 
-#[bitsize(16)]
-#[derive(FromBits, DebugBits, PartialEq)]
+#[bitfield(u16, default = 0x0000)]
+#[derive(Debug, PartialEq)]
 pub struct AdcMode {
-    reserved: u2,
+    #[bits(2..=3, rw)]
     clocksel: ClockSel,
-    mode: Mode,
-    reserved: u1,
+    #[bits(4..=6, rw)]
+    mode: Option<Mode>,
+    #[bits(8..=10, rw)]
     delay: u3,
-    reserved: u2,
+    #[bit(13, rw)]
     single_cycle: bool,
+    #[bit(14, rw)]
     #[doc(alias("HIDE_DELAY_N"))]
     show_delay: bool,
+    #[bit(15, rw)]
     ref_en: bool,
 }
 
-#[bitsize(16)]
-#[derive(FromBits, DebugBits, PartialEq)]
+#[bitfield(u16, default = 0x0000)]
+#[derive(Debug, PartialEq)]
 pub struct IfMode {
-    reserved: u1,
+    #[bit(0, rw)]
+    wl16: bool,
+    #[bits(2..=3, rw)]
     crc_en: u2,
-    reserved: u1,
+    #[bit(5, rw)]
     reg_check: bool,
+    #[bit(6, rw)]
     data_stat: bool,
+    #[bit(7, rw)]
     contread: bool,
+    #[bit(8, rw)]
     dout_reset: bool,
-    reserved: u2,
+    #[bit(11, rw)]
     iostrength: bool,
+    #[bit(12, rw)]
     alt_sync: bool,
-    reserved: u3,
 }
 
-
-#[bitsize(16)]
-#[derive(FromBits, DebugBits, PartialEq)]
+#[bitfield(u16, default = 0x0800)]
+#[derive(Debug, PartialEq)]
 pub struct GpioCon {
+    #[bits(0..=1, rw)]
     gp_data: u2,
+    #[bits(2..=3, rw)]
     op_en: u2,
+    #[bits(4..=5, rw)]
     ip_en: u2,
-    reserved: u2,
+    #[bit(8, rw)]
     err_dat: bool,
+    #[bits(9..=10, rw)]
     err_en: u2,
+    #[bit(11, rw)]
     sync_en: bool,
+    #[bit(12, rw)]
     mux_io: bool,
-    reserved: u3,
 }
 
-#[bitsize(5)]
-#[derive(FromBits, Debug, PartialEq)]
+#[bitenum(u5)]
+#[derive(Debug, PartialEq)]
 pub enum Mux {
     Ain0 = 0,
     Ain1 = 1,
@@ -144,93 +161,86 @@ pub enum Mux {
     AvddAvss5N = 20,
     RefP = 21,
     RefN = 22,
-    #[fallback]
-    Reserved
 }
 
-#[bitsize(16)]
-#[derive(FromBits, DebugBits, PartialEq)]
+#[bitfield(u16, default = 0x0000)] // deviate default for simplicity
+#[derive(Debug, PartialEq)]
 pub struct Channel {
-    ainneg: Mux,
-    ainpos: Mux,
-    reserved: u2,
+    #[bits(0..=4, rw)]
+    ainneg: Option<Mux>,
+    #[bits(5..=9, rw)]
+    ainpos: Option<Mux>,
+    #[bits(12..=13, rw)]
     setup_sel: u2,
-    reserved: u1,
+    #[bit(15, rw)]
     en: bool,
 }
 
-#[bitsize(2)]
-#[derive(FromBits, Debug, PartialEq)]
+#[bitenum(u2)]
+#[derive(Debug, PartialEq)]
 pub enum RefSel {
     External = 0,
     Internal = 2,
     AvddAvss = 3,
-    Reserved = 1,
 }
 
-#[bitsize(1)]
-#[derive(FromBits, Debug, PartialEq)]
-pub enum Coding {
-    Unipolar = 0,
-    Bipolar = 1,
-}
-
-#[bitsize(16)]
-#[derive(FromBits, DebugBits, PartialEq)]
+#[bitfield(u16, default = 0x1000)]
+#[derive(Debug, PartialEq)]
 pub struct SetupCon {
-    reserved: u4,
-    ref_sel: RefSel,
-    reserved: u1,
+    #[bits(4..=5, rw)]
+    ref_sel: Option<RefSel>,
+    #[bit(7, rw)]
     burnout_en: bool,
+    #[bit(8, rw)]
     ainbufn: bool,
+    #[bit(9, rw)]
     ainbufp: bool,
+    #[bit(10, rw)]
     refbufn: bool,
+    #[bit(11, rw)]
     refbufp: bool,
-    coding: Coding,
-    reserved: u3,
+    #[bit(12, rw)]
+    bipolar: bool,
 }
 
-#[bitsize(5)]
-#[derive(FromBits, Debug, PartialEq)]
+#[bitenum(u5)]
+#[derive(Debug, PartialEq)]
 pub enum Odr {
     _1007 = 0b01010,
     _20 = 0b10001,
     _10 = 0b10011,
     _1_25 = 0b10110,
     // ...
-    #[fallback]
-    Reserved,
 }
 
-#[bitsize(2)]
-#[derive(FromBits, Debug, PartialEq)]
+#[bitenum(u2)]
+#[derive(Debug, PartialEq)]
 pub enum Order {
     Sinc5Sinc1 = 0,
     Sinc3 = 3,
-    #[fallback]
-    Reserved,
 }
 
-#[bitsize(3)]
-#[derive(FromBits, Debug, PartialEq)]
+#[bitenum(u3)]
+#[derive(Debug, PartialEq)]
 pub enum Enhfilt {
     _27 = 2,
     _21 = 3,
     _20 = 5,
     _17 = 6,
-    #[fallback]
-    Reserved,
 }
 
-#[bitsize(16)]
-#[derive(FromBits, DebugBits, PartialEq)]
+#[bitfield(u16, default = 0x0500)]
+#[derive(Debug, PartialEq)]
 pub struct FiltCon {
-    odr: Odr,
-    order: Order,
-    reserved: u1,
-    enhfilt: Enhfilt,
+    #[bits(0..=4, rw)]
+    odr: Option<Odr>,
+    #[bits(5..=6, rw)]
+    order: Option<Order>,
+    #[bits(8..=10, rw)]
+    enhfilt: Option<Enhfilt>,
+    #[bit(11, rw)]
     enhfilt_en: bool,
-    reserved: u3,
+    #[bit(15, rw)]
     sinc3_map: bool,
 }
 
@@ -264,7 +274,12 @@ where
     pub fn read(&mut self, addr: Register) -> u32 {
         let size = Self::reg_width(&addr);
         let mut buf = [0u8; 8];
-        buf[7 - size] = Comms::new(addr, true, false).into(); // addr with read flag
+        buf[7 - size] = Comms::builder()
+            .with_register(addr)
+            .with_read(true)
+            .with_ignore(false)
+            .build()
+            .raw_value(); // addr with read flag
         self.spi.transfer(&mut buf[7 - size..]).unwrap();
         (u64::from_be_bytes(buf) & ((1 << (size * 8)) - 1)) as u32
     }
@@ -273,18 +288,22 @@ where
     pub fn write(&mut self, addr: Register, data: u32) {
         let size = Self::reg_width(&addr);
         let mut buf = data.to_be_bytes();
-        buf[3 - size] = Comms::new(addr, false, false).into();
+        buf[3 - size] = Comms::builder()
+            .with_register(addr)
+            .with_read(false)
+            .with_ignore(false)
+            .build()
+            .raw_value();
         self.spi.write(&buf[3 - size..]).unwrap();
     }
 
     /// Reads the data register and returns data and status information.
     /// The DATA_STAT bit has to be set in the IFMODE register.
     /// If DATA_STAT bit is not set, the content of status is undefined but data is still valid.
-    pub fn read_data(&mut self) -> (u32, u8) {
+    pub fn read_data(&mut self) -> (u32, Status) {
         let res = self.read(Register::DATA);
-        let status = res as u8;
         let data = res >> 8;
-        (data, status)
+        (data, Status::new_with_raw_value(res as _))
     }
 
     fn reg_width(reg: &Register) -> usize {
