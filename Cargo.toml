@@ -46,6 +46,7 @@ embedded-hal = "0.2.7"
 
 # Note: Keep in-sync with `py/setup.py`
 miniconf = "0.9"
+bilge = { version = "0.2.0", default-features = false }
 
 [profile.dev]
 opt-level = 3

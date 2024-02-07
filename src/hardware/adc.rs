@@ -3,8 +3,9 @@
 use enum_iterator::{all, Sequence};
 use num_enum::TryFromPrimitive;
 use smlang::statemachine;
+use bilge::prelude::*;
 
-use super::ad7172::{self, AdcChannel};
+use super::ad7172;
 
 use super::hal::{
     self, device,
@@ -255,7 +256,7 @@ impl Adc {
 
         delay.delay_us(500u16);
 
-        let id = self.adcs.read(ad7172::AdcReg::ID);
+        let id = self.adcs.read(ad7172::Register::ID);
         // check that ID is 0x00DX, as per datasheet
         if id & 0xfff0 != 0x00d0 {
             log::error!("invalid ID: {:#x}", id);
@@ -263,49 +264,76 @@ impl Adc {
         }
 
         self.adcs.write(
-            ad7172::AdcReg::ADCMODE,
-            ad7172::Adcmode::RefEn::ENABLED
-                | ad7172::Adcmode::Mode::CONTINOUS_CONVERSION
-                | ad7172::Adcmode::Clocksel::EXTERNAL_CLOCK,
+            ad7172::Register::ADCMODE,
+            ad7172::AdcMode::new(
+                ad7172::ClockSel::ExternalClock,
+                ad7172::Mode::Continuous,
+                u3::new(0),
+                false,
+                false,
+                true,
+            )
+            .into() as _,
         );
 
-        self.adcs
-            .write(ad7172::AdcReg::IFMODE, ad7172::Ifmode::DataStat::ENABLED);
+        self.adcs.write(
+            ad7172::Register::IFMODE,
+            ad7172::IfMode::new(u2::new(0), false, true, false, false, false, false).into() as _,
+        );
 
         for (cfg, channel) in input_config.iter().zip([
-            ad7172::AdcReg::CH0,
-            ad7172::AdcReg::CH1,
-            ad7172::AdcReg::CH2,
-            ad7172::AdcReg::CH3,
+            ad7172::Register::CH0,
+            ad7172::Register::CH1,
+            ad7172::Register::CH2,
+            ad7172::Register::CH3,
         ]) {
             let (en, ainpos, ainneg) = if let Some(cfg) = cfg {
-                (ad7172::Channel::ChEn::ENABLED, (cfg.0 as u32) << 5, cfg.1 as u32) // see datasheet or [ad7172::Channel::Ainpos] and [ad7172::Channel::Ainneg]
+                (true, cfg.0 as u32, cfg.1 as u32) // see datasheet or [ad7172::Channel::Ainpos] and [ad7172::Channel::Ainneg]
             } else {
-                (ad7172::Channel::ChEn::DISABLED, 0, 0) // Default to zero. Doesn't matter since channel will be disabled.
+                (true, 0, 0) // Default to zero. Doesn't matter since channel will be disabled.
             };
 
-            let data = en | ad7172::Channel::SetupSel::SETUP_0 | ainpos | ainneg; // only Setup 0 for now
-            self.adcs.write(channel, data);
+            let data = ad7172::Channel::new(
+                ad7172::Mux::from(ainneg.into()),
+                ad7172::Mux::from(ainpos.into()),
+                u2::new(0),
+                en,
+            ); // only Setup 0 for now
+            self.adcs.write(channel, data.into() as _);
         }
 
         self.adcs.write(
-            ad7172::AdcReg::SETUPCON0,
-            ad7172::Setupcon::BiUnipolar::UNIPOLAR
-                | ad7172::Setupcon::Refbufn::ENABLED
-                | ad7172::Setupcon::Refbufp::ENABLED
-                | ad7172::Setupcon::Ainbufn::ENABLED
-                | ad7172::Setupcon::Ainbufp::ENABLED
-                | ad7172::Setupcon::Refsel::EXTERNAL,
+            ad7172::Register::SETUPCON0,
+            ad7172::SetupCon::new(
+                ad7172::RefSel::External,
+                false,
+                true,
+                true,
+                true,
+                true,
+                ad7172::Coding::Unipolar,
+            )
+            .into() as _,
         );
 
         self.adcs.write(
-            ad7172::AdcReg::FILTCON0,
-            ad7172::Filtcon::Order::SINC5SINC1 | ad7172::Filtcon::Odr::ODR_1007,
+            ad7172::Register::FILTCON0,
+            ad7172::FiltCon::new(
+                ad7172::Odr::_1007,
+                ad7172::Order::Sinc5Sinc1,
+                ad7172::Enhfilt::_20,
+                false,
+                false,
+            )
+            .into() as _,
         );
 
         // Re-apply (also set after ADC reset) SYNC_EN flag in gpio register for standard synchronization
-        self.adcs
-            .write(ad7172::AdcReg::GPIOCON, ad7172::Gpiocon::SyncEn::ENABLED);
+        self.adcs.write(
+            ad7172::Register::GPIOCON,
+            ad7172::GpioCon::new(u2::new(0), u2::new(0), u2::new(0),  false, u2::new(0), true, false).into()
+                as _,
+        );
 
         Ok(())
     }
@@ -369,10 +397,10 @@ impl sm::StateMachine<Adc> {
     ///
     /// This routine is called every time the currently selected ADC on Thermostat reports that it has data ready
     /// to be read out by pulling the dout line low. It then reads out the ADC data via SPI.
-    pub fn handle_interrupt(&mut self) -> (AdcPhy, AdcChannel, AdcCode) {
+    pub fn handle_interrupt(&mut self) -> (AdcPhy, usize, AdcCode) {
         if let sm::States::Selected(phy) = *self.state() {
             let (code, status) = self.context_mut().read_data();
-            let adc_ch = status.unwrap().channel();
+            let adc_ch = status.unwrap().channel().value() as _;
             self.process_event(sm::Events::Read).unwrap();
             (phy, adc_ch, code)
         } else {

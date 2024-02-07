@@ -16,7 +16,6 @@ use panic_probe as _; // global panic handler
 
 use enum_iterator::all;
 use hardware::{
-    ad7172::AdcChannel,
     adc::AdcPhy,
     adc::{sm::StateMachine, Adc, AdcCode},
     adc_internal::AdcInternal,
@@ -333,7 +332,7 @@ mod app {
     fn convert_adc_code(
         mut c: convert_adc_code::Context,
         phy: AdcPhy,
-        ch: AdcChannel,
+        ch: usize,
         adc_code: AdcCode,
     ) {
         let (phy_i, ch_i) = (phy as usize, ch as usize);
