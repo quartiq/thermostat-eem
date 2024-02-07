@@ -263,12 +263,10 @@ mod app {
         // Finalize temperature telemetry and reset buffer
         for phy_i in 0..4 {
             for cfg_i in 0..4 {
-                if let Some(stat) = &mut telemetry.statistics[phy_i][cfg_i] {
-                    c.shared.statistics_buff.lock(|buff| {
-                        *stat = buff[phy_i][cfg_i].into();
-                        buff[phy_i][cfg_i] = Default::default();
-                    });
-                }
+                c.shared.statistics_buff.lock(|buff| {
+                    telemetry.statistics[phy_i][cfg_i] = buff[phy_i][cfg_i].into();
+                    buff[phy_i][cfg_i] = Default::default();
+                });
             }
         }
 

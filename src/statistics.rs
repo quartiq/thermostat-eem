@@ -10,15 +10,19 @@ pub struct Statistics {
     max: f32,
 }
 
-impl From<Buffer> for Statistics {
+impl From<Buffer> for Option<Statistics> {
     /// Process temperature buffer. Calculates mean, returns the finalized Statistics type
     /// and resets the buffer.
-    fn from(buff: Buffer) -> Statistics {
-        let mean = buff.accumulator / buff.counter as f64;
-        Statistics {
-            mean: mean as f32,
-            max: buff.max,
-            min: buff.min,
+    fn from(buff: Buffer) -> Self {
+        if buff.counter > 0 {
+            let mean = buff.accumulator / buff.counter as f64;
+            Some(Statistics {
+                mean: mean as f32,
+                max: buff.max,
+                min: buff.min,
+            })
+        } else {
+            None
         }
     }
 }
