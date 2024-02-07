@@ -144,13 +144,8 @@ mod app {
 
         let settings = Settings::default();
 
-        let mut id = heapless::String::<64>::new();
-        write!(
-            &mut id,
-            "{}-{}",
-            thermostat.metadata.app, thermostat.net.mac_address
-        )
-        .unwrap();
+        let mut id = heapless::String::<32>::new();
+        write!(&mut id, "{}", thermostat.net.mac_address).unwrap();
 
         let network = NetworkUsers::new(
             thermostat.net.stack,
