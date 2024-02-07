@@ -1071,7 +1071,6 @@ dependencies = [
  "enum-iterator",
  "heapless",
  "idsp",
- "libm",
  "log",
  "miniconf",
  "minimq",

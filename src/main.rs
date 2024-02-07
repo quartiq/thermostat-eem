@@ -340,7 +340,7 @@ mod app {
             temp[phy as usize][ch] = temperature;
         });
         c.shared.statistics_buff.lock(|stat_buff| {
-            stat_buff[phy as usize][ch].update(temperature);
+            stat_buff[phy as usize][ch].update(temperature as _);
         });
         // Start processing when the last ADC has been read out.
         // This implies a zero-order hold (aka the input sample will not be updated at every signal processing step) if more than one channel is enabled on an ADC.
