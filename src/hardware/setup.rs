@@ -436,30 +436,36 @@ pub fn setup(
     let mut adc_sm = StateMachine::new(adc);
     adc_sm.start(&mut device.EXTI, &mut device.SYSCFG);
 
-    let _afe_i2c = {
-        let sda = gpiof.pf0.into_alternate().set_open_drain();
-        let scl = gpiof.pf1.into_alternate().set_open_drain();
+    let mut afe_i2c = {
+        let sda = gpiof.pf0.into_alternate_open_drain();
+        let scl = gpiof.pf1.into_alternate_open_drain();
         device
             .I2C2
             .i2c((scl, sda), 100.kHz(), ccdr.peripheral.I2C2, &ccdr.clocks)
     };
 
-    // let eui48 = super::eeprom::read_eui48(&mut afe_i2c, &mut delay);
-    // log::info!("AFE EUI48: {eui48:?}");
-
     let mut i2c = {
-        let sda = gpiob.pb9.into_alternate().set_open_drain();
-        let scl = gpiob.pb8.into_alternate().set_open_drain();
+        let sda = gpiob.pb9.into_alternate_open_drain();
+        let scl = gpiob.pb8.into_alternate_open_drain();
         device
             .I2C1
             .i2c((scl, sda), 100.kHz(), ccdr.peripheral.I2C1, &ccdr.clocks)
     };
 
-    let mac_addr = smoltcp::wire::EthernetAddress(super::eeprom::read_eui48(&mut i2c, &mut delay));
+    let mut eui48 = [0; 6];
+    if i2c.write_read(0x50, &[0xFA], &mut eui48).is_err() {
+        // wrong ESD protection https://github.com/sinara-hw/Thermostat_EEM/issues/51
+        log::warn!("I2C failure, using default MAC");
+        eui48 = [0x02, 0x00, 0x00, 0x00, 0x00, 0xd3];
+    } else {
+        let mut lm75 = lm75::Lm75::new(i2c, lm75::Address::default());
+        log::info!("LM75 Temperature: {}°C", lm75.read_temperature().unwrap());
+        if let Ok(()) = afe_i2c.write_read(0x50, &[0xFA], &mut eui48) {
+            log::info!("AFE EUI48: {eui48:?}");
+        }
+    }
+    let mac_addr = smoltcp::wire::EthernetAddress(eui48);
     log::info!("EUI48: {}", mac_addr);
-
-    let mut lm75 = lm75::Lm75::new(i2c, lm75::Address::default());
-    log::info!("Board Temperature: {}°C", lm75.read_temperature().unwrap());
 
     info!("Setup Ethernet");
 
