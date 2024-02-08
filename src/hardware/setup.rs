@@ -447,7 +447,7 @@ pub fn setup(
     // let eui48 = super::eeprom::read_eui48(&mut afe_i2c, &mut delay);
     // log::info!("AFE EUI48: {eui48:?}");
 
-    let mut eeprom_i2c = {
+    let mut i2c = {
         let sda = gpiob.pb9.into_alternate().set_open_drain();
         let scl = gpiob.pb8.into_alternate().set_open_drain();
         device
@@ -455,9 +455,11 @@ pub fn setup(
             .i2c((scl, sda), 100.kHz(), ccdr.peripheral.I2C1, &ccdr.clocks)
     };
 
-    let mac_addr =
-        smoltcp::wire::EthernetAddress(super::eeprom::read_eui48(&mut eeprom_i2c, &mut delay));
+    let mac_addr = smoltcp::wire::EthernetAddress(super::eeprom::read_eui48(&mut i2c, &mut delay));
     log::info!("EUI48: {}", mac_addr);
+
+    let mut lm75 = lm75::Lm75::new(i2c, lm75::Address::default());
+    log::info!("Board Temperature: {}°C", lm75.read_temperature().unwrap());
 
     info!("Setup Ethernet");
 
