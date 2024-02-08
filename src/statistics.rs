@@ -1,9 +1,10 @@
 //! # Thermostat_EEM temperature telemetry processing
 
-use serde::Serialize;
 use num_traits::Float;
+use serde::Serialize;
 
-/// Statistics telemetry struct. Contains the mean, min and max temperature in the last telemetry period.
+/// Statistics telemetry struct. Contains the mean, peak-to-peak and standard deviation temperature
+/// over the last telemetry period.
 #[derive(Serialize, Copy, Clone, Debug)]
 pub struct Statistics {
     mean: f32,
@@ -12,13 +13,12 @@ pub struct Statistics {
 }
 
 impl From<Buffer> for Option<Statistics> {
-    /// Process temperature buffer. Calculates mean, returns the finalized Statistics type
-    /// and resets the buffer.
+    /// Process temperature buffer. Calculates and returns the finalized Statistics type.
     fn from(buff: Buffer) -> Self {
         if buff.counter > 0 {
             let c = 1.0 / buff.counter as f32;
             let mean = buff.m1 * c;
-            let var = buff.m2 * c - mean * mean;
+            let var = buff.m2 * c - mean.powi(2);
             Some(Statistics {
                 mean: mean + buff.x0,
                 ptp: buff.max - buff.min,

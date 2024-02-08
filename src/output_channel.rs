@@ -6,6 +6,37 @@ use idsp::iir;
 use miniconf::Tree;
 use num_traits::Signed;
 
+#[derive(Copy, Clone, Debug, Tree, Default)]
+pub struct Pid {
+    pub ki: f64,
+    pub kp: f64,
+    pub kd: f64,
+    pub li: f64,
+    pub ld: f64,
+    pub x0: f64,
+    pub min: f64,
+    pub max: f64,
+}
+
+impl TryFrom<Pid> for iir::Biquad<f64> {
+    type Error = iir::PidError;
+    fn try_from(value: Pid) -> Result<Self, Self::Error> {
+        let mut biquad: iir::Biquad<f64> = iir::Pid::default()
+            .gain(iir::Action::Ki, value.ki)
+            .gain(iir::Action::Kp, value.kp)
+            .gain(iir::Action::Kd, value.kd)
+            .limit(iir::Action::Ki, value.li)
+            .limit(iir::Action::Kd, value.ld)
+            .period(1.0 / 1007.0)
+            .build()?
+            .into();
+        biquad.set_input_offset(value.x0);
+        biquad.set_min(value.min);
+        biquad.set_max(value.max);
+        Ok(biquad)
+    }
+}
+
 #[derive(Copy, Clone, Debug, Tree)]
 pub struct OutputChannel {
     /// En-/Disables the TEC driver. This implies "hold".
@@ -27,11 +58,15 @@ pub struct OutputChannel {
     /// 0.0 to 4.3
     pub voltage_limit: f32,
 
+    #[tree]
+    pub pid: Pid,
+
     /// IIR filter parameters.
     /// The y limits will be clamped to the maximum output current of +-3 A.
     ///
     /// # Value
     /// See [iir::Biquad]
+    #[tree(skip)]
     pub iir: iir::Biquad<f64>,
 
     /// Thermostat input channel weights. Each input temperature of an enabled channel
@@ -54,6 +89,7 @@ impl Default for OutputChannel {
             shutdown: true,
             hold: false,
             voltage_limit: 0.0,
+            pid: Default::default(),
             iir: Default::default(),
             weights: [[0.0; 4]; 4],
         }
@@ -86,6 +122,11 @@ impl OutputChannel {
     /// - Normalization of the weights
     /// Returns the current limits.
     pub fn finalize_settings(&mut self) -> [f32; 2] {
+        if let Ok(iir) = self.pid.try_into() {
+            self.iir = iir;
+        } else {
+            log::info!("Pid build failure, update not applied.");
+        }
         self.iir.set_max(
             self.iir
                 .max()
