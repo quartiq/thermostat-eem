@@ -6,7 +6,7 @@ use idsp::iir;
 use miniconf::Tree;
 use num_traits::Signed;
 
-#[derive(Copy, Clone, Debug, Tree, Default)]
+#[derive(Copy, Clone, Debug, Tree)]
 pub struct Pid {
     pub ki: f64,
     pub kp: f64,
@@ -16,6 +16,21 @@ pub struct Pid {
     pub x0: f64,
     pub min: f64,
     pub max: f64,
+}
+
+impl Default for Pid {
+    fn default() -> Self {
+        Self {
+            ki: 0.0,
+            kp: 0.0,
+            kd: 0.0,
+            li: f64::INFINITY,
+            ld: f64::INFINITY,
+            x0: 0.0,
+            min: 0.0,
+            max: 0.0,
+        }
+    }
 }
 
 impl TryFrom<Pid> for iir::Biquad<f64> {
@@ -88,7 +103,7 @@ impl Default for OutputChannel {
         Self {
             shutdown: true,
             hold: false,
-            voltage_limit: 0.0,
+            voltage_limit: Pwm::MAX_VOLTAGE_LIMIT,
             pid: Default::default(),
             iir: Default::default(),
             weights: Default::default(),
