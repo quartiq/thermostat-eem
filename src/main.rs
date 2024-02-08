@@ -319,7 +319,7 @@ mod app {
     fn process_output_channel(mut c: process_output_channel::Context, output_ch: OutputChannelIdx) {
         let idx = output_ch as usize;
         let current = (c.shared.settings, c.shared.temperature).lock(|settings, temperature| {
-            settings.output_channel[idx].update(temperature, &mut c.local.iir_state[idx])
+            settings.output_channel[idx].update(temperature, &mut c.local.iir_state[idx]) as f32
         });
         c.shared
             .telemetry

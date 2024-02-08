@@ -91,7 +91,7 @@ impl Default for OutputChannel {
             voltage_limit: 0.0,
             pid: Default::default(),
             iir: Default::default(),
-            weights: [[0.0; 4]; 4],
+            weights: Default::default(),
         }
     }
 }
@@ -102,19 +102,19 @@ impl OutputChannel {
         &mut self,
         channel_temperatures: &[[f64; 4]; 4],
         iir_state: &mut [f64; 4],
-    ) -> f32 {
+    ) -> f64 {
         let weighted_temperature = channel_temperatures
             .iter()
             .flatten()
             .zip(self.weights.iter().flatten())
-            // weight is `None` if temperature is invalid (phy cfg absent)
             .map(|(t, w)| t * *w as f64)
             .sum();
-        if self.shutdown || self.hold {
-            iir::Biquad::HOLD.update(iir_state, weighted_temperature) as f32
+        let iir = if self.shutdown || self.hold {
+            &iir::Biquad::HOLD
         } else {
-            self.iir.update(iir_state, weighted_temperature) as f32
-        }
+            &self.iir
+        };
+        iir.update(iir_state, weighted_temperature)
     }
 
     /// Performs finalization of the output_channel miniconf settings:
@@ -138,15 +138,12 @@ impl OutputChannel {
                 .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT),
         );
         self.voltage_limit = self.voltage_limit.clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
-        let divisor: f32 = self
-            .weights
-            .iter()
-            .map(|w| w.iter().map(|w| w.abs()).sum::<f32>())
-            .sum();
+        let divisor: f32 = self.weights.iter().flatten().map(|w| w.abs()).sum::<f32>();
         // Note: The weights which are not 'None' should always affect an enabled channel and therefore count for normalization.
         if divisor != 0.0 {
+            let n = divisor.recip();
             for w in self.weights.iter_mut().flatten() {
-                *w /= divisor;
+                *w *= n;
             }
         }
         [
