@@ -11,7 +11,6 @@ pub mod adc;
 pub mod adc_internal;
 pub mod dac;
 pub mod delay;
-pub mod eeprom;
 pub mod fan;
 pub mod gpio;
 pub mod metadata;
