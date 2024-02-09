@@ -6,6 +6,7 @@
 #![no_main]
 
 use core::fmt::Write;
+use core::mem::MaybeUninit;
 
 pub mod hardware;
 pub mod net;
@@ -27,7 +28,10 @@ use hardware::{
     OutputChannelIdx,
 };
 use miniconf::Tree;
-use net::{Alarm, NetworkState, NetworkUsers};
+use net::{
+    data_stream::{FrameGenerator, StreamFormat, StreamTarget},
+    Alarm, NetworkState, NetworkUsers,
+};
 use serde::Serialize;
 use statistics::{Buffer, Statistics};
 use systick_monotonic::{ExtU64, Systick};
@@ -63,6 +67,8 @@ pub struct Settings {
     /// See [Alarm]
     #[tree(depth(3))]
     alarm: Alarm,
+
+    stream_target: StreamTarget,
 }
 
 impl Default for Settings {
@@ -71,6 +77,7 @@ impl Default for Settings {
             telemetry_period: 1.0,
             output_channel: Default::default(),
             alarm: Default::default(),
+            stream_target: Default::default(),
         }
     }
 }
@@ -131,6 +138,7 @@ mod app {
         pwm: Pwm,
         adc_internal: AdcInternal,
         iir_state: [[f64; 4]; 4],
+        generator: FrameGenerator,
     }
 
     #[init]
@@ -146,7 +154,7 @@ mod app {
         let mut id = heapless::String::<32>::new();
         write!(&mut id, "{}", thermostat.net.mac_address).unwrap();
 
-        let network = NetworkUsers::new(
+        let mut network = NetworkUsers::new(
             thermostat.net.stack,
             thermostat.net.phy,
             clock,
@@ -156,12 +164,15 @@ mod app {
             thermostat.metadata,
         );
 
+        let generator = network.configure_streaming(StreamFormat::ThermostatEem);
+
         let local = Local {
             adc_sm: thermostat.adc_sm,
             pwm: thermostat.pwm,
             adc_internal: thermostat.adc_internal,
             iir_state: Default::default(),
             dac: thermostat.dac,
+            generator,
         };
 
         let shared = Shared {
@@ -216,6 +227,8 @@ mod app {
                 gpio.set_shutdown(ch, s.shutdown.into());
                 gpio.set_led(ch.into(), (!s.shutdown).into()) // fix leds to channel state
             }
+
+            network.direct_stream(settings.stream_target.into());
 
             c.shared.settings.lock(|current_settings| {
                 *current_settings = settings;
@@ -298,7 +311,7 @@ mod app {
         c.local.dac.set(output_ch, dac_code);
     }
 
-    #[task(priority = 2, shared=[temperature, settings, telemetry], local=[iir_state], capacity = 4)]
+    #[task(priority = 2, shared=[temperature, settings, telemetry], local=[iir_state, generator], capacity = 4)]
     fn process_output_channel(mut c: process_output_channel::Context, output_ch: OutputChannelIdx) {
         let idx = output_ch as usize;
         let current = (c.shared.settings, c.shared.temperature).lock(|settings, temperature| {
@@ -308,6 +321,27 @@ mod app {
             .telemetry
             .lock(|tele| tele.output_current[idx] = current);
         convert_current_and_set_dac::spawn(output_ch, current).unwrap();
+
+        #[repr(C)]
+        #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+        struct Stream {
+            ch: u32,
+            temperature: f32,
+            current: f32,
+        }
+        c.local.generator.add(|buf| {
+            for (b, s) in buf.iter_mut().zip(
+                bytemuck::cast::<_, [u8; 4 * 3]>(Stream {
+                    ch: idx as _,
+                    temperature: c.local.iir_state[idx][0] as _,
+                    current,
+                })
+                .iter(),
+            ) {
+                b.write(*s);
+            }
+            core::mem::size_of::<Stream>()
+        });
     }
 
     // Higher priority than telemetry but lower than adc data readout.

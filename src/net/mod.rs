@@ -9,6 +9,7 @@ pub use heapless;
 pub use miniconf;
 pub use serde;
 
+pub mod data_stream;
 pub mod network_processor;
 pub mod telemetry;
 
@@ -16,7 +17,9 @@ use crate::hardware::{
     metadata::ApplicationMetadata, system_timer::SystemTimer, EthernetPhy, NetworkManager,
     NetworkStack,
 };
+use data_stream::{DataStream, FrameGenerator};
 use network_processor::NetworkProcessor;
+use smoltcp_nal::embedded_nal::SocketAddr;
 use telemetry::TelemetryClient;
 
 use core::fmt::Write;
@@ -64,6 +67,8 @@ where
         Y,
     >,
     pub processor: NetworkProcessor,
+    stream: DataStream,
+    generator: Option<FrameGenerator>,
     pub telemetry: TelemetryClient,
 }
 
@@ -137,10 +142,34 @@ where
             TelemetryClient::new(mqtt, &prefix, metadata)
         };
 
+        let (generator, stream) = data_stream::setup_streaming(stack_manager.acquire_stack());
+
         NetworkUsers {
             miniconf: settings,
             processor,
             telemetry,
+            stream,
+            generator: Some(generator),
+        }
+    }
+
+    /// Enable live data streaming.
+    ///
+    /// # Args
+    /// * `format` - A unique u8 code indicating the format of the data.
+    pub fn configure_streaming(&mut self, format: impl Into<u8>) -> FrameGenerator {
+        let mut generator = self.generator.take().unwrap();
+        generator.configure(format);
+        generator
+    }
+
+    /// Direct the stream to the provided remote target.
+    ///
+    /// # Args
+    /// * `remote` - The destination for the streamed data.
+    pub fn direct_stream(&mut self, remote: SocketAddr) {
+        if self.generator.is_none() {
+            self.stream.set_remote(remote);
         }
     }
 
