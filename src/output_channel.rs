@@ -1,34 +1,34 @@
 //! # Thermostat_EEM IIR wrapper.
 //!
 
-use crate::hardware::pwm::Pwm;
+use crate::{hardware::pwm::Pwm, DacCode};
 use idsp::iir;
 use miniconf::Tree;
-use num_traits::Signed;
+use num_traits::Float;
 
 #[derive(Copy, Clone, Debug, Tree)]
 pub struct Pid {
-    pub ki: f64,
-    pub kp: f64,
-    pub kd: f64,
-    pub li: f64,
-    pub ld: f64,
-    pub x0: f64,
-    pub min: f64,
-    pub max: f64,
+    pub ki: f32,
+    pub kp: f32,
+    pub kd: f32,
+    pub li: f32,
+    pub ld: f32,
+    pub setpoint: f32,
+    pub min: f32,
+    pub max: f32,
 }
 
 impl Default for Pid {
     fn default() -> Self {
         Self {
-            ki: 0.0,
-            kp: 0.0,
-            kd: 0.0,
-            li: f64::INFINITY,
-            ld: f64::INFINITY,
-            x0: 0.0,
-            min: 0.0,
-            max: 0.0,
+            ki: 0.,
+            kp: 1e-3,
+            kd: 0.,
+            li: f32::INFINITY,
+            ld: f32::INFINITY,
+            setpoint: 25.,
+            min: -f32::INFINITY,
+            max: f32::INFINITY,
         }
     }
 }
@@ -36,18 +36,18 @@ impl Default for Pid {
 impl TryFrom<Pid> for iir::Biquad<f64> {
     type Error = iir::PidError;
     fn try_from(value: Pid) -> Result<Self, Self::Error> {
-        let mut biquad: iir::Biquad<f64> = iir::Pid::default()
-            .gain(iir::Action::Ki, value.ki)
-            .gain(iir::Action::Kp, value.kp)
-            .gain(iir::Action::Kd, value.kd)
-            .limit(iir::Action::Ki, value.li)
-            .limit(iir::Action::Kd, value.ld)
-            .period(1.0 / 1007.0)
+        let mut biquad: iir::Biquad<f64> = iir::Pid::<f64>::default()
+            .period(1.0 / 1007.0) // ADC sample rate (ODR) including zero-oder-holds
+            .gain(iir::Action::Ki, value.ki.copysign(value.kp) as _)
+            .gain(iir::Action::Kp, value.kp as _)
+            .gain(iir::Action::Kd, value.kd.copysign(value.kp) as _)
+            .limit(iir::Action::Ki, value.li.copysign(value.kp) as _)
+            .limit(iir::Action::Kd, value.ld.copysign(value.kp) as _)
             .build()?
             .into();
-        biquad.set_input_offset(value.x0);
-        biquad.set_min(value.min);
-        biquad.set_max(value.max);
+        biquad.set_input_offset(-value.setpoint as _);
+        biquad.set_min(value.min as _);
+        biquad.set_max(value.max as _);
         Ok(biquad)
     }
 }
@@ -142,16 +142,11 @@ impl OutputChannel {
         } else {
             log::info!("Pid build failure, update not applied.");
         }
-        self.iir.set_max(
-            self.iir
-                .max()
-                .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT),
-        );
-        self.iir.set_min(
-            self.iir
-                .min()
-                .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT),
-        );
+        let range = DacCode::MAX_CURRENT.min(Pwm::MAX_CURRENT_LIMIT);
+        self.iir
+            .set_max(self.iir.max().clamp(-range as _, range as _));
+        self.iir
+            .set_min(self.iir.min().clamp(-range as _, range as _));
         self.voltage_limit = self.voltage_limit.clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
         let divisor: f32 = self.weights.iter().flatten().map(|w| w.abs()).sum::<f32>();
         // Note: The weights which are not 'None' should always affect an enabled channel and therefore count for normalization.
@@ -164,8 +159,8 @@ impl OutputChannel {
         [
             // [Pwm::MAX_CURRENT_LIMIT] + 5% is still below 100% duty cycle for the PWM limits and therefore OK.
             // Might not be OK for a different shunt resistor or different PWM setup.
-            (self.iir.max() + 0.05 * Pwm::MAX_CURRENT_LIMIT).max(0.) as f32,
-            (self.iir.min() - 0.05 * Pwm::MAX_CURRENT_LIMIT).min(0.) as f32,
+            (self.iir.max() as f32 + 0.05 * Pwm::MAX_CURRENT_LIMIT).max(0.),
+            (self.iir.min() as f32 - 0.05 * Pwm::MAX_CURRENT_LIMIT).min(0.),
         ]
     }
 }

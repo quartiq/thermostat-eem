@@ -121,7 +121,7 @@ mod app {
         telemetry: Telemetry,
         gpio: Gpio,
         temperature: [[f64; 4]; 4], // input temperature array in °C. Organized as [Adc_idx,  Channel_idx].
-        statistics_buff: [[Buffer; 4]; 4], // input statistics buffer for processing telemetry. Organized as [Adc_idx,  Channel_idx].
+        statistics: [[Buffer; 4]; 4], // input statistics buffer for processing telemetry. Organized as [Adc_idx,  Channel_idx].
     }
 
     #[local]
@@ -166,15 +166,15 @@ mod app {
 
         let shared = Shared {
             network,
-            settings: settings.clone(),
+            settings,
             telemetry: Default::default(),
             gpio: thermostat.gpio,
             temperature: Default::default(),
-            statistics_buff: Default::default(),
+            statistics: Default::default(),
         };
 
         // Apply initial settings
-        settings_update::spawn(settings).unwrap();
+        settings_update::spawn().unwrap();
         ethernet_link::spawn().unwrap();
         telemetry_task::spawn().unwrap();
         mqtt_alarm::spawn().unwrap();
@@ -193,54 +193,37 @@ mod app {
     fn idle(mut c: idle::Context) -> ! {
         loop {
             c.shared.network.lock(|net| match net.update() {
-                NetworkState::SettingsChanged(_path) => {
-                    settings_update::spawn(net.miniconf.settings().clone()).unwrap()
-                }
+                NetworkState::SettingsChanged(_path) => settings_update::spawn().unwrap(),
                 NetworkState::Updated => {}
                 NetworkState::NoChange => {}
             })
         }
     }
 
-    #[task(priority = 1, local=[pwm], shared=[settings, gpio], capacity=1)]
-    fn settings_update(mut c: settings_update::Context, mut settings: Settings) {
-        // Limit y_min and y_max values here. Will be incorporated into miniconf response later.
-        for ch in settings.output_channel.iter_mut() {
-            ch.iir.set_max(
-                ch.iir
-                    .max()
-                    .clamp(-DacCode::MAX_CURRENT as _, DacCode::MAX_CURRENT as _),
-            );
-            ch.iir.set_min(
-                ch.iir
-                    .min()
-                    .clamp(-DacCode::MAX_CURRENT as _, DacCode::MAX_CURRENT as _),
-            );
-        }
-
+    #[task(priority = 1, local=[pwm], shared=[network, settings, gpio], capacity=1)]
+    fn settings_update(mut c: settings_update::Context) {
         let pwm = c.local.pwm;
-        for ch in all::<OutputChannelIdx>() {
-            let mut s = settings.output_channel[ch as usize];
-            let current_limits = s.finalize_settings(); // clamp limits and normalize weights
-            pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
-            // give 5% extra headroom for PWM current limits
-            pwm.set_limit(Limit::PositiveCurrent(ch), current_limits[0])
-                .unwrap();
-            pwm.set_limit(Limit::NegativeCurrent(ch), current_limits[1])
-                .unwrap();
-            c.shared.gpio.lock(|gpio| {
+        (c.shared.network, c.shared.gpio).lock(|network, gpio| {
+            let mut settings = network.miniconf.settings().clone();
+            for (ch, s) in all::<OutputChannelIdx>().zip(settings.output_channel.iter_mut()) {
+                let current_limits = s.finalize_settings(); // clamp limits and normalize weights
+                pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
+                // give 5% extra headroom for PWM current limits
+                pwm.set_limit(Limit::PositiveCurrent(ch), current_limits[0])
+                    .unwrap();
+                pwm.set_limit(Limit::NegativeCurrent(ch), current_limits[1])
+                    .unwrap();
                 gpio.set_shutdown(ch, s.shutdown.into());
                 gpio.set_led(ch.into(), (!s.shutdown).into()) // fix leds to channel state
-            });
-        }
+            }
 
-        // Verify settings and make them available
-        c.shared.settings.lock(|current_settings| {
-            *current_settings = settings;
+            c.shared.settings.lock(|current_settings| {
+                *current_settings = settings;
+            });
         });
     }
 
-    #[task(priority = 1, local=[adc_internal], shared=[network, settings, telemetry, gpio, statistics_buff])]
+    #[task(priority = 1, local=[adc_internal], shared=[network, settings, telemetry, gpio, statistics])]
     fn telemetry_task(mut c: telemetry_task::Context) {
         let mut telemetry: Telemetry = c.shared.telemetry.lock(|telemetry| *telemetry);
         let adc_int = c.local.adc_internal;
@@ -262,7 +245,7 @@ mod app {
         // Finalize temperature telemetry and reset buffer
         for phy_i in 0..4 {
             for cfg_i in 0..4 {
-                c.shared.statistics_buff.lock(|buff| {
+                c.shared.statistics.lock(|buff| {
                     telemetry.statistics[phy_i][cfg_i] = buff[phy_i][cfg_i].into();
                     buff[phy_i][cfg_i] = Default::default();
                 });
@@ -328,7 +311,7 @@ mod app {
     }
 
     // Higher priority than telemetry but lower than adc data readout.
-    #[task(priority = 2, shared=[temperature, statistics_buff], capacity=4)]
+    #[task(priority = 2, shared=[temperature, statistics], capacity=4)]
     fn convert_adc_code(
         mut c: convert_adc_code::Context,
         phy: AdcPhy,
@@ -339,7 +322,7 @@ mod app {
         c.shared.temperature.lock(|temp| {
             temp[phy as usize][ch] = temperature;
         });
-        c.shared.statistics_buff.lock(|stat_buff| {
+        c.shared.statistics.lock(|stat_buff| {
             stat_buff[phy as usize][ch].update(temperature as _);
         });
         // Start processing when the last ADC has been read out.
