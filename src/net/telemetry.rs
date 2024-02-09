@@ -16,9 +16,6 @@ use serde::Serialize;
 use super::NetworkReference;
 use crate::hardware::{metadata::ApplicationMetadata, system_timer::SystemTimer};
 
-/// Default metadata message if formatting errors occur.
-const DEFAULT_METADATA: &str = "{\"message\":\"Truncated\"}";
-
 /// The telemetry client for reporting telemetry data over MQTT.
 pub struct TelemetryClient {
     mqtt: minimq::Minimq<
@@ -108,7 +105,7 @@ impl TelemetryClient {
                 smoltcp_nal::smoltcp::socket::tcp::ConnectError::Unaddressable,
             ))) => {}
 
-            Err(error) => log::info!("Unexpected error: {:?}", error),
+            Err(error) => log::info!("Unexpected MQTT error: {:?}", error),
             _ => {}
         }
 
@@ -119,20 +116,15 @@ impl TelemetryClient {
 
         // Publish application metadata
         if !self.meta_published && self.mqtt.client().can_publish(minimq::QoS::AtMostOnce) {
-            let Self {
-                ref mut mqtt,
-                metadata,
-                ..
-            } = self;
-
             let mut topic = self.prefix.clone();
             topic.push_str("/meta").unwrap();
 
-            if mqtt
+            if self
+                .mqtt
                 .client()
                 .publish(
                     minimq::DeferredPublication::new(|buf| {
-                        serde_json_core::to_slice(&metadata, buf)
+                        serde_json_core::to_slice(&self.metadata, buf)
                     })
                     .topic(&topic)
                     .finish()
@@ -142,9 +134,10 @@ impl TelemetryClient {
             {
                 // Note(unwrap): We can guarantee that this message will be sent because we checked
                 // for ability to publish above.
-                mqtt.client()
+                self.mqtt
+                    .client()
                     .publish(
-                        minimq::Publication::new(DEFAULT_METADATA.as_bytes())
+                        minimq::Publication::new("{\"message\":\"Truncated\"}".as_bytes())
                             .topic(&topic)
                             .finish()
                             .unwrap(),

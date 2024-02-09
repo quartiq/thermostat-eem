@@ -135,6 +135,7 @@ where
                     // The telemetry client doesn't receive any messages except MQTT control packets.
                     // As such, we don't need much of the buffer for RX.
                     .rx_buffer(minimq::config::BufferConfig::Maximum(100))
+                    .session_state(minimq::config::BufferConfig::Maximum(0))
                     .client_id(&get_client_id(id, "tlm"))
                     .unwrap(),
             );
