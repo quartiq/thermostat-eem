@@ -182,6 +182,11 @@ where
         // Update the MQTT clients.
         self.telemetry.update();
 
+        // Update the data stream.
+        if self.generator.is_none() {
+            self.stream.process();
+        }
+
         // Poll for incoming data.
         let poll_result = match self.processor.update() {
             UpdateState::NoChange => NetworkState::NoChange,
