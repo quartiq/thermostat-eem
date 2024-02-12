@@ -77,7 +77,7 @@ impl Pwm {
     // PWM constants
     const MAX_DUTY: u32 = 10000; // Maximum duty cycle valid for all channels.
     const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
-    pub const MAX_CURRENT_LIMIT: f64 = 3.0; // As per MAX1968 datasheet. (Pwm::V_PWM * 0.15) / (VREF_TEC * R_SENSE) for 100% duty cycle equivalent.
+    pub const MAX_CURRENT_LIMIT: f32 = 3.0; // As per MAX1968 datasheet. (Pwm::V_PWM * 0.15) / (VREF_TEC * R_SENSE) for 100% duty cycle equivalent.
     pub const MAX_VOLTAGE_LIMIT: f32 = 4.3; // As per MAX1968 datasheet
 
     /// Construct a new PWM driver for all Thermostat output channel limits.

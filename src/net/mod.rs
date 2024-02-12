@@ -9,6 +9,7 @@ pub use heapless;
 pub use miniconf;
 pub use serde;
 
+pub mod data_stream;
 pub mod network_processor;
 pub mod telemetry;
 
@@ -16,13 +17,14 @@ use crate::hardware::{
     metadata::ApplicationMetadata, system_timer::SystemTimer, EthernetPhy, NetworkManager,
     NetworkStack,
 };
+use data_stream::{DataStream, FrameGenerator};
 use network_processor::NetworkProcessor;
+use smoltcp_nal::embedded_nal::SocketAddr;
 use telemetry::TelemetryClient;
 
 use core::fmt::Write;
 use heapless::String;
 use miniconf::{JsonCoreSlash, Tree};
-use serde::Serialize;
 
 pub type NetworkReference = smoltcp_nal::shared::NetworkStackProxy<'static, NetworkStack>;
 
@@ -52,10 +54,9 @@ pub enum NetworkState {
     NoChange,
 }
 /// A structure of Stabilizer's default network users.
-pub struct NetworkUsers<S, T, const Y: usize>
+pub struct NetworkUsers<S, const Y: usize>
 where
     for<'de> S: Default + JsonCoreSlash<'de, Y> + Clone,
-    T: Serialize,
 {
     pub miniconf: miniconf::MqttClient<
         'static,
@@ -66,13 +67,14 @@ where
         Y,
     >,
     pub processor: NetworkProcessor,
-    pub telemetry: TelemetryClient<T>,
+    stream: DataStream,
+    generator: Option<FrameGenerator>,
+    pub telemetry: TelemetryClient,
 }
 
-impl<S, T, const Y: usize> NetworkUsers<S, T, Y>
+impl<S, const Y: usize> NetworkUsers<S, Y>
 where
     for<'de> S: Default + JsonCoreSlash<'de, Y> + Clone,
-    T: Serialize,
 {
     /// Construct Stabilizer's default network users.
     ///
@@ -133,6 +135,7 @@ where
                     // The telemetry client doesn't receive any messages except MQTT control packets.
                     // As such, we don't need much of the buffer for RX.
                     .rx_buffer(minimq::config::BufferConfig::Maximum(100))
+                    .session_state(minimq::config::BufferConfig::Maximum(0))
                     .client_id(&get_client_id(id, "tlm"))
                     .unwrap(),
             );
@@ -140,10 +143,34 @@ where
             TelemetryClient::new(mqtt, &prefix, metadata)
         };
 
+        let (generator, stream) = data_stream::setup_streaming(stack_manager.acquire_stack());
+
         NetworkUsers {
             miniconf: settings,
             processor,
             telemetry,
+            stream,
+            generator: Some(generator),
+        }
+    }
+
+    /// Enable live data streaming.
+    ///
+    /// # Args
+    /// * `format` - A unique u8 code indicating the format of the data.
+    pub fn configure_streaming(&mut self, format: impl Into<u8>) -> FrameGenerator {
+        let mut generator = self.generator.take().unwrap();
+        generator.configure(format);
+        generator
+    }
+
+    /// Direct the stream to the provided remote target.
+    ///
+    /// # Args
+    /// * `remote` - The destination for the streamed data.
+    pub fn direct_stream(&mut self, remote: SocketAddr) {
+        if self.generator.is_none() {
+            self.stream.set_remote(remote);
         }
     }
 
@@ -155,6 +182,11 @@ where
         // Update the MQTT clients.
         self.telemetry.update();
 
+        // Update the data stream.
+        if self.generator.is_none() {
+            self.stream.process();
+        }
+
         // Poll for incoming data.
         let poll_result = match self.processor.update() {
             UpdateState::NoChange => NetworkState::NoChange,
@@ -162,11 +194,12 @@ where
         };
 
         let mut settings_path: String<128> = String::new();
-        match self.miniconf.handled_update(|path, old, new| {
+        let res = self.miniconf.handled_update(|path, old, new| {
             settings_path = path.into();
             *old = new.clone();
-            Result::<(), &'static str>::Ok(())
-        }) {
+            Result::<_, &str>::Ok(())
+        });
+        match res {
             Ok(true) => NetworkState::SettingsChanged(settings_path),
             _ => poll_result,
         }

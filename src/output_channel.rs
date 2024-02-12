@@ -1,10 +1,56 @@
 //! # Thermostat_EEM IIR wrapper.
 //!
 
-use crate::hardware::pwm::Pwm;
+use crate::{hardware::pwm::Pwm, DacCode};
 use idsp::iir;
 use miniconf::Tree;
-use num_traits::Signed;
+use num_traits::Float;
+
+#[derive(Copy, Clone, Debug, Tree)]
+pub struct Pid {
+    pub ki: f32,
+    pub kp: f32,
+    pub kd: f32,
+    pub li: f32,
+    pub ld: f32,
+    pub setpoint: f32,
+    pub min: f32,
+    pub max: f32,
+}
+
+impl Default for Pid {
+    fn default() -> Self {
+        Self {
+            ki: 0.,
+            kp: 1e-3,
+            kd: 0.,
+            li: f32::INFINITY,
+            ld: f32::INFINITY,
+            setpoint: 25.,
+            min: -f32::INFINITY,
+            max: f32::INFINITY,
+        }
+    }
+}
+
+impl TryFrom<Pid> for iir::Biquad<f64> {
+    type Error = iir::PidError;
+    fn try_from(value: Pid) -> Result<Self, Self::Error> {
+        let mut biquad: iir::Biquad<f64> = iir::Pid::<f64>::default()
+            .period(1.0 / 1007.0) // ADC sample rate (ODR) including zero-oder-holds
+            .gain(iir::Action::Ki, value.ki.copysign(value.kp) as _)
+            .gain(iir::Action::Kp, value.kp as _)
+            .gain(iir::Action::Kd, value.kd.copysign(value.kp) as _)
+            .limit(iir::Action::Ki, value.li.copysign(value.kp) as _)
+            .limit(iir::Action::Kd, value.ld.copysign(value.kp) as _)
+            .build()?
+            .into();
+        biquad.set_input_offset(-value.setpoint as _);
+        biquad.set_min(value.min as _);
+        biquad.set_max(value.max as _);
+        Ok(biquad)
+    }
+}
 
 #[derive(Copy, Clone, Debug, Tree)]
 pub struct OutputChannel {
@@ -27,11 +73,15 @@ pub struct OutputChannel {
     /// 0.0 to 4.3
     pub voltage_limit: f32,
 
+    #[tree]
+    pub pid: Pid,
+
     /// IIR filter parameters.
     /// The y limits will be clamped to the maximum output current of +-3 A.
     ///
     /// # Value
     /// See [iir::Biquad]
+    #[tree(skip)]
     pub iir: iir::Biquad<f64>,
 
     /// Thermostat input channel weights. Each input temperature of an enabled channel
@@ -45,7 +95,6 @@ pub struct OutputChannel {
     ///
     /// # Value
     /// f32
-    #[tree(depth(2))]
     pub weights: [[f32; 4]; 4],
 }
 
@@ -54,9 +103,10 @@ impl Default for OutputChannel {
         Self {
             shutdown: true,
             hold: false,
-            voltage_limit: 0.0,
+            voltage_limit: Pwm::MAX_VOLTAGE_LIMIT,
+            pid: Default::default(),
             iir: Default::default(),
-            weights: [[0.0; 4]; 4],
+            weights: Default::default(),
         }
     }
 }
@@ -67,19 +117,19 @@ impl OutputChannel {
         &mut self,
         channel_temperatures: &[[f64; 4]; 4],
         iir_state: &mut [f64; 4],
-    ) -> f32 {
+    ) -> f64 {
         let weighted_temperature = channel_temperatures
             .iter()
             .flatten()
             .zip(self.weights.iter().flatten())
-            // weight is `None` if temperature is invalid (phy cfg absent)
             .map(|(t, w)| t * *w as f64)
             .sum();
-        if self.shutdown || self.hold {
-            iir::Biquad::HOLD.update(iir_state, weighted_temperature) as f32
+        let iir = if self.shutdown || self.hold {
+            &iir::Biquad::HOLD
         } else {
-            self.iir.update(iir_state, weighted_temperature) as f32
-        }
+            &self.iir
+        };
+        iir.update(iir_state, weighted_temperature)
     }
 
     /// Performs finalization of the output_channel miniconf settings:
@@ -87,33 +137,30 @@ impl OutputChannel {
     /// - Normalization of the weights
     /// Returns the current limits.
     pub fn finalize_settings(&mut self) -> [f32; 2] {
-        self.iir.set_max(
-            self.iir
-                .max()
-                .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT),
-        );
-        self.iir.set_min(
-            self.iir
-                .min()
-                .clamp(-Pwm::MAX_CURRENT_LIMIT, Pwm::MAX_CURRENT_LIMIT),
-        );
+        if let Ok(iir) = self.pid.try_into() {
+            self.iir = iir;
+        } else {
+            log::info!("Pid build failure, update not applied.");
+        }
+        let range = DacCode::MAX_CURRENT.min(Pwm::MAX_CURRENT_LIMIT);
+        self.iir
+            .set_max(self.iir.max().clamp(-range as _, range as _));
+        self.iir
+            .set_min(self.iir.min().clamp(-range as _, range as _));
         self.voltage_limit = self.voltage_limit.clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
-        let divisor: f32 = self
-            .weights
-            .iter()
-            .map(|w| w.iter().map(|w| w.abs()).sum::<f32>())
-            .sum();
+        let divisor: f32 = self.weights.iter().flatten().map(|w| w.abs()).sum::<f32>();
         // Note: The weights which are not 'None' should always affect an enabled channel and therefore count for normalization.
         if divisor != 0.0 {
+            let n = divisor.recip();
             for w in self.weights.iter_mut().flatten() {
-                *w /= divisor;
+                *w *= n;
             }
         }
         [
             // [Pwm::MAX_CURRENT_LIMIT] + 5% is still below 100% duty cycle for the PWM limits and therefore OK.
             // Might not be OK for a different shunt resistor or different PWM setup.
-            (self.iir.max() + 0.05 * Pwm::MAX_CURRENT_LIMIT).max(0.) as f32,
-            (self.iir.min() - 0.05 * Pwm::MAX_CURRENT_LIMIT).min(0.) as f32,
+            (self.iir.max() as f32 + 0.05 * Pwm::MAX_CURRENT_LIMIT).max(0.),
+            (self.iir.min() as f32 - 0.05 * Pwm::MAX_CURRENT_LIMIT).min(0.),
         ]
     }
 }

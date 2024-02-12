@@ -1,10 +1,7 @@
 use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::hardware::{
-    adc::{AdcConfig, AdcInput},
-    system_timer,
-};
+use crate::hardware::{ad7172::Mux, adc::AdcConfig, system_timer};
 use smoltcp_nal::smoltcp;
 
 use super::hal::{
@@ -33,10 +30,8 @@ const NUM_UDP_SOCKETS: usize = 1;
 const NUM_SOCKETS: usize = NUM_UDP_SOCKETS + NUM_TCP_SOCKETS;
 
 pub struct NetStorage {
-    pub ip_addrs: [smoltcp::wire::IpCidr; 1],
-
     // Note: There is an additional socket set item required for the DHCP socket.
-    pub sockets: [smoltcp::iface::SocketStorage<'static>; NUM_SOCKETS + 1],
+    pub sockets: [smoltcp::iface::SocketStorage<'static>; NUM_SOCKETS + 2],
     pub tcp_socket_storage: [TcpSocketStorage; NUM_TCP_SOCKETS],
     pub udp_socket_storage: [UdpSocketStorage; NUM_UDP_SOCKETS],
     pub dns_storage: [Option<smoltcp::socket::dns::DnsQuery>; 1],
@@ -79,11 +74,7 @@ impl Default for NetStorage {
     fn default() -> Self {
         NetStorage {
             // Placeholder for the real IP address, which is initialized at runtime.
-            ip_addrs: [smoltcp::wire::IpCidr::Ipv6(
-                smoltcp::wire::Ipv6Cidr::SOLICITED_NODE_PREFIX,
-            )],
-            // Placeholder for the real IP address, which is initialized at runtime.
-            sockets: [smoltcp::iface::SocketStorage::EMPTY; NUM_SOCKETS + 1],
+            sockets: [smoltcp::iface::SocketStorage::EMPTY; NUM_SOCKETS + 2],
             tcp_socket_storage: [TcpSocketStorage::new(); NUM_TCP_SOCKETS],
             udp_socket_storage: [UdpSocketStorage::new(); NUM_UDP_SOCKETS],
             dns_storage: [None; 1],
@@ -353,26 +344,26 @@ pub fn setup(
     let adc_input_config = AdcConfig {
         input_config: [
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
@@ -383,36 +374,32 @@ pub fn setup(
     let adc_input_config = AdcConfig {
         input_config: [
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
             [
-                Some((AdcInput::Ain0, AdcInput::Ain1)),
-                Some((AdcInput::Ain2, AdcInput::Ain3)),
+                Some((Mux::Ain0, Mux::Ain1)),
+                Some((Mux::Ain2, Mux::Ain3)),
                 None,
                 None,
             ],
             // last ADC has single ended inputs negatively referenced to the positive reference input
             [
-                Some((AdcInput::RefP, AdcInput::Ain0)),
-                Some((AdcInput::RefP, AdcInput::Ain1)),
-                Some((AdcInput::RefP, AdcInput::Ain2)),
-                Some((AdcInput::RefP, AdcInput::Ain3)),
+                Some((Mux::RefP, Mux::Ain0)),
+                Some((Mux::RefP, Mux::Ain1)),
+                Some((Mux::RefP, Mux::Ain2)),
+                Some((Mux::RefP, Mux::Ain3)),
             ],
         ],
     };
-
-    for (i, config) in adc_input_config.input_config.iter().enumerate() {
-        log::info!("ADC{} input configuration: {:?}", i, config);
-    }
 
     let adc = Adc::new(
         &mut delay,
@@ -443,24 +430,35 @@ pub fn setup(
     let mut adc_sm = StateMachine::new(adc);
     adc_sm.start(&mut device.EXTI, &mut device.SYSCFG);
 
-    let mut eeprom_i2c = {
-        let sda = gpiob.pb9.into_alternate().set_open_drain();
-        let scl = gpiob.pb8.into_alternate().set_open_drain();
+    let mut afe_i2c = {
+        let sda = gpiof.pf0.into_alternate_open_drain();
+        let scl = gpiof.pf1.into_alternate_open_drain();
+        device
+            .I2C2
+            .i2c((scl, sda), 100.kHz(), ccdr.peripheral.I2C2, &ccdr.clocks)
+    };
+
+    let mut i2c = {
+        let sda = gpiob.pb9.into_alternate_open_drain();
+        let scl = gpiob.pb8.into_alternate_open_drain();
         device
             .I2C1
             .i2c((scl, sda), 100.kHz(), ccdr.peripheral.I2C1, &ccdr.clocks)
     };
 
-    // The EEPROM is a variant without address bits, so the 3 LSB of this word are "dont-cares".
-    const I2C_ADDR: u8 = 0x50;
-    // The MAC address is stored in the last 6 bytes of the 256 byte address space.
-    const MAC_POINTER: u8 = 0xFA;
-
-    let mut buffer = [0u8; 6];
-    eeprom_i2c
-        .write_read(I2C_ADDR, &[MAC_POINTER], &mut buffer)
-        .unwrap();
-    let mac_addr = smoltcp::wire::EthernetAddress(buffer);
+    let mut eui48 = [0; 6];
+    if i2c.write_read(0x50, &[0xFA], &mut eui48).is_err() {
+        // wrong ESD protection https://github.com/sinara-hw/Thermostat_EEM/issues/51
+        log::warn!("I2C failure, using default MAC");
+        eui48 = [0x02, 0x00, 0x00, 0x00, 0x00, 0xd3];
+    } else {
+        let mut lm75 = lm75::Lm75::new(i2c, lm75::Address::default());
+        log::info!("LM75 Temperature: {}°C", lm75.read_temperature().unwrap());
+        if let Ok(()) = afe_i2c.write_read(0x50, &[0xFA], &mut eui48) {
+            log::info!("AFE EUI48: {eui48:?}");
+        }
+    }
+    let mac_addr = smoltcp::wire::EthernetAddress(eui48);
     log::info!("EUI48: {}", mac_addr);
 
     info!("Setup Ethernet");
@@ -512,12 +510,6 @@ pub fn setup(
 
         unsafe { ethernet::enable_interrupt() };
 
-        // Configure IP address according to DHCP socket availability
-        let ip_addrs: smoltcp::wire::IpAddress = option_env!("STATIC_IP")
-            .unwrap_or("0.0.0.0")
-            .parse()
-            .unwrap();
-
         let random_seed = {
             let mut rng = device.RNG.constrain(ccdr.peripheral.RNG, &ccdr.clocks);
             let mut data = [0u8; 8];
@@ -528,8 +520,6 @@ pub fn setup(
         // Note(unwrap): The hardware configuration function is only allowed to be called once.
         // Unwrapping is intended to panic if called again to prevent re-use of global memory.
         let store = cortex_m::singleton!(: NetStorage = NetStorage::default()).unwrap();
-
-        store.ip_addrs[0] = smoltcp::wire::IpCidr::new(ip_addrs, 24);
 
         let mut ethernet_config =
             smoltcp::iface::Config::new(smoltcp::wire::HardwareAddress::Ethernet(mac_addr));
@@ -547,11 +537,13 @@ pub fn setup(
             .add_default_ipv4_route(smoltcp::wire::Ipv4Address::UNSPECIFIED)
             .unwrap();
 
+        // Configure IP address according to DHCP socket availability
+        let ip_addr: Option<smoltcp::wire::IpAddress> =
+            option_env!("STATIC_IP").map(|a| a.parse().unwrap());
+
         interface.update_ip_addrs(|ref mut addrs| {
-            if !ip_addrs.is_unspecified() {
-                addrs
-                    .push(smoltcp::wire::IpCidr::new(ip_addrs, 24))
-                    .unwrap();
+            if let Some(addr) = ip_addr {
+                addrs.push(smoltcp::wire::IpCidr::new(addr, 24)).unwrap();
             }
         });
 
@@ -569,7 +561,7 @@ pub fn setup(
             sockets.add(tcp_socket);
         }
 
-        if ip_addrs.is_unspecified() {
+        if ip_addr.is_none() {
             sockets.add(smoltcp::socket::dhcpv4::Socket::new());
         }
 

@@ -1,10 +1,11 @@
 // Thermostat ADC struct.
 
+use arbitrary_int::u2;
 use enum_iterator::{all, Sequence};
 use num_enum::TryFromPrimitive;
 use smlang::statemachine;
 
-use super::ad7172::{self, AdcChannel};
+use super::ad7172;
 
 use super::hal::{
     self, device,
@@ -130,28 +131,13 @@ pub struct AdcPins {
     pub sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum AdcInput {
-    Ain0 = 0,
-    Ain1 = 1,
-    Ain2 = 2,
-    Ain3 = 3,
-    Ain4 = 4,
-    TemperaturesensorP = 5,
-    TemperaturesensorN = 6,
-    AvddMinusAvssOver5P = 7,
-    AvddMinusAvssOver5N = 8,
-    RefP = 9,
-    RefN = 10,
-}
-
 /// ADC configuration structure.
 /// Could be extended with further configuration options for the ADCs in the future.
 #[derive(Clone, Copy, Debug)]
 pub struct AdcConfig {
     /// Configuration for all ADC inputs. Four ADCs with four inputs each.
     /// Some(([AdcInput], [AdcInput])) positive and negative channel inputs or None to disable the channel.
-    pub input_config: [[Option<(AdcInput, AdcInput)>; 4]; 4],
+    pub input_config: [[Option<(ad7172::Mux, ad7172::Mux)>; 4]; 4],
 }
 
 /// Full Adc structure which holds all the ADC peripherals and auxillary pins on Thermostat-EEM and the configuration.
@@ -185,7 +171,7 @@ impl Adc {
         let spi: spi::Spi<_, _, u8> =
             spi4.spi(pins.spi, spi::MODE_3, 12500.kHz(), spi4_rec, clocks);
 
-        let mut adc = Adc {
+        let mut adc = Self {
             adcs: ad7172::Ad7172::new(spi),
             cs: pins.cs,
             rdyn: rdyn_pullup,
@@ -208,6 +194,7 @@ impl Adc {
         self.sync.set_low();
 
         for phy in all::<AdcPhy>() {
+            log::info!("AD7172 {:?}", phy);
             self.selected(phy, |adc| {
                 adc.setup_adc(delay, config.input_config[phy as usize])
             })?;
@@ -221,12 +208,15 @@ impl Adc {
     /// Returns the configuration of which ADC channels are enabled.
     pub fn channels(&self) -> [[bool; 4]; 4] {
         let mut result = [[false; 4]; 4];
-        self.config
+        for (cfg, ch) in self
+            .config
             .input_config
             .iter()
             .flatten()
             .zip(result.iter_mut().flatten())
-            .for_each(|(cfg, ch)| *ch = cfg.is_some());
+        {
+            *ch = cfg.is_some();
+        }
         result
     }
 
@@ -242,86 +232,212 @@ impl Adc {
         res
     }
 
+    /// Debug measurements on selected ADC
+    fn report(&mut self, delay: &mut impl DelayUs<u16>) {
+        self.adcs.write(
+            ad7172::Register::GPIOCON,
+            ad7172::GpioCon::DEFAULT.with_sync_en(false).raw_value() as _,
+        );
+
+        self.adcs.write(
+            ad7172::Register::FILTCON0,
+            ad7172::FiltCon::DEFAULT
+                .with_odr(ad7172::Odr::_20)
+                .raw_value() as _,
+        );
+
+        self.adcs.write(
+            ad7172::Register::IFMODE,
+            ad7172::IfMode::DEFAULT.with_data_stat(true).raw_value() as _,
+        );
+
+        let adcmode = ad7172::AdcMode::DEFAULT
+            .with_mode(ad7172::Mode::Single)
+            .with_single_cycle(true)
+            .with_ref_en(true)
+            .raw_value() as _;
+
+        for (name, refsel, ainposneg, scale) in [
+            (
+                "Avdd-Avss (int ref=2.5V)",
+                ad7172::RefSel::Internal,
+                (ad7172::Mux::AvddAvss5P, ad7172::Mux::AvddAvss5N),
+                5.0 * 2.5,
+            ),
+            (
+                "Avdd-Avss (ext ref=5V)",
+                ad7172::RefSel::External,
+                (ad7172::Mux::AvddAvss5P, ad7172::Mux::AvddAvss5N),
+                5.0 * 5.0,
+            ),
+            (
+                "Ain0-Ain4 (ext ref=5V)",
+                ad7172::RefSel::External,
+                (ad7172::Mux::Ain0, ad7172::Mux::Ain4),
+                5.0,
+            ),
+            (
+                "Ain1-Ain4 (ext ref=5V)",
+                ad7172::RefSel::External,
+                (ad7172::Mux::Ain1, ad7172::Mux::Ain4),
+                5.0,
+            ),
+            (
+                "Ain2-Ain4 (ext ref=5V)",
+                ad7172::RefSel::External,
+                (ad7172::Mux::Ain2, ad7172::Mux::Ain4),
+                5.0,
+            ),
+            (
+                "Ain3-Ain4 (ext ref=5V)",
+                ad7172::RefSel::External,
+                (ad7172::Mux::Ain3, ad7172::Mux::Ain4),
+                5.0,
+            ),
+            (
+                "Ref--Ain4 (ext ref=5V)",
+                ad7172::RefSel::External,
+                (ad7172::Mux::RefN, ad7172::Mux::Ain4),
+                5.0,
+            ),
+            (
+                "Temperature (K) (int ref=2.5V)",
+                ad7172::RefSel::Internal,
+                (ad7172::Mux::TempP, ad7172::Mux::TempN),
+                2.5 / 477e-6,
+            ),
+        ] {
+            self.adcs.write(
+                ad7172::Register::SETUPCON0,
+                ad7172::SetupCon::builder()
+                    .with_ref_sel(refsel)
+                    .with_burnout_en(false)
+                    .with_ainbufn(true)
+                    .with_ainbufp(true)
+                    .with_refbufn(true)
+                    .with_refbufp(true)
+                    .with_bipolar(true)
+                    .build()
+                    .raw_value() as _,
+            );
+
+            self.adcs.write(
+                ad7172::Register::CH0,
+                ad7172::Channel::builder()
+                    .with_ainneg(ainposneg.1)
+                    .with_ainpos(ainposneg.0)
+                    .with_setup_sel(u2::new(0))
+                    .with_en(true)
+                    .build()
+                    .raw_value() as _,
+            );
+
+            self.adcs.write(ad7172::Register::ADCMODE, adcmode);
+
+            while self.rdyn.is_high() {}
+            let (data, status) = self.adcs.read_data();
+            assert!(!status.busy());
+            assert!(!status.reg_error());
+            assert!(!status.crc_error());
+            assert_eq!(status.channel(), u2::new(0));
+            log::info!(
+                "{name}: {}{}",
+                (data as i32 - 0x800000) as f32 * scale / (1 << 23) as f32,
+                if status.adc_error() {
+                    " (ADC Error)"
+                } else {
+                    ""
+                },
+            );
+        }
+
+        self.adcs.reset();
+        delay.delay_us(500);
+    }
+
     /// Setup an ADC on Thermostat-EEM.
     fn setup_adc(
         &mut self,
         delay: &mut impl DelayUs<u16>,
-        input_config: [Option<(AdcInput, AdcInput)>; 4],
+        input_config: [Option<(ad7172::Mux, ad7172::Mux)>; 4],
     ) -> Result<(), Error> {
         self.adcs.reset();
+        delay.delay_us(500);
 
-        delay.delay_us(500u16);
-
-        let id = self.adcs.read(ad7172::AdcReg::ID);
+        let id = self.adcs.read(ad7172::Register::ID);
         // check that ID is 0x00DX, as per datasheet
         if id & 0xfff0 != 0x00d0 {
             log::error!("invalid ID: {:#x}", id);
             return Err(Error::Ident);
         }
 
+        self.report(delay);
+
         self.adcs.write(
-            ad7172::AdcReg::ADCMODE,
-            ad7172::Adcmode::RefEn::ENABLED
-                | ad7172::Adcmode::Mode::CONTINOUS_CONVERSION
-                | ad7172::Adcmode::Clocksel::EXTERNAL_CLOCK,
+            ad7172::Register::ADCMODE,
+            ad7172::AdcMode::DEFAULT
+                .with_clocksel(ad7172::ClockSel::ExternalClock)
+                .raw_value() as _,
         );
 
-        self.adcs
-            .write(ad7172::AdcReg::IFMODE, ad7172::Ifmode::DataStat::ENABLED);
+        self.adcs.write(
+            ad7172::Register::IFMODE,
+            ad7172::IfMode::DEFAULT.with_data_stat(true).raw_value() as _,
+        );
 
-        for (channel, data) in input_config
-            .iter()
-            .zip([
-                ad7172::AdcReg::CH0,
-                ad7172::AdcReg::CH1,
-                ad7172::AdcReg::CH2,
-                ad7172::AdcReg::CH3,
-            ])
-            .map(|(cfg, ch)| {
-                let en = if cfg.is_some() {
-                    ad7172::Channel::ChEn::ENABLED
-                } else {
-                    ad7172::Channel::ChEn::DISABLED
-                };
-                let (ainpos, ainneg) = if let Some(cfg) = cfg {
-                    ((cfg.0 as u32) << 5, (cfg.1 as u32)) // see datasheet or [ad7172::Channel::Ainpos] and [ad7172::Channel::Ainneg]
-                } else {
-                    (0, 0) // Default to zero. Doesn't matter since channel will be disabled.
-                };
+        self.adcs.write(
+            ad7172::Register::GPIOCON,
+            ad7172::GpioCon::DEFAULT.with_sync_en(true).raw_value() as _,
+        );
 
-                let data = en | ad7172::Channel::SetupSel::SETUP_0 | ainpos | ainneg; // only Setup 0 for now
-                (ch, data)
-            })
-        {
-            self.adcs.write(channel, data);
+        log::info!("Input configuration: {:?}", input_config);
+
+        for (cfg, channel) in input_config.iter().zip([
+            ad7172::Register::CH0,
+            ad7172::Register::CH1,
+            ad7172::Register::CH2,
+            ad7172::Register::CH3,
+        ]) {
+            let ch = ad7172::Channel::DEFAULT;
+            let ch = if let Some(cfg) = cfg {
+                ch.with_ainneg(cfg.1)
+                    .with_ainpos(cfg.0)
+                    .with_setup_sel(u2::new(0)) // only Setup 0 for now
+                    .with_en(true)
+            } else {
+                ch.with_ainneg(ad7172::Mux::Ain4)
+                    .with_ainpos(ad7172::Mux::Ain4)
+                    .with_setup_sel(u2::new(0))
+                    .with_en(false)
+            };
+            self.adcs.write(channel, ch.raw_value() as _);
         }
 
         self.adcs.write(
-            ad7172::AdcReg::SETUPCON0,
-            ad7172::Setupcon::BiUnipolar::UNIPOLAR
-                | ad7172::Setupcon::Refbufn::ENABLED
-                | ad7172::Setupcon::Refbufp::ENABLED
-                | ad7172::Setupcon::Ainbufn::ENABLED
-                | ad7172::Setupcon::Ainbufp::ENABLED
-                | ad7172::Setupcon::Refsel::EXTERNAL,
+            ad7172::Register::SETUPCON0,
+            ad7172::SetupCon::DEFAULT
+                .with_ainbufn(true)
+                .with_ainbufp(true)
+                .with_refbufn(true)
+                .with_refbufp(true)
+                .with_bipolar(false)
+                .raw_value() as _,
         );
 
         self.adcs.write(
-            ad7172::AdcReg::FILTCON0,
-            ad7172::Filtcon::Order::SINC5SINC1 | ad7172::Filtcon::Odr::ODR_1007,
+            ad7172::Register::FILTCON0,
+            ad7172::FiltCon::DEFAULT
+                .with_odr(ad7172::Odr::_1007)
+                .raw_value() as _,
         );
-
-        // Re-apply (also set after ADC reset) SYNC_EN flag in gpio register for standard synchronization
-        self.adcs
-            .write(ad7172::AdcReg::GPIOCON, ad7172::Gpiocon::SyncEn::ENABLED);
 
         Ok(())
     }
 
     /// Read the data from the ADC and return the raw data and the status information.
-    pub fn read_data(&mut self) -> (AdcCode, Option<ad7172::Status>) {
+    pub fn read_data(&mut self) -> (AdcCode, ad7172::Status) {
         let (data, status) = self.adcs.read_data();
-        (data.into(), Some(status.into()))
+        (data.into(), status)
     }
 }
 
@@ -377,10 +493,10 @@ impl sm::StateMachine<Adc> {
     ///
     /// This routine is called every time the currently selected ADC on Thermostat reports that it has data ready
     /// to be read out by pulling the dout line low. It then reads out the ADC data via SPI.
-    pub fn handle_interrupt(&mut self) -> (AdcPhy, AdcChannel, AdcCode) {
+    pub fn handle_interrupt(&mut self) -> (AdcPhy, usize, AdcCode) {
         if let sm::States::Selected(phy) = *self.state() {
             let (code, status) = self.context_mut().read_data();
-            let adc_ch = status.unwrap().channel();
+            let adc_ch = status.channel().value() as _;
             self.process_event(sm::Events::Read).unwrap();
             (phy, adc_ch, code)
         } else {

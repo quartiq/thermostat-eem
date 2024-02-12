@@ -16,11 +16,8 @@ use serde::Serialize;
 use super::NetworkReference;
 use crate::hardware::{metadata::ApplicationMetadata, system_timer::SystemTimer};
 
-/// Default metadata message if formatting errors occur.
-const DEFAULT_METADATA: &str = "{\"message\":\"Truncated\"}";
-
 /// The telemetry client for reporting telemetry data over MQTT.
-pub struct TelemetryClient<T: Serialize> {
+pub struct TelemetryClient {
     mqtt: minimq::Minimq<
         'static,
         NetworkReference,
@@ -30,10 +27,9 @@ pub struct TelemetryClient<T: Serialize> {
     prefix: String<128>,
     meta_published: bool,
     metadata: &'static ApplicationMetadata,
-    _telemetry: core::marker::PhantomData<T>,
 }
 
-impl<T: Serialize> TelemetryClient<T> {
+impl TelemetryClient {
     /// Construct a new telemetry client.
     ///
     /// # Args
@@ -57,7 +53,6 @@ impl<T: Serialize> TelemetryClient<T> {
             prefix: String::from(prefix),
             meta_published: false,
             metadata,
-            _telemetry: core::marker::PhantomData,
         }
     }
 
@@ -69,7 +64,7 @@ impl<T: Serialize> TelemetryClient<T> {
     ///
     /// # Args
     /// * `telemetry` - The telemetry to report
-    pub fn publish(&mut self, telemetry: &T) {
+    pub fn publish<T: Serialize>(&mut self, telemetry: &T) {
         let mut topic = self.prefix.clone();
         topic.push_str("/telemetry").unwrap();
 
@@ -110,7 +105,7 @@ impl<T: Serialize> TelemetryClient<T> {
                 smoltcp_nal::smoltcp::socket::tcp::ConnectError::Unaddressable,
             ))) => {}
 
-            Err(error) => log::info!("Unexpected error: {:?}", error),
+            Err(error) => log::info!("Unexpected MQTT error: {:?}", error),
             _ => {}
         }
 
@@ -121,20 +116,15 @@ impl<T: Serialize> TelemetryClient<T> {
 
         // Publish application metadata
         if !self.meta_published && self.mqtt.client().can_publish(minimq::QoS::AtMostOnce) {
-            let Self {
-                ref mut mqtt,
-                metadata,
-                ..
-            } = self;
-
             let mut topic = self.prefix.clone();
             topic.push_str("/meta").unwrap();
 
-            if mqtt
+            if self
+                .mqtt
                 .client()
                 .publish(
                     minimq::DeferredPublication::new(|buf| {
-                        serde_json_core::to_slice(&metadata, buf)
+                        serde_json_core::to_slice(&self.metadata, buf)
                     })
                     .topic(&topic)
                     .finish()
@@ -144,9 +134,10 @@ impl<T: Serialize> TelemetryClient<T> {
             {
                 // Note(unwrap): We can guarantee that this message will be sent because we checked
                 // for ability to publish above.
-                mqtt.client()
+                self.mqtt
+                    .client()
                     .publish(
-                        minimq::Publication::new(DEFAULT_METADATA.as_bytes())
+                        minimq::Publication::new("{\"message\":\"Truncated\"}".as_bytes())
                             .topic(&topic)
                             .finish()
                             .unwrap(),

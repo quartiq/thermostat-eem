@@ -1,13 +1,15 @@
 // (AD7172 https://www.analog.com/media/en/technical-documentation/data-sheets/AD7172-2.pdf)
 
+use arbitrary_int::{u2, u3};
+use bitbybit::{bitenum, bitfield};
 use core::fmt::Debug;
-use num_enum::TryFromPrimitive;
 
 use super::hal::hal::blocking::spi::{Transfer, Write};
 
 // ADC Register Addresses
-#[allow(unused)]
-pub enum AdcReg {
+#[bitenum(u6)]
+#[derive(PartialEq, Debug)]
+pub enum Register {
     STATUS = 0x00,
     ADCMODE = 0x1,
     IFMODE = 0x2,
@@ -37,165 +39,216 @@ pub enum AdcReg {
     GAIN3 = 0x3b,
 }
 
-// *Note*: Register bitfields are not exhaustive.
-
-#[allow(non_snake_case)]
-pub mod Comms {
-    pub mod Wen {
-        pub const ENABLED: u32 = 0 << 7;
-        pub const DISABLED: u32 = 1 << 7;
-    }
-    pub mod RW {
-        pub const WRITE: u32 = 0 << 6;
-        pub const READ: u32 = 1 << 6;
-    }
+#[bitfield(u8, default = 0x00)]
+#[derive(Debug, PartialEq)]
+pub struct Comms {
+    #[bits(0..=5, w)]
+    pub register: Option<Register>,
+    #[bit(6, w)]
+    #[doc(alias = "RW")]
+    read: bool,
+    #[bit(7, w)]
+    #[doc(alias = "WEN_N")]
+    ignore: bool,
 }
 
-#[derive(Clone, Copy, TryFromPrimitive, Debug)]
-#[repr(usize)]
-pub enum AdcChannel {
-    Zero = 0,
-    One = 1,
-    Two = 2,
-    Three = 3,
+#[bitfield(u8, default = 0x80)]
+#[derive(Debug, PartialEq)]
+pub struct Status {
+    #[bits(0..=1, r)]
+    channel: u2,
+    #[bit(4, r)]
+    reg_error: bool,
+    #[bit(5, r)]
+    crc_error: bool,
+    #[bit(6, r)]
+    adc_error: bool,
+    #[bit(7, r)]
+    #[doc(alias("RDY_N"))]
+    busy: bool,
 }
 
-pub struct Status(u8);
-impl Status {
-    pub fn channel(&self) -> AdcChannel {
-        AdcChannel::try_from(self.0 as usize & 0x3).unwrap()
-    }
+#[bitenum(u2, exhaustive = true)]
+#[derive(Debug, PartialEq)]
+pub enum ClockSel {
+    InternalOsc = 0,
+    InternalOscOut = 1,
+    ExternalClock = 2,
+    ExternalOsc = 3,
 }
 
-impl From<u8> for Status {
-    fn from(x: u8) -> Self {
-        Self(x)
-    }
+#[bitenum(u3)]
+#[derive(Debug, PartialEq)]
+pub enum Mode {
+    Continuous = 0,
+    Single = 1,
+    Standby = 2,
+    PowerDown = 3,
+    InternalOffset = 4,
+    SystemOffset = 6,
+    SystemGain = 7,
 }
 
-/// ADCMODE register settings.
-#[allow(non_snake_case)]
-pub mod Adcmode {
-    pub mod RefEn {
-        pub const ENABLED: u32 = 1 << 15;
-    }
-    pub mod Mode {
-        pub const CONTINOUS_CONVERSION: u32 = 0b000 << 4;
-    }
-    pub mod Clocksel {
-        pub const INTERNAL_OSC: u32 = 0b00 << 2;
-        pub const INTERNAL_OSC_OUT: u32 = 0b01 << 2;
-        pub const EXTERNAL_CLOCK: u32 = 0b10 << 2;
-        pub const EXTERNAL_OSC: u32 = 0b11 << 2;
-    }
+#[bitfield(u16, default = 0x0000)]
+#[derive(Debug, PartialEq)]
+pub struct AdcMode {
+    #[bits(2..=3, rw)]
+    clocksel: ClockSel,
+    #[bits(4..=6, rw)]
+    mode: Option<Mode>,
+    #[bits(8..=10, rw)]
+    delay: u3,
+    #[bit(13, rw)]
+    single_cycle: bool,
+    #[bit(14, rw)]
+    #[doc(alias("HIDE_DELAY_N"))]
+    show_delay: bool,
+    #[bit(15, rw)]
+    ref_en: bool,
 }
 
-/// ADC IFMODE register settings.
-#[allow(non_snake_case)]
-pub mod Ifmode {
-    pub mod DataStat {
-        pub const ENABLED: u32 = 1 << 6;
-    }
+#[bitfield(u16, default = 0x0000)]
+#[derive(Debug, PartialEq)]
+pub struct IfMode {
+    #[bit(0, rw)]
+    wl16: bool,
+    #[bits(2..=3, rw)]
+    crc_en: u2,
+    #[bit(5, rw)]
+    reg_check: bool,
+    #[bit(6, rw)]
+    data_stat: bool,
+    #[bit(7, rw)]
+    contread: bool,
+    #[bit(8, rw)]
+    dout_reset: bool,
+    #[bit(11, rw)]
+    iostrength: bool,
+    #[bit(12, rw)]
+    alt_sync: bool,
 }
 
-/// ADC GPIOCON register settings.
-#[allow(non_snake_case)]
-pub mod Gpiocon {
-    pub mod SyncEn {
-        pub const ENABLED: u32 = 1 << 11;
-        pub const DISABLED: u32 = 0 << 11;
-    }
+#[bitfield(u16, default = 0x0800)]
+#[derive(Debug, PartialEq)]
+pub struct GpioCon {
+    #[bits(0..=1, rw)]
+    gp_data: u2,
+    #[bits(2..=3, rw)]
+    op_en: u2,
+    #[bits(4..=5, rw)]
+    ip_en: u2,
+    #[bit(8, rw)]
+    err_dat: bool,
+    #[bits(9..=10, rw)]
+    err_en: u2,
+    #[bit(11, rw)]
+    sync_en: bool,
+    #[bit(12, rw)]
+    mux_io: bool,
 }
 
-/// ADC CH register settings. Valid for registers CH0-CH3.
-#[allow(non_snake_case)]
-pub mod Channel {
-    pub mod ChEn {
-        pub const ENABLED: u32 = 1 << 15;
-        pub const DISABLED: u32 = 0 << 15;
-    }
-    pub mod SetupSel {
-        pub const SETUP_0: u32 = 0b00 << 12;
-        pub const SETUP_1: u32 = 0b01 << 12;
-        pub const SETUP_2: u32 = 0b10 << 12;
-        pub const SETUP_3: u32 = 0b11 << 12;
-    }
-    pub mod Ainpos {
-        pub const AIN0: u32 = 0b00000 << 5;
-        pub const AIN1: u32 = 0b00001 << 5;
-        pub const AIN2: u32 = 0b00010 << 5;
-        pub const AIN3: u32 = 0b00011 << 5;
-        pub const AIN4: u32 = 0b00100 << 5;
-        pub const TEMPERATURESENSOR_P: u32 = 0b10001 << 5;
-        pub const TEMPERATURESENSOR_N: u32 = 0b10010 << 5;
-        pub const AVDD_MINUS_AVSS_OVER_5_P: u32 = 0b10011 << 5;
-        pub const AVDD_MINUS_AVSS_OVER_5_N: u32 = 0b10100 << 5;
-        pub const REF_P: u32 = 0b10101 << 5;
-        pub const REF_N: u32 = 0b10110 << 5;
-    }
-    pub mod Ainneg {
-        pub const AIN0: u32 = 0b00000;
-        pub const AIN1: u32 = 0b00001;
-        pub const AIN2: u32 = 0b00010;
-        pub const AIN3: u32 = 0b00011;
-        pub const AIN4: u32 = 0b00100;
-        pub const TEMPERATURESENSOR_P: u32 = 0b10001;
-        pub const TEMPERATURESENSOR_N: u32 = 0b10010;
-        pub const AVDD_MINUS_AVSS_OVER_5_P: u32 = 0b10011;
-        pub const AVDD_MINUS_AVSS_OVER_5_N: u32 = 0b10100;
-        pub const REF_P: u32 = 0b10101;
-        pub const REF_N: u32 = 0b10110;
-    }
+#[bitenum(u5)]
+#[derive(Debug, PartialEq)]
+pub enum Mux {
+    Ain0 = 0b00000,
+    Ain1 = 0b00001,
+    Ain2 = 0b00010,
+    Ain3 = 0b00011,
+    Ain4 = 0b00100,
+    TempP = 0b10001,
+    TempN = 0b10010,
+    AvddAvss5P = 0b10011,
+    AvddAvss5N = 0b10100,
+    RefP = 0b10101,
+    RefN = 0b10110,
 }
 
-/// ADC SETUPCON register settings. Valid for registers SETUPCON0-SETUPCON3.
-#[allow(non_snake_case)]
-pub mod Setupcon {
-    pub mod BiUnipolar {
-        pub const BIPOLAR: u32 = 1 << 12;
-        pub const UNIPOLAR: u32 = 0 << 12;
-    }
-    pub mod Refbufp {
-        pub const ENABLED: u32 = 1 << 11;
-    }
-    pub mod Refbufn {
-        pub const ENABLED: u32 = 1 << 10;
-    }
-    pub mod Ainbufp {
-        pub const ENABLED: u32 = 1 << 9;
-    }
-    pub mod Ainbufn {
-        pub const ENABLED: u32 = 1 << 8;
-    }
-    pub mod Refsel {
-        pub const EXTERNAL: u32 = 0b00 << 4;
-        pub const INTERNAL_2V5: u32 = 0b10 << 4;
-        pub const AVDD_AVSS: u32 = 0b11 << 4;
-    }
+#[bitfield(u16, default = 0x0001)] // deviate default for simplicity
+#[derive(Debug, PartialEq)]
+pub struct Channel {
+    #[bits(0..=4, rw)]
+    ainneg: Option<Mux>,
+    #[bits(5..=9, rw)]
+    ainpos: Option<Mux>,
+    #[bits(12..=13, rw)]
+    setup_sel: u2,
+    #[bit(15, rw)]
+    en: bool,
 }
 
-/// ADC FILTCON register settings. Valid for registers FILTCON0-FILTCON3.
-#[allow(non_snake_case)]
-pub mod Filtcon {
-    pub mod Enhfilten {
-        pub const ENABLED: u32 = 1 << 11;
-    }
-    pub mod Enhfilt {
-        pub const SPS_27: u32 = 0b010 << 8;
-        pub const SPS_21: u32 = 0b011 << 8;
-        pub const SPS_20: u32 = 0b101 << 8;
-        pub const SPS_16: u32 = 0b110 << 8;
-    }
-    pub mod Order {
-        pub const SINC5SINC1: u32 = 0b00 << 5;
-        pub const SINC3: u32 = 0b11 << 5;
-    }
-    pub mod Odr {
-        pub const ODR_1_25: u32 = 0b10110;
-        pub const ODR_10: u32 = 0b10011;
-        pub const ODR_20: u32 = 0b10001;
-        pub const ODR_1007: u32 = 0b01010;
-    }
+#[bitenum(u2)]
+#[derive(Debug, PartialEq)]
+pub enum RefSel {
+    External = 0,
+    Internal = 2,
+    AvddAvss = 3,
+}
+
+#[bitfield(u16, default = 0x1000)]
+#[derive(Debug, PartialEq)]
+pub struct SetupCon {
+    #[bits(4..=5, rw)]
+    ref_sel: Option<RefSel>,
+    #[bit(7, rw)]
+    burnout_en: bool,
+    #[bit(8, rw)]
+    ainbufn: bool,
+    #[bit(9, rw)]
+    ainbufp: bool,
+    #[bit(10, rw)]
+    refbufn: bool,
+    #[bit(11, rw)]
+    refbufp: bool,
+    #[bit(12, rw)]
+    bipolar: bool,
+}
+
+#[bitenum(u5)]
+#[derive(Debug, PartialEq)]
+pub enum Odr {
+    _31250a = 0b00000,
+    _31250f = 0b00101,
+    _10417 = 0b00111,
+    _5208 = 0b01000,
+    _2597 = 0b01001,
+    _1007 = 0b01010,
+    _200 = 0b01101,
+    _100 = 0b01110,
+    _20 = 0b10001,
+    _10 = 0b10011,
+    _1_25 = 0b10110,
+    // ...
+}
+
+#[bitenum(u2)]
+#[derive(Debug, PartialEq)]
+pub enum Order {
+    Sinc5Sinc1 = 0,
+    Sinc3 = 3,
+}
+
+#[bitenum(u3)]
+#[derive(Debug, PartialEq)]
+pub enum Enhfilt {
+    _27 = 2,
+    _21_25 = 3,
+    _20 = 5,
+    _16_67 = 6,
+}
+
+#[bitfield(u16, default = 0x0500)]
+#[derive(Debug, PartialEq)]
+pub struct FiltCon {
+    #[bits(0..=4, rw)]
+    odr: Option<Odr>,
+    #[bits(5..=6, rw)]
+    order: Option<Order>,
+    #[bits(8..=10, rw)]
+    enhfilt: Option<Enhfilt>,
+    #[bit(11, rw)]
+    enhfilt_en: bool,
+    #[bit(15, rw)]
+    sinc3_map: bool,
 }
 
 /// DAC value out of bounds error.
@@ -225,45 +278,53 @@ where
     }
 
     /// Read a ADC register of size in bytes. Max. size 4 bytes.
-    pub fn read(&mut self, addr: AdcReg) -> u32 {
+    pub fn read(&mut self, addr: Register) -> u32 {
         let size = Self::reg_width(&addr);
         let mut buf = [0u8; 8];
-        buf[7 - size] = addr as u8 | Comms::RW::READ as u8; // addr with read flag
+        buf[7 - size] = Comms::builder()
+            .with_register(addr)
+            .with_read(true)
+            .with_ignore(false)
+            .build()
+            .raw_value();
         self.spi.transfer(&mut buf[7 - size..]).unwrap();
         (u64::from_be_bytes(buf) & ((1 << (size * 8)) - 1)) as u32
     }
 
     /// Write a ADC register of size in bytes. Max. size 3 bytes.
-    pub fn write(&mut self, addr: AdcReg, data: u32) {
+    pub fn write(&mut self, addr: Register, data: u32) {
         let size = Self::reg_width(&addr);
         let mut buf = data.to_be_bytes();
-        buf[3 - size] = addr as u8 | Comms::RW::WRITE as u8;
+        buf[3 - size] = Comms::builder()
+            .with_register(addr)
+            .with_read(false)
+            .with_ignore(false)
+            .build()
+            .raw_value();
         self.spi.write(&buf[3 - size..]).unwrap();
     }
 
     /// Reads the data register and returns data and status information.
     /// The DATA_STAT bit has to be set in the IFMODE register.
     /// If DATA_STAT bit is not set, the content of status is undefined but data is still valid.
-    pub fn read_data(&mut self) -> (u32, u8) {
-        let res = self.read(AdcReg::DATA);
-        let status = res as u8;
-        let data = res >> 8;
-        (data, status)
+    pub fn read_data(&mut self) -> (u32, Status) {
+        let res = self.read(Register::DATA);
+        (res >> 8, Status::new_with_raw_value(res as _))
     }
 
-    fn reg_width(reg: &AdcReg) -> usize {
+    fn reg_width(reg: &Register) -> usize {
         match reg {
-            AdcReg::STATUS => 1,
-            AdcReg::REGCHECK => 3,
-            AdcReg::DATA => 4, // If DATA_STAT bit is not set this is 3 bytes but a 4 byte read will also yield 3 valid bytes.
-            AdcReg::OFFSET0 => 3,
-            AdcReg::OFFSET1 => 3,
-            AdcReg::OFFSET2 => 3,
-            AdcReg::OFFSET3 => 3,
-            AdcReg::GAIN0 => 3,
-            AdcReg::GAIN1 => 3,
-            AdcReg::GAIN2 => 3,
-            AdcReg::GAIN3 => 3,
+            Register::STATUS => 1,
+            Register::REGCHECK => 3,
+            Register::DATA => 4, // If DATA_STAT bit is not set this is 3 bytes but a 4 byte read will also yield 3 valid bytes.
+            Register::OFFSET0 => 3,
+            Register::OFFSET1 => 3,
+            Register::OFFSET2 => 3,
+            Register::OFFSET3 => 3,
+            Register::GAIN0 => 3,
+            Register::GAIN1 => 3,
+            Register::GAIN2 => 3,
+            Register::GAIN3 => 3,
             _ => 2,
         }
     }

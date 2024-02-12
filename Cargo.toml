@@ -13,15 +13,16 @@ exclude = [
 	".gitignore"
 ]
 # keep MSRV in sync in ci.yaml and Cargo.toml
-rust-version = "1.66.1"
+rust-version = "1.74.1"
 
 [features]
 default = ["all_differential"]
 all_differential = []
 ai_artiq = []
+nightly = []
 
 [dependencies]
-cortex-m = { version = "0.7" }
+cortex-m = { version = "0.7.7", features = ["inline-asm", "critical-section-single-core"] }
 cortex-m-rt = { version = "0.7", features = ["device"] }
 stm32h7xx-hal =  { version = "0.15.1", features = ["stm32h743v", "rt", "ethernet"]}
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
@@ -41,7 +42,13 @@ num-traits = { version = "0.2", default-features = false, features = ["libm"] }
 byteorder = { version = "1", default-features = false }
 smlang = "0.6.0"
 enum-iterator = "1.5.0"
-idsp = "0.14.1"
+idsp = "0.15.0"
+embedded-hal = "0.2.7"
+bitbybit = "1.3.1"
+arbitrary-int = "1.2.7"
+# stabilizer = "0.9.0"
+lm75 = "0.2"
+bytemuck = { version = "1.14.3", features = ["derive"], default-features = false }
 
 # Note: Keep in-sync with `py/setup.py`
 miniconf = "0.9"

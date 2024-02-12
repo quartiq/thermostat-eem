@@ -41,10 +41,10 @@ impl DacCode {
     // DAC constants
     const MAX_DAC_WORD: i32 = 1 << 20; // maximum DAC dataword (exclusive) plus 2 bit due to interface alignment
     const VREF_DAC: f32 = 3.0; // DAC reference voltage
-    pub const MAX_CURRENT: f32 = (((DacCode::MAX_DAC_WORD - 1) as f32 * DacCode::VREF_DAC
-        / DacCode::MAX_DAC_WORD as f32)
-        - VREF_TEC)
-        / (10.0 * R_SENSE);
+    pub const MAX_CURRENT: f32 =
+        ((DacCode::MAX_DAC_WORD - 1) as f32 / DacCode::MAX_DAC_WORD as f32 * DacCode::VREF_DAC
+            - VREF_TEC)
+            / (10.0 * R_SENSE);
 }
 
 impl TryFrom<f32> for DacCode {
