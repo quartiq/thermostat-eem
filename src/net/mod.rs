@@ -194,11 +194,12 @@ where
         };
 
         let mut settings_path: String<128> = String::new();
-        match self.miniconf.handled_update(|path, old, new| {
+        let res = self.miniconf.handled_update(|path, old, new| {
             settings_path = path.into();
             *old = new.clone();
-            Result::<(), &'static str>::Ok(())
-        }) {
+            Result::<_, &str>::Ok(())
+        });
+        match res {
             Ok(true) => NetworkState::SettingsChanged(settings_path),
             _ => poll_result,
         }
