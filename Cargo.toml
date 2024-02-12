@@ -19,6 +19,7 @@ rust-version = "1.66.1"
 default = ["all_differential"]
 all_differential = []
 ai_artiq = []
+nightly = []
 
 [dependencies]
 cortex-m = { version = "0.7.7", features = ["inline-asm", "critical-section-single-core"] }
