@@ -31,7 +31,7 @@ smoltcp-nal = { version = "0.4", features = ["shared-stack"] }
 cortex-m-rtic = "1.1.4"
 embedded-time = "0.12.1"
 systick-monotonic = "1.0.1"
-heapless = { version = "0.7", features = ["serde"] }
+heapless = { version = "0.8", features = ["serde"] }
 minimq = "0.8"
 serde = { version = "1.0.158", features = ["derive"], default-features = false }
 serde-json-core = "0.5"
