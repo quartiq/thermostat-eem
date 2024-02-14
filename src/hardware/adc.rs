@@ -136,7 +136,7 @@ pub struct AdcPins {
 #[derive(Clone, Copy, Debug)]
 pub struct AdcConfig {
     /// Configuration for all ADC inputs. Four ADCs with four inputs each.
-    /// Some(([AdcInput], [AdcInput])) positive and negative channel inputs or None to disable the channel.
+    /// `Some(([AdcInput], [AdcInput]))` positive and negative channel inputs or None to disable the channel.
     pub input_config: [[Option<(ad7172::Mux, ad7172::Mux)>; 4]; 4],
 }
 
