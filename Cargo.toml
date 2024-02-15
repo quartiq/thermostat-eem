@@ -1,6 +1,6 @@
 [package]
 name = "thermostat-eem"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Norman Krackow <nk@quartiq.de>", "Robert Jördens <rj@quartiq.de>", "Ryan Summers"]
 description = "Firmware for the Sinara Thermostat-EEM temperature controller."
