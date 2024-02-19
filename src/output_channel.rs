@@ -22,7 +22,7 @@ impl Default for Pid {
     fn default() -> Self {
         Self {
             ki: 0.,
-            kp: 1e-3,
+            kp: 0., // positive, sign reference for all gains and limits
             kd: 0.,
             li: f32::INFINITY,
             ld: f32::INFINITY,
