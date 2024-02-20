@@ -17,7 +17,7 @@ use super::{
     dac::{Dac, DacPins},
     delay,
     fan::{Fan, FanPins},
-    gpio::{Gpio, GpioPins},
+    gpio::Gpio,
     metadata::ApplicationMetadata,
     pwm::{Pwm, PwmPins},
     EthernetPhy, NetworkStack,
@@ -190,7 +190,7 @@ pub fn setup(
     let gpiog = device.GPIOG.split(ccdr.peripheral.GPIOG);
 
     info!("Setup GPIO");
-    let gpio_pins = GpioPins {
+    let mut gpio = Gpio {
         hwrev: [
             gpiod.pd8.into_floating_input().erase(),
             gpiod.pd9.into_floating_input().erase(),
@@ -219,7 +219,7 @@ pub fn setup(
         tec_freq: gpiod.pd2.into_push_pull_output(),
         overtemp: gpiog.pg12.into_floating_input(),
     };
-    let gpio = Gpio::new(gpio_pins);
+    gpio.init();
     info!("HWREV: {:?}", gpio.hwrev());
     info!("PoE Power: {:?}", gpio.poe());
     info!("Overtemp: {:?}", gpio.overtemp());

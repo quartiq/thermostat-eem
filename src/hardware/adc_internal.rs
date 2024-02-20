@@ -1,12 +1,10 @@
-use stm32h7xx_hal::device::{ADC12_COMMON, ADC3_COMMON};
-
 use super::hal::{
     adc,
     gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*, Analog},
     hal::blocking::delay::DelayUs,
     prelude::*,
     rcc::{rec, CoreClocks},
-    stm32::{ADC1, ADC2, ADC3},
+    stm32::{ADC1, ADC12_COMMON, ADC2, ADC3, ADC3_COMMON},
 };
 use super::{
     dac::{R_SENSE, VREF_TEC},

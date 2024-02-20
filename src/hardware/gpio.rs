@@ -1,4 +1,4 @@
-use num_enum::TryFromPrimitive;
+use strum::IntoEnumIterator;
 
 use super::hal::{
     gpio::{gpiod::*, gpioe::*, gpiof::*, gpiog::*, ErasedPin, Input, Output, PushPull},
@@ -8,8 +8,7 @@ use crate::net::serde::Serialize;
 
 use super::OutputChannelIdx;
 
-#[allow(clippy::type_complexity)]
-pub struct GpioPins {
+pub struct Gpio {
     pub hwrev: [ErasedPin<Input>; 4],
     // Front panel LEDs
     pub led: [ErasedPin<Output>; 8],
@@ -79,7 +78,7 @@ impl From<TecFrequency> for PinState {
     }
 }
 
-#[derive(Copy, Clone, Debug, TryFromPrimitive)]
+#[derive(Copy, Clone, Debug, strum::EnumIter)]
 #[repr(usize)]
 pub enum Led {
     Led0 = 0,
@@ -104,13 +103,6 @@ impl From<OutputChannelIdx> for Led {
     }
 }
 
-/// GPIO struct.
-///
-/// pins - All Thermostat GPIO pins.
-pub struct Gpio {
-    pins: GpioPins,
-}
-
 impl Gpio {
     /// Construct a new GPIO driver for all Thermostat QPIOs.
     /// - Sets all output channels into shutdown mode.
@@ -120,18 +112,15 @@ impl Gpio {
     ///
     /// # Args
     /// * `pins` - Thermostat GPIO pins.
-    pub fn new(pins: GpioPins) -> Self {
-        let mut gpio = Gpio { pins };
-        for i in 0..4 {
-            let ch = OutputChannelIdx::try_from(i).unwrap();
-            gpio.set_shutdown(ch, State::Assert);
+    pub fn init(&mut self) {
+        for i in OutputChannelIdx::iter() {
+            self.set_shutdown(i, State::Assert);
         }
-        for i in 0..8 {
-            gpio.set_led(Led::try_from(i).unwrap(), State::Deassert);
+        for i in Led::iter() {
+            self.set_led(i, State::Deassert);
         }
-        gpio.set_eem_pwr(false);
-        gpio.set_tec_frequency(TecFrequency::Low);
-        gpio
+        self.set_eem_pwr(false);
+        self.set_tec_frequency(TecFrequency::Low);
     }
 
     /// Set or reset the shutdown pin of an output channel.
@@ -140,16 +129,15 @@ impl Gpio {
     /// * `ch` - Thermostat output channel
     /// * `shutdown` - TEC driver shutdown. True to set shutdown mode, false to enable the driver.
     pub fn set_shutdown(&mut self, ch: OutputChannelIdx, shutdown: State) {
-        self.pins.shdn[ch as usize].set_state(!PinState::from(shutdown));
+        self.shdn[ch as usize].set_state(!PinState::from(shutdown));
     }
 
     pub fn set_led(&mut self, led: Led, state: State) {
-        self.pins.led[led as usize].set_state(PinState::from(state));
+        self.led[led as usize].set_state(PinState::from(state));
     }
 
     pub fn hwrev(&self) -> u8 {
-        self.pins
-            .hwrev
+        self.hwrev
             .iter()
             .enumerate()
             .map(|(i, p)| (p.is_high() as u8) << i)
@@ -157,7 +145,7 @@ impl Gpio {
     }
 
     pub fn poe(&self) -> PoePower {
-        match (self.pins.poe_pwr.is_high(), self.pins.at_event.is_high()) {
+        match (self.poe_pwr.is_high(), self.at_event.is_high()) {
             (false, _) => PoePower::Absent,
             (true, false) => PoePower::Low,
             (true, true) => PoePower::High,
@@ -165,14 +153,14 @@ impl Gpio {
     }
 
     pub fn set_eem_pwr(&mut self, enabled: bool) {
-        self.pins.eem_pwr.set_state(enabled.into());
+        self.eem_pwr.set_state(enabled.into());
     }
 
     pub fn set_tec_frequency(&mut self, frequency: TecFrequency) {
-        self.pins.tec_freq.set_state(frequency.into());
+        self.tec_freq.set_state(frequency.into());
     }
 
     pub fn overtemp(&self) -> bool {
-        self.pins.overtemp.is_low()
+        self.overtemp.is_low()
     }
 }
