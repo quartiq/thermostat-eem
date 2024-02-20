@@ -13,8 +13,8 @@ pub mod output_channel;
 pub mod statistics;
 
 use panic_probe as _; // global panic handler
+use strum::IntoEnumIterator;
 
-use enum_iterator::all;
 use hardware::{
     adc::AdcPhy,
     adc::{sm::StateMachine, Adc, AdcCode},
@@ -223,7 +223,7 @@ mod app {
         let pwm = c.local.pwm;
         (c.shared.network, c.shared.gpio).lock(|network, gpio| {
             let mut settings = network.miniconf.settings().clone();
-            for (ch, s) in all::<OutputChannelIdx>().zip(settings.output_channel.iter_mut()) {
+            for (ch, s) in OutputChannelIdx::iter().zip(settings.output_channel.iter_mut()) {
                 s.finalize_settings(); // clamp limits and normalize weights
                 pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
                 let [pos, neg] = s.current_limits();
@@ -249,7 +249,7 @@ mod app {
         telemetry.monitor.p5v_voltage = adc_int.read_p5v_voltage();
         telemetry.monitor.p12v_voltage = adc_int.read_p12v_voltage();
         telemetry.monitor.p12v_current = adc_int.read_p12v_current();
-        for ch in all::<OutputChannelIdx>() {
+        for ch in OutputChannelIdx::iter() {
             let idx = ch as usize;
             telemetry.monitor.output_vref[idx] = adc_int.read_output_vref(ch);
             telemetry.monitor.output_voltage[idx] = adc_int.read_output_voltage(ch);
@@ -326,7 +326,7 @@ mod app {
                     return;
                 }
 
-                for ch in all::<OutputChannelIdx>() {
+                for ch in OutputChannelIdx::iter() {
                     let idx = ch as usize;
                     let current = settings.output_channel[idx]
                         .update(temperature, &mut c.local.iir_state[idx])

@@ -1,9 +1,10 @@
 // Thermostat ADC struct.
 
 use arbitrary_int::u2;
-use enum_iterator::{all, Sequence};
 use num_enum::TryFromPrimitive;
+use num_traits::float::Float;
 use smlang::statemachine;
+use strum::IntoEnumIterator;
 
 use super::ad7172;
 
@@ -15,8 +16,6 @@ use super::hal::{
     prelude::*,
     rcc, spi, stm32,
 };
-
-use num_traits::float::Float;
 
 /// A type representing an ADC sample.
 /// Might be extended to support different input types (other NTCs, ref resistors etc.) in the future.
@@ -89,7 +88,7 @@ impl From<AdcCode> for f64 {
     }
 }
 
-#[derive(Clone, Copy, TryFromPrimitive, Debug, Sequence, PartialEq, Eq)]
+#[derive(Clone, Copy, TryFromPrimitive, Debug, strum::EnumIter, PartialEq, Eq)]
 #[repr(usize)]
 pub enum AdcPhy {
     Zero = 0,
@@ -193,7 +192,7 @@ impl Adc {
         // set sync low first for synchronization at rising edge
         self.sync.set_low();
 
-        for phy in all::<AdcPhy>() {
+        for phy in AdcPhy::iter() {
             log::info!("AD7172 {:?}", phy);
             self.selected(phy, |adc| {
                 adc.setup_adc(delay, config.input_config[phy as usize])
