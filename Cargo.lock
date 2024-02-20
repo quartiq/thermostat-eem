@@ -1041,7 +1041,6 @@ dependencies = [
  "miniconf",
  "minimq",
  "num-traits",
- "num_enum",
  "panic-probe",
  "rtt-logger",
  "rtt-target",

@@ -1,7 +1,6 @@
 // Thermostat ADC struct.
 
 use arbitrary_int::u2;
-use num_enum::TryFromPrimitive;
 use num_traits::float::Float;
 use smlang::statemachine;
 use strum::IntoEnumIterator;
@@ -88,7 +87,7 @@ impl From<AdcCode> for f64 {
     }
 }
 
-#[derive(Clone, Copy, TryFromPrimitive, Debug, strum::EnumIter, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, strum::EnumIter, PartialEq, Eq)]
 #[repr(usize)]
 pub enum AdcPhy {
     Zero = 0,
@@ -105,7 +104,12 @@ impl AdcPhy {
     /// of a channel depends on how many channels are enabled on an ADC.
     pub fn next(&self) -> Self {
         // Round-robin
-        Self::try_from((*self as usize + 1) & 0x3).unwrap()
+        match self {
+            Self::Zero => Self::One,
+            Self::One => Self::Two,
+            Self::Two => Self::Three,
+            Self::Three => Self::Zero,
+        }
     }
 }
 

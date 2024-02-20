@@ -171,7 +171,7 @@ mod app {
             thermostat.metadata,
         );
 
-        let generator = network.configure_streaming(StreamFormat::ThermostatEem);
+        let generator = network.configure_streaming(StreamFormat::ThermostatEem as _);
 
         let local = Local {
             adc_sm: thermostat.adc_sm,

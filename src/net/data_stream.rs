@@ -27,7 +27,6 @@ use heapless::{
     pool::{Box, Init, Pool, Uninit},
     spsc::{Consumer, Producer, Queue},
 };
-use num_enum::IntoPrimitive;
 use serde::{Deserialize, Serialize};
 use smoltcp_nal::embedded_nal::{IpAddr, Ipv4Addr, SocketAddr, UdpClientStack};
 
@@ -73,7 +72,7 @@ pub struct StreamTarget {
 
 /// Specifies the format of streamed data
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, IntoPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum StreamFormat {
     /// Reserved, unused format specifier.
     Unknown = 0,
@@ -204,7 +203,7 @@ impl FrameGenerator {
         Self {
             queue,
             pool,
-            format: StreamFormat::Unknown.into(),
+            format: StreamFormat::Unknown as _,
             current_frame: None,
             sequence_number: 0,
         }
@@ -218,8 +217,8 @@ impl FrameGenerator {
     /// # Args
     /// * `format` - The desired format of the stream.
     #[doc(hidden)]
-    pub(crate) fn configure(&mut self, format: impl Into<u8>) {
-        self.format = format.into();
+    pub(crate) fn configure(&mut self, format: u8) {
+        self.format = format;
     }
 
     /// Add a batch to the current stream frame.

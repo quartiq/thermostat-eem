@@ -2,7 +2,6 @@
 //!
 //! Hardware specific setup etc.
 
-use num_enum::TryFromPrimitive;
 pub use stm32h7xx_hal as hal;
 
 pub mod ad7172;
@@ -37,7 +36,7 @@ pub type NetworkManager = smoltcp_nal::shared::NetworkManager<
 
 pub type EthernetPhy = hal::ethernet::phy::LAN8742A<hal::ethernet::EthernetMAC>;
 
-#[derive(Clone, Copy, TryFromPrimitive, strum::EnumIter, Debug)]
+#[derive(Clone, Copy, strum::EnumIter, Debug)]
 #[repr(usize)]
 pub enum OutputChannelIdx {
     Zero = 0,
