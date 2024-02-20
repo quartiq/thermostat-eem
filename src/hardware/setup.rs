@@ -456,6 +456,8 @@ pub fn setup(
         log::info!("LM75 Temperature: {}°C", lm75.read_temperature().unwrap());
         if let Ok(()) = afe_i2c.write_read(0x50, &[0xFA], &mut eui48) {
             log::info!("AFE EUI48: {eui48:?}");
+        } else {
+            log::warn!("AFE EUI48 read failure.");
         }
     }
     let mac_addr = smoltcp::wire::EthernetAddress(eui48);
@@ -470,8 +472,6 @@ pub fn setup(
             let mut eth_phy_nrst = gpiog.pg14.into_push_pull_output();
             eth_phy_nrst.set_low();
             delay.delay_us(200u8);
-            eth_phy_nrst.set_high();
-
             eth_phy_nrst.set_high();
 
             let ref_clk = gpioa.pa1.into_alternate().speed(Speed::VeryHigh);
@@ -563,6 +563,8 @@ pub fn setup(
 
         if ip_addr.is_none() {
             sockets.add(smoltcp::socket::dhcpv4::Socket::new());
+        } else {
+            log::info!("Using static IP {ip_addr:?}");
         }
 
         sockets.add(smoltcp::socket::dns::Socket::new(
