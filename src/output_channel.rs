@@ -52,19 +52,22 @@ impl TryFrom<Pid> for iir::Biquad<f64> {
     }
 }
 
+#[derive(
+    Copy, Clone, Default, Debug, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
+)]
+pub enum State {
+    /// Active TEC driver and Biquad/PID.
+    On,
+    /// Hold the output.
+    Hold,
+    /// Disables the TEC driver. This implies "hold".
+    #[default]
+    Off,
+}
+
 #[derive(Copy, Clone, Debug, Tree)]
 pub struct OutputChannel {
-    /// En-/Disables the TEC driver. This implies "hold".
-    ///
-    /// # Value
-    /// true to shut the driver down, false to enable the driver.
-    pub shutdown: bool,
-
-    /// Hold the output.
-    ///
-    /// # Value
-    /// true to hold, false to continue with default iir.
-    pub hold: bool,
+    pub state: State,
 
     /// Maximum absolute (positive and negative) TEC voltage in volt.
     /// These will be clamped to the maximum of 4.3 V.
@@ -101,8 +104,7 @@ pub struct OutputChannel {
 impl Default for OutputChannel {
     fn default() -> Self {
         Self {
-            shutdown: true,
-            hold: false,
+            state: State::Off,
             voltage_limit: Pwm::MAX_VOLTAGE_LIMIT,
             pid: Default::default(),
             iir: Default::default(),
@@ -124,10 +126,10 @@ impl OutputChannel {
             .zip(self.weights.iter().flatten())
             .map(|(t, w)| t * *w as f64)
             .sum();
-        let iir = if self.shutdown || self.hold {
-            &iir::Biquad::HOLD
-        } else {
+        let iir = if self.state == State::On {
             &self.iir
+        } else {
+            &iir::Biquad::HOLD
         };
         iir.update(iir_state, weighted_temperature)
     }
@@ -136,7 +138,7 @@ impl OutputChannel {
     /// - Clamping of the limits
     /// - Normalization of the weights
     /// Returns the current limits.
-    pub fn finalize_settings(&mut self) -> [f32; 2] {
+    pub fn finalize_settings(&mut self) {
         if let Ok(iir) = self.pid.try_into() {
             self.iir = iir;
         } else {
@@ -156,7 +158,11 @@ impl OutputChannel {
                 *w *= n;
             }
         }
+    }
+
+    pub fn current_limits(&self) -> [f32; 2] {
         [
+            // give 5% extra headroom for PWM current limits
             // [Pwm::MAX_CURRENT_LIMIT] + 5% is still below 100% duty cycle for the PWM limits and therefore OK.
             // Might not be OK for a different shunt resistor or different PWM setup.
             (self.iir.max() as f32 + 0.05 * Pwm::MAX_CURRENT_LIMIT).max(0.),
