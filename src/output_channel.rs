@@ -11,11 +11,11 @@ pub struct Pid {
     pub ki: f32,
     pub kp: f32,
     pub kd: f32,
-    pub li: f32,
-    pub ld: f32,
+    pub li: Option<f32>,
+    pub ld: Option<f32>,
     pub setpoint: f32,
-    pub min: f32,
-    pub max: f32,
+    pub min: Option<f32>,
+    pub max: Option<f32>,
 }
 
 impl Default for Pid {
@@ -24,11 +24,11 @@ impl Default for Pid {
             ki: 0.,
             kp: 0., // positive, sign reference for all gains and limits
             kd: 0.,
-            li: f32::INFINITY,
-            ld: f32::INFINITY,
+            li: None,
+            ld: None,
             setpoint: 25.,
-            min: -f32::INFINITY,
-            max: f32::INFINITY,
+            min: None,
+            max: None,
         }
     }
 }
@@ -41,13 +41,19 @@ impl TryFrom<Pid> for iir::Biquad<f64> {
             .gain(iir::Action::Ki, value.ki.copysign(value.kp) as _)
             .gain(iir::Action::Kp, value.kp as _)
             .gain(iir::Action::Kd, value.kd.copysign(value.kp) as _)
-            .limit(iir::Action::Ki, value.li.copysign(value.kp) as _)
-            .limit(iir::Action::Kd, value.ld.copysign(value.kp) as _)
+            .limit(
+                iir::Action::Ki,
+                value.li.unwrap_or(f32::INFINITY).copysign(value.kp) as _,
+            )
+            .limit(
+                iir::Action::Kd,
+                value.ld.unwrap_or(f32::INFINITY).copysign(value.kp) as _,
+            )
             .build()?
             .into();
         biquad.set_input_offset(-value.setpoint as _);
-        biquad.set_min(value.min as _);
-        biquad.set_max(value.max as _);
+        biquad.set_min(value.min.unwrap_or(f32::NEG_INFINITY) as _);
+        biquad.set_max(value.max.unwrap_or(f32::INFINITY) as _);
         Ok(biquad)
     }
 }
