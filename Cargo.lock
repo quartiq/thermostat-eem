@@ -67,9 +67,9 @@ checksum = "dc827186963e592360843fb5ba4b973e145841266c1357f7180c43526f2e5b61"
 
 [[package]]
 name = "bitbybit"
-version = "1.3.1"
+version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "345a1b8d56dd8fa422c8d8450718b6ddf6a0e54eca43ea4b997140c47c0f003a"
+checksum = "fb157f9753a7cddfcf4a4f5fed928fbf4ce1b7b64b6bcc121d7a9f95d698997b"
 dependencies = [
  "arbitrary-int",
  "proc-macro2",
