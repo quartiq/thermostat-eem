@@ -33,7 +33,7 @@ embedded-time = "0.12.1"
 systick-monotonic = "1.0.1"
 heapless = { version = "0.7", features = ["serde"] }
 minimq = "0.8"
-serde = { version = "1.0.158", features = ["derive"], default-features = false }
+serde = { version = "1.0.197", features = ["derive"], default-features = false }
 serde-json-core = "0.5"
 num_enum = { version = "0.7.2", default-features = false }
 rtt-logger = "0.2"
