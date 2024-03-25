@@ -867,7 +867,7 @@ dependencies = [
 [[package]]
 name = "smoltcp-nal"
 version = "0.4.1"
-source = "git+https://github.com/quartiq/smoltcp-nal.git?branch=deps-smoltcp-0.11#f9e5aa379ce72e80faa063e8cb33d21f510e96bb"
+source = "git+https://github.com/quartiq/smoltcp-nal.git?branch=deps-smoltcp-0.11#5a65544de30ead3c2a2b5ee8d3deffbdd6cbae58"
 dependencies = [
  "embedded-nal",
  "embedded-time",
