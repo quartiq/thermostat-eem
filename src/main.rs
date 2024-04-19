@@ -55,7 +55,7 @@ pub struct Settings {
     ///
     /// # Value
     /// See [OutputChannel]
-    #[tree(depth(3))]
+    #[tree(depth = 3)]
     output_channel: [OutputChannel; 4],
 
     /// Alarm settings.
@@ -65,7 +65,7 @@ pub struct Settings {
     ///
     /// # Value
     /// See [Alarm]
-    #[tree(depth(3))]
+    #[tree(depth = 3)]
     alarm: Alarm,
 
     stream_target: StreamTarget,
@@ -156,7 +156,7 @@ mod app {
         // setup Thermostat hardware
         let thermostat = hardware::setup::setup(c.device, clock);
 
-        let settings = Settings::default();
+        let settings: Settings = Settings::default();
 
         let mut id = heapless::String::<32>::new();
         write!(&mut id, "{}", thermostat.net.mac_address).unwrap();
@@ -167,7 +167,6 @@ mod app {
             clock,
             &id,
             option_env!("BROKER").unwrap_or("mqtt"),
-            settings.clone(),
             thermostat.metadata,
         );
 
@@ -207,22 +206,23 @@ mod app {
         )
     }
 
-    #[idle(shared=[network])]
+    #[idle(shared=[network, settings])]
     fn idle(mut c: idle::Context) -> ! {
         loop {
-            c.shared.network.lock(|net| match net.update() {
-                NetworkState::SettingsChanged(_path) => settings::spawn().unwrap(),
-                NetworkState::Updated => {}
-                NetworkState::NoChange => {}
+            (&mut c.shared.network, &mut c.shared.settings).lock(|net, settings| {
+                match net.update(settings) {
+                    NetworkState::SettingsChanged => settings::spawn().unwrap(),
+                    NetworkState::Updated => {}
+                    NetworkState::NoChange => {}
+                }
             })
         }
     }
 
     #[task(priority = 1, local=[pwm], shared=[network, settings, gpio])]
-    fn settings(mut c: settings::Context) {
+    fn settings(c: settings::Context) {
         let pwm = c.local.pwm;
-        (c.shared.network, c.shared.gpio).lock(|network, gpio| {
-            let mut settings = network.miniconf.settings().clone();
+        (c.shared.network, c.shared.gpio, c.shared.settings).lock(|network, gpio, settings| {
             for (ch, s) in OutputChannelIdx::iter().zip(settings.output_channel.iter_mut()) {
                 s.finalize_settings(); // clamp limits and normalize weights
                 pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
@@ -234,10 +234,6 @@ mod app {
             }
 
             network.direct_stream(settings.stream_target.into());
-
-            c.shared.settings.lock(|current_settings| {
-                *current_settings = settings;
-            });
         });
     }
 

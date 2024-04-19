@@ -100,7 +100,7 @@ pub struct OutputChannel {
     /// 0.0 to 4.3
     pub voltage_limit: f32,
 
-    #[tree]
+    #[tree(depth = 1)]
     pub pid: Pid,
 
     /// IIR filter parameters.
