@@ -47,17 +47,9 @@ arbitrary-int = "1.2.7"
 lm75 = "0.2"
 bytemuck = { version = "1.14.3", features = ["derive"], default-features = false }
 # Note: Keep in-sync with `py/setup.py`
-miniconf = { version = "0.9", features = ["json-core"] }
-miniconf_mqtt = "0.9"
+miniconf = { version = "0.10", features = ["json-core"] }
+miniconf_mqtt = "0.10"
 strum = { version = "0.26.1", default-features = false, features = ["derive"] }
-
-[patch.crates-io.miniconf]
-git = "https://github.com/quartiq/miniconf"
-rev = "231981d"
-
-[patch.crates-io.miniconf_mqtt]
-git = "https://github.com/quartiq/miniconf"
-rev = "231981d"
 
 [profile.dev]
 codegen-units = 1
