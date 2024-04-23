@@ -14,7 +14,7 @@ use heapless::String;
 use serde::Serialize;
 
 use super::NetworkReference;
-use crate::hardware::{metadata::ApplicationMetadata, system_timer::SystemTimer};
+use crate::{hardware::metadata::ApplicationMetadata, SystemTimer};
 
 /// The telemetry client for reporting telemetry data over MQTT.
 pub struct TelemetryClient {

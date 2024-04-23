@@ -13,9 +13,10 @@ pub mod data_stream;
 pub mod network_processor;
 pub mod telemetry;
 
-use crate::hardware::{
-    metadata::ApplicationMetadata, system_timer::SystemTimer, EthernetPhy, NetworkManager,
-    NetworkStack,
+use crate::{
+    hardware::{metadata::ApplicationMetadata, EthernetPhy, NetworkManager, NetworkStack},
+    settings::NetSettings,
+    SystemTimer,
 };
 use data_stream::{DataStream, FrameGenerator};
 use network_processor::NetworkProcessor;
@@ -48,8 +49,9 @@ pub enum UpdateState {
     Updated,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum NetworkState {
-    SettingsChanged(String<128>),
+    SettingsChanged,
     Updated,
     NoChange,
 }
@@ -58,12 +60,12 @@ pub struct NetworkUsers<S, const Y: usize>
 where
     for<'de> S: Default + JsonCoreSlash<'de, Y> + Clone,
 {
-    pub miniconf: miniconf::MqttClient<
+    pub miniconf: miniconf_mqtt::MqttClient<
         'static,
         S,
         NetworkReference,
         SystemTimer,
-        miniconf::minimq::broker::NamedBroker<NetworkReference>,
+        minimq::broker::NamedBroker<NetworkReference>,
         Y,
     >,
     pub processor: NetworkProcessor,
@@ -93,10 +95,9 @@ where
     pub fn new(
         stack: NetworkStack,
         phy: EthernetPhy,
-        clock: SystemTimer,
-        id: &str,
-        broker: &str,
-        settings: S,
+        clock: crate::SystemTimer,
+        app: &str,
+        net_settings: &NetSettings,
         metadata: &'static ApplicationMetadata,
     ) -> Self {
         let stack_manager =
@@ -104,29 +105,32 @@ where
 
         let processor = NetworkProcessor::new(stack_manager.acquire_stack(), phy);
 
-        let prefix = get_device_prefix(metadata.app, id);
+        let prefix = get_device_prefix(app, &net_settings.id);
 
         let store = cortex_m::singleton!(: MqttStorage = MqttStorage::default()).unwrap();
 
-        let named_broker =
-            miniconf::minimq::broker::NamedBroker::new(broker, stack_manager.acquire_stack())
-                .unwrap();
+        let named_broker = miniconf_mqtt::minimq::broker::NamedBroker::new(
+            &net_settings.broker,
+            stack_manager.acquire_stack(),
+        )
+        .unwrap();
 
-        let settings = miniconf::MqttClient::new(
+        let settings = miniconf_mqtt::MqttClient::new(
             stack_manager.acquire_stack(),
             &prefix,
             clock,
-            settings,
-            miniconf::minimq::ConfigBuilder::new(named_broker, &mut store.settings)
-                .client_id(&get_client_id(id, "settings"))
+            miniconf_mqtt::minimq::ConfigBuilder::new(named_broker, &mut store.settings)
+                .client_id(&get_client_id(&net_settings.id, "settings"))
                 .unwrap(),
         )
         .unwrap();
 
         let telemetry = {
-            let named_broker =
-                miniconf::minimq::broker::NamedBroker::new(broker, stack_manager.acquire_stack())
-                    .unwrap();
+            let named_broker = miniconf_mqtt::minimq::broker::NamedBroker::new(
+                &net_settings.broker,
+                stack_manager.acquire_stack(),
+            )
+            .unwrap();
 
             let mqtt = minimq::Minimq::new(
                 stack_manager.acquire_stack(),
@@ -136,7 +140,7 @@ where
                     // As such, we don't need much of the buffer for RX.
                     .rx_buffer(minimq::config::BufferConfig::Maximum(100))
                     .session_state(minimq::config::BufferConfig::Maximum(0))
-                    .client_id(&get_client_id(id, "tlm"))
+                    .client_id(&get_client_id(&net_settings.id, "tlm"))
                     .unwrap(),
             );
 
@@ -178,7 +182,7 @@ where
     ///
     /// # Returns
     /// An indication if any of the network users indicated a state change.
-    pub fn update(&mut self) -> NetworkState {
+    pub fn update(&mut self, settings: &mut S) -> NetworkState {
         // Update the MQTT clients.
         self.telemetry.update();
 
@@ -193,14 +197,8 @@ where
             UpdateState::Updated => NetworkState::Updated,
         };
 
-        let mut settings_path: String<128> = String::new();
-        let res = self.miniconf.handled_update(|path, old, new| {
-            settings_path = path.into();
-            *old = new.clone();
-            Result::<_, &str>::Ok(())
-        });
-        match res {
-            Ok(true) => NetworkState::SettingsChanged(settings_path),
+        match self.miniconf.update(settings) {
+            Ok(true) => NetworkState::SettingsChanged,
             _ => poll_result,
         }
     }
@@ -283,7 +281,7 @@ pub struct Alarm {
     ///
     /// # Value
     /// `[f32, f32]` or `None`
-    #[tree(depth(2))]
+    #[tree(depth = 2)]
     pub temperature_limits: [[Option<[f32; 2]>; 4]; 4],
 }
 
