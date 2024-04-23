@@ -1,7 +1,8 @@
+use core::fmt::Write;
 use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::hardware::{ad7172::Mux, adc::AdcConfig, system_timer};
+use crate::hardware::{ad7172::Mux, adc::AdcConfig, platform};
 use smoltcp_nal::smoltcp;
 
 use super::hal::{
@@ -20,10 +21,30 @@ use super::{
     gpio::Gpio,
     metadata::ApplicationMetadata,
     pwm::{Pwm, PwmPins},
-    EthernetPhy, NetworkStack,
+    EthernetPhy, NetworkStack, Systick,
 };
 
 use log::info;
+
+pub struct SerialBufferStore([u8; 1024]);
+
+impl Default for SerialBufferStore {
+    fn default() -> Self {
+        Self([0u8; 1024])
+    }
+}
+
+impl core::borrow::Borrow<[u8]> for &mut SerialBufferStore {
+    fn borrow(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl core::borrow::BorrowMut<[u8]> for &mut SerialBufferStore {
+    fn borrow_mut(&mut self) -> &mut [u8] {
+        &mut self.0
+    }
+}
 
 const NUM_TCP_SOCKETS: usize = 4;
 const NUM_UDP_SOCKETS: usize = 1;
@@ -90,7 +111,7 @@ pub struct NetworkDevices {
 }
 
 /// The available hardware interfaces on Thermostat.
-pub struct ThermostatDevices {
+pub struct ThermostatDevices<C: serial_settings::Settings<Y> + 'static, const Y: usize> {
     pub clocks: hal::rcc::CoreClocks,
     pub net: NetworkDevices,
     pub dac: Dac,
@@ -100,7 +121,10 @@ pub struct ThermostatDevices {
     pub adc_internal: AdcInternal,
     pub adc_sm: StateMachine<Adc>,
     pub adc_channels: [[bool; 4]; 4],
+    pub usb_serial: super::SerialTerminal<C, Y>,
+    pub usb: super::UsbDevice,
     pub metadata: &'static ApplicationMetadata,
+    pub settings: C,
 }
 
 #[link_section = ".sram3.eth"]
@@ -109,10 +133,16 @@ static mut DES_RING: MaybeUninit<
     ethernet::DesRing<{ super::TX_DESRING_CNT }, { super::RX_DESRING_CNT }>,
 > = MaybeUninit::uninit();
 
-pub fn setup(
+pub fn setup<C, const Y: usize>(
+    mut core: stm32h7xx_hal::stm32::CorePeripherals,
     mut device: stm32h7xx_hal::stm32::Peripherals,
-    clock: system_timer::SystemTimer,
-) -> ThermostatDevices {
+    clock: crate::SystemTimer,
+) -> ThermostatDevices<C, Y>
+where
+    C: serial_settings::Settings<Y>
+        + for<'d> miniconf::JsonCoreSlash<'d, Y>
+        + crate::settings::AppSettings,
+{
     // Set up RTT logging
     {
         // Enable debug during WFE/WFI-induced sleep
@@ -154,6 +184,12 @@ pub fn setup(
             .unwrap();
         log::info!("Start logging");
     }
+
+    // Check for a reboot to DFU before doing any system configuration.
+    if platform::dfu_bootflag() {
+        platform::execute_system_bootloader();
+    }
+
     let pwr = device.PWR.constrain();
     let vos = pwr.freeze();
 
@@ -162,19 +198,32 @@ pub fn setup(
 
     device.RCC.d2ccip1r.modify(|_, w| w.spi123sel().per());
 
+    device.RCC.d3ccipr.modify(|_, w| w.adcsel().per());
+
     // Clear reset flags.
     device.RCC.rsr.write(|w| w.rmvf().set_bit());
 
     let rcc = device.RCC.constrain();
-    let ccdr = rcc
+    let mut ccdr = rcc
         .use_hse(8.MHz())
         .sysclk(400.MHz())
         .hclk(200.MHz())
-        .per_ck(100.MHz())
+        .per_ck(64.MHz())
         .pll2_p_ck(80.MHz())
         .pll2_q_ck(100.MHz())
         .mco1_from_hse(2.MHz())
         .freeze(vos, &device.SYSCFG);
+
+    // Set up USB clocks.
+    ccdr.clocks.hsi48_ck().unwrap();
+    ccdr.peripheral
+        .kernel_usb_clk_mux(stm32h7xx_hal::rcc::rec::UsbClkSel::Hsi48);
+
+    let mono_token = rtic_monotonics::create_systick_token!();
+    Systick::start(core.SYST, ccdr.clocks.sysclk().to_Hz(), mono_token);
+
+    // After ITCM loading.
+    core.SCB.enable_icache();
 
     info!("--- Starting hardware setup");
 
@@ -463,6 +512,17 @@ pub fn setup(
     let mac_addr = smoltcp::wire::EthernetAddress(eui48);
     log::info!("EUI48: {}", mac_addr);
 
+    let (flash, mut settings) = {
+        let mut flash = {
+            let (_, flash_bank2) = device.FLASH.split();
+            super::flash::Flash(flash_bank2.unwrap())
+        };
+
+        let mut settings = C::new(crate::NetSettings::new(mac_addr));
+        crate::settings::load_from_flash(&mut settings, &mut flash);
+        (flash, settings)
+    };
+
     info!("Setup Ethernet");
 
     // Setup network
@@ -600,6 +660,89 @@ pub fn setup(
         }
     };
 
+    let (usb_device, usb_serial) = {
+        let usb_bus =
+            cortex_m::singleton!(: Option<usb_device::bus::UsbBusAllocator<super::UsbBus>> = None)
+                .unwrap();
+        let endpoint_memory = cortex_m::singleton!(: [u32; 1024] = [0; 1024]).unwrap();
+
+        //let usb_id = gpioa.pa10.into_alternate::<8>();
+        let usb_n = gpioa.pa11.into_alternate();
+        let usb_p = gpioa.pa12.into_alternate();
+
+        let usb = stm32h7xx_hal::usb_hs::USB2::new(
+            device.OTG2_HS_GLOBAL,
+            device.OTG2_HS_DEVICE,
+            device.OTG2_HS_PWRCLK,
+            usb_n,
+            usb_p,
+            ccdr.peripheral.USB2OTG,
+            &ccdr.clocks,
+        );
+
+        // Generate a device serial number from the MAC address.
+        let serial_number = cortex_m::singleton!(: Option<heapless::String<17>> = None).unwrap();
+        {
+            let mut serial_string: heapless::String<17> = heapless::String::new();
+            let octets = mac_addr.0;
+
+            write!(
+                serial_string,
+                "{:02x}-{:02x}-{:02x}-{:02x}-{:02x}-{:02x}",
+                octets[0], octets[1], octets[2], octets[3], octets[4], octets[5]
+            )
+            .unwrap();
+            serial_number.replace(serial_string);
+        }
+
+        usb_bus.replace(stm32h7xx_hal::usb_hs::UsbBus::new(
+            usb,
+            &mut endpoint_memory[..],
+        ));
+
+        let rx_buffer =
+            cortex_m::singleton!(: SerialBufferStore = SerialBufferStore::default()).unwrap();
+        let tx_buffer =
+            cortex_m::singleton!(: SerialBufferStore = SerialBufferStore::default()).unwrap();
+
+        let serial = {
+            usbd_serial::SerialPort::new_with_store(usb_bus.as_ref().unwrap(), rx_buffer, tx_buffer)
+        };
+        let usb_device = usb_device::device::UsbDeviceBuilder::new(
+            usb_bus.as_ref().unwrap(),
+            usb_device::device::UsbVidPid(0x1209, 0x392F),
+        )
+        .strings(&[usb_device::device::StringDescriptors::default()
+            .manufacturer("ARTIQ/Sinara")
+            .product("Thermostat-EEM")
+            .serial_number(serial_number.as_ref().unwrap())])
+        .unwrap()
+        .device_class(usbd_serial::USB_CLASS_CDC)
+        .build();
+
+        (usb_device, serial)
+    };
+
+    let metadata = ApplicationMetadata::new(gpio.hwrev());
+
+    let usb_terminal = {
+        let input_buffer = cortex_m::singleton!(: [u8; 256] = [0u8; 256]).unwrap();
+        let serialize_buffer = cortex_m::singleton!(: [u8; 512] = [0u8; 512]).unwrap();
+
+        serial_settings::Runner::new(
+            crate::settings::SerialSettingsPlatform {
+                interface: serial_settings::BestEffortInterface::new(usb_serial),
+                storage: flash,
+                metadata,
+                _settings_marker: core::marker::PhantomData,
+            },
+            input_buffer,
+            serialize_buffer,
+            &mut settings,
+        )
+        .unwrap()
+    };
+
     info!("--- Hardware setup done");
 
     ThermostatDevices {
@@ -612,6 +755,9 @@ pub fn setup(
         adc_internal,
         adc_sm,
         adc_channels,
-        metadata: ApplicationMetadata::new(),
+        usb_serial: usb_terminal,
+        settings,
+        usb: usb_device,
+        metadata,
     }
 }

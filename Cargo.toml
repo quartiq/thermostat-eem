@@ -28,9 +28,14 @@ stm32h7xx-hal =  { version = "0.16.0", features = ["stm32h743v", "rt", "ethernet
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
 panic-probe = { version = "=0.3.0", features = ["print-rtt"] }
 smoltcp-nal = { version = "0.4", features = ["shared-stack"], git = "https://github.com/quartiq/smoltcp-nal.git", rev = "3e3373e" }
-cortex-m-rtic = "1.1.4"
+rtic = { version = "2.1", features = ["thumbv7-backend"] }
+rtic-monotonics = { version = "1.0", features = ["cortex-m-systick"] }
+rtic-sync = { version = "1.0" }
 embedded-time = "0.12.1"
 systick-monotonic = "1.0.1"
+fugit = "0.3"
+mono-clock = "0.1"
+mutex-trait = "0.2"
 heapless = { version = "0.7", features = ["serde"] }
 minimq = "0.8"
 serde = { version = "1.0.158", features = ["derive"], default-features = false }
@@ -50,6 +55,13 @@ bytemuck = { version = "1.14.3", features = ["derive"], default-features = false
 miniconf = { version = "0.10", features = ["json-core"] }
 miniconf_mqtt = "0.10"
 strum = { version = "0.26.1", default-features = false, features = ["derive"] }
+serial-settings = { version = "0.1", git = "https://github.com/quartiq/stabilizer.git", rev = "becc1c72" }
+postcard = "1"
+embedded-storage = "0.3"
+sequential-storage = "0.6"
+usb-device = "0.3.2"
+usbd-serial = "0.2"
+panic-persist = { version = "0.3", features = ["utf8", "custom-panic-handler"] }
 
 [profile.dev]
 codegen-units = 1

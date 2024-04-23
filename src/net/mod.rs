@@ -13,9 +13,10 @@ pub mod data_stream;
 pub mod network_processor;
 pub mod telemetry;
 
-use crate::hardware::{
-    metadata::ApplicationMetadata, system_timer::SystemTimer, EthernetPhy, NetworkManager,
-    NetworkStack,
+use crate::{
+    hardware::{metadata::ApplicationMetadata, EthernetPhy, NetworkManager, NetworkStack},
+    settings::NetSettings,
+    SystemTimer,
 };
 use data_stream::{DataStream, FrameGenerator};
 use network_processor::NetworkProcessor;
@@ -64,7 +65,7 @@ where
         S,
         NetworkReference,
         SystemTimer,
-        miniconf_mqtt::minimq::broker::NamedBroker<NetworkReference>,
+        minimq::broker::NamedBroker<NetworkReference>,
         Y,
     >,
     pub processor: NetworkProcessor,
@@ -94,9 +95,9 @@ where
     pub fn new(
         stack: NetworkStack,
         phy: EthernetPhy,
-        clock: SystemTimer,
-        id: &str,
-        broker: &str,
+        clock: crate::SystemTimer,
+        app: &str,
+        net_settings: &NetSettings,
         metadata: &'static ApplicationMetadata,
     ) -> Self {
         let stack_manager =
@@ -104,27 +105,29 @@ where
 
         let processor = NetworkProcessor::new(stack_manager.acquire_stack(), phy);
 
-        let prefix = get_device_prefix(metadata.app, id);
+        let prefix = get_device_prefix(app, &net_settings.id);
 
         let store = cortex_m::singleton!(: MqttStorage = MqttStorage::default()).unwrap();
 
-        let named_broker =
-            miniconf_mqtt::minimq::broker::NamedBroker::new(broker, stack_manager.acquire_stack())
-                .unwrap();
+        let named_broker = miniconf_mqtt::minimq::broker::NamedBroker::new(
+            &net_settings.broker,
+            stack_manager.acquire_stack(),
+        )
+        .unwrap();
 
         let settings = miniconf_mqtt::MqttClient::new(
             stack_manager.acquire_stack(),
             &prefix,
             clock,
             miniconf_mqtt::minimq::ConfigBuilder::new(named_broker, &mut store.settings)
-                .client_id(&get_client_id(id, "settings"))
+                .client_id(&get_client_id(&net_settings.id, "settings"))
                 .unwrap(),
         )
         .unwrap();
 
         let telemetry = {
             let named_broker = miniconf_mqtt::minimq::broker::NamedBroker::new(
-                broker,
+                &net_settings.broker,
                 stack_manager.acquire_stack(),
             )
             .unwrap();
@@ -137,7 +140,7 @@ where
                     // As such, we don't need much of the buffer for RX.
                     .rx_buffer(minimq::config::BufferConfig::Maximum(100))
                     .session_state(minimq::config::BufferConfig::Maximum(0))
-                    .client_id(&get_client_id(id, "tlm"))
+                    .client_id(&get_client_id(&net_settings.id, "tlm"))
                     .unwrap(),
             );
 
