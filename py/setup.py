@@ -13,8 +13,8 @@ setup(
     author="QUARTIQ GmbH",
     license="MIT",
     install_requires=[
-        "stabilizer@git+https://github.com/quartiq/stabilizer@d25f2efaaa598eb1a47ceed409f7179d7031f4c0#subdirectory=py",
+        "stabilizer@git+https://github.com/quartiq/stabilizer@becc1c72#subdirectory=py",
         # Note: Keep in-sync with `Cargo.toml`
-        "miniconf-mqtt@git+https://github.com/quartiq/miniconf@v0.9.0#subdirectory=py/miniconf-mqtt",
+        "miniconf-mqtt@git+https://github.com/quartiq/miniconf@miniconf-v0.10.1#subdirectory=py/miniconf-mqtt",
     ],
 )
