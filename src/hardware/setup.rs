@@ -51,6 +51,7 @@ const NUM_UDP_SOCKETS: usize = 1;
 const NUM_SOCKETS: usize = NUM_UDP_SOCKETS + NUM_TCP_SOCKETS;
 
 pub struct NetStorage {
+    pub ip_addrs: [smoltcp::wire::IpCidr; 1],
     // Note: There is an additional socket set item required for the DHCP socket.
     pub sockets: [smoltcp::iface::SocketStorage<'static>; NUM_SOCKETS + 2],
     pub tcp_socket_storage: [TcpSocketStorage; NUM_TCP_SOCKETS],
@@ -94,6 +95,10 @@ impl TcpSocketStorage {
 impl Default for NetStorage {
     fn default() -> Self {
         NetStorage {
+            // Placeholder for the real IP address, which is initialized at runtime.
+            ip_addrs: [smoltcp::wire::IpCidr::Ipv6(
+                smoltcp::wire::Ipv6Cidr::SOLICITED_NODE_PREFIX,
+            )],
             // Placeholder for the real IP address, which is initialized at runtime.
             sockets: [smoltcp::iface::SocketStorage::EMPTY; NUM_SOCKETS + 2],
             tcp_socket_storage: [TcpSocketStorage::new(); NUM_TCP_SOCKETS],
@@ -547,7 +552,7 @@ where
             (ref_clk, mdio, mdc, crs_dv, rxd0, rxd1, tx_en, txd0, txd1)
         };
 
-        unsafe { DES_RING.write(ethernet::DesRing::new()) };
+        let ring = unsafe { DES_RING.write(ethernet::DesRing::new()) };
 
         // Configure the ethernet controller
         let (mut eth_dma, eth_mac) = ethernet::new(
@@ -557,7 +562,7 @@ where
             ethernet_pins,
             // Note(unsafe): We only call this function once to take ownership of the
             // descriptor ring.
-            unsafe { DES_RING.assume_init_mut() },
+            ring,
             mac_addr,
             ccdr.peripheral.ETH1MAC,
             &ccdr.clocks,
@@ -570,6 +575,15 @@ where
 
         unsafe { ethernet::enable_interrupt() };
 
+        // Configure IP address according to DHCP socket availability
+        let ip_addrs: smoltcp::wire::IpAddress = match settings.net().ip.parse() {
+            Ok(addr) => addr,
+            Err(e) => {
+                log::warn!("Invalid IP address in settings: {e:?}. Defaulting to 0.0.0.0 (DHCP)");
+                "0.0.0.0".parse().unwrap()
+            }
+        };
+
         let random_seed = {
             let mut rng = device.RNG.constrain(ccdr.peripheral.RNG, &ccdr.clocks);
             let mut data = [0u8; 8];
@@ -581,9 +595,10 @@ where
         // Unwrapping is intended to panic if called again to prevent re-use of global memory.
         let store = cortex_m::singleton!(: NetStorage = NetStorage::default()).unwrap();
 
+        store.ip_addrs[0] = smoltcp::wire::IpCidr::new(ip_addrs, 24);
+
         let mut ethernet_config =
             smoltcp::iface::Config::new(smoltcp::wire::HardwareAddress::Ethernet(mac_addr));
-
         ethernet_config.random_seed = u64::from_be_bytes(random_seed);
 
         let mut interface = smoltcp::iface::Interface::new(
@@ -597,13 +612,11 @@ where
             .add_default_ipv4_route(smoltcp::wire::Ipv4Address::UNSPECIFIED)
             .unwrap();
 
-        // Configure IP address according to DHCP socket availability
-        let ip_addr: Option<smoltcp::wire::IpAddress> =
-            option_env!("STATIC_IP").map(|a| a.parse().unwrap());
-
         interface.update_ip_addrs(|ref mut addrs| {
-            if let Some(addr) = ip_addr {
-                addrs.push(smoltcp::wire::IpCidr::new(addr, 24)).unwrap();
+            if !ip_addrs.is_unspecified() {
+                addrs
+                    .push(smoltcp::wire::IpCidr::new(ip_addrs, 24))
+                    .unwrap();
             }
         });
 
@@ -621,10 +634,8 @@ where
             sockets.add(tcp_socket);
         }
 
-        if ip_addr.is_none() {
+        if ip_addrs.is_unspecified() {
             sockets.add(smoltcp::socket::dhcpv4::Socket::new());
-        } else {
-            log::info!("Using static IP {ip_addr:?}");
         }
 
         sockets.add(smoltcp::socket::dns::Socket::new(
