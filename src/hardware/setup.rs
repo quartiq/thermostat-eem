@@ -693,7 +693,7 @@ where
 
         let usb_device = usb_device::device::UsbDeviceBuilder::new(
             usb_bus,
-            usb_device::device::UsbVidPid(0x1209, 0x392F),
+            usb_device::device::UsbVidPid(0x1209, 0x391A),
         )
         .strings(&[usb_device::device::StringDescriptors::default()
             .manufacturer("ARTIQ/Sinara")
@@ -709,7 +709,7 @@ where
     let metadata = ApplicationMetadata::new(gpio.hwrev());
 
     let usb_terminal = {
-        let input_buffer = cortex_m::singleton!(: [u8; 256] = [0u8; 256]).unwrap();
+        let input_buffer = cortex_m::singleton!(: [u8; 128] = [0u8; 128]).unwrap();
         let serialize_buffer = cortex_m::singleton!(: [u8; 512] = [0u8; 512]).unwrap();
 
         serial_settings::Runner::new(
