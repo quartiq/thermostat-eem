@@ -3,6 +3,7 @@ use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::hardware::{ad7172::Mux, adc::AdcConfig, platform};
+use heapless::String;
 use smoltcp_nal::smoltcp;
 
 use super::hal::{
@@ -25,26 +26,6 @@ use super::{
 };
 
 use log::info;
-
-pub struct SerialBufferStore([u8; 1024]);
-
-impl Default for SerialBufferStore {
-    fn default() -> Self {
-        Self([0u8; 1024])
-    }
-}
-
-impl core::borrow::Borrow<[u8]> for &mut SerialBufferStore {
-    fn borrow(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl core::borrow::BorrowMut<[u8]> for &mut SerialBufferStore {
-    fn borrow_mut(&mut self) -> &mut [u8] {
-        &mut self.0
-    }
-}
 
 const NUM_TCP_SOCKETS: usize = 4;
 const NUM_UDP_SOCKETS: usize = 1;
@@ -672,15 +653,9 @@ where
     };
 
     let (usb_device, usb_serial) = {
-        let usb_bus =
-            cortex_m::singleton!(: Option<usb_device::bus::UsbBusAllocator<super::UsbBus>> = None)
-                .unwrap();
-        let endpoint_memory = cortex_m::singleton!(: [u32; 1024] = [0; 1024]).unwrap();
-
-        //let usb_id = gpioa.pa10.into_alternate::<8>();
+        let _usb_id = gpioa.pa10.into_alternate::<10>();
         let usb_n = gpioa.pa11.into_alternate();
         let usb_p = gpioa.pa12.into_alternate();
-
         let usb = stm32h7xx_hal::usb_hs::USB2::new(
             device.OTG2_HS_GLOBAL,
             device.OTG2_HS_DEVICE,
@@ -691,42 +666,39 @@ where
             &ccdr.clocks,
         );
 
-        // Generate a device serial number from the MAC address.
-        let serial_number = cortex_m::singleton!(: Option<heapless::String<17>> = None).unwrap();
-        {
-            let mut serial_string: heapless::String<17> = heapless::String::new();
-            let octets = mac_addr.0;
-
-            write!(
-                serial_string,
-                "{:02x}-{:02x}-{:02x}-{:02x}-{:02x}-{:02x}",
-                octets[0], octets[1], octets[2], octets[3], octets[4], octets[5]
-            )
-            .unwrap();
-            serial_number.replace(serial_string);
-        }
-
-        usb_bus.replace(stm32h7xx_hal::usb_hs::UsbBus::new(
+        let endpoint_memory = cortex_m::singleton!(: Option<&'static mut [u32]> = None).unwrap();
+        endpoint_memory.replace(&mut cortex_m::singleton!(: [u32; 1024] = [0; 1024]).unwrap()[..]);
+        let usb_bus = cortex_m::singleton!(: usb_device::bus::UsbBusAllocator<super::UsbBus> =
+        stm32h7xx_hal::usb_hs::UsbBus::new(
             usb,
-            &mut endpoint_memory[..],
-        ));
+            endpoint_memory.take().unwrap(),
+        ))
+        .unwrap();
 
-        let rx_buffer =
-            cortex_m::singleton!(: SerialBufferStore = SerialBufferStore::default()).unwrap();
-        let tx_buffer =
-            cortex_m::singleton!(: SerialBufferStore = SerialBufferStore::default()).unwrap();
+        let read_store = cortex_m::singleton!(: [u8; 128] = [0; 128]).unwrap();
+        let write_store = cortex_m::singleton!(: [u8; 1024] = [0; 1024]).unwrap();
+        let serial = usbd_serial::SerialPort::new_with_store(
+            usb_bus,
+            &mut read_store[..],
+            &mut write_store[..],
+        );
 
-        let serial = {
-            usbd_serial::SerialPort::new_with_store(usb_bus.as_ref().unwrap(), rx_buffer, tx_buffer)
-        };
+        // Generate a device serial number from the MAC address.
+        let serial_number = cortex_m::singleton!(: String<17> = {
+            let mut s = String::new();
+            write!(s, "{mac_addr}").unwrap();
+            s
+        })
+        .unwrap();
+
         let usb_device = usb_device::device::UsbDeviceBuilder::new(
-            usb_bus.as_ref().unwrap(),
+            usb_bus,
             usb_device::device::UsbVidPid(0x1209, 0x392F),
         )
         .strings(&[usb_device::device::StringDescriptors::default()
             .manufacturer("ARTIQ/Sinara")
             .product("Thermostat-EEM")
-            .serial_number(serial_number.as_ref().unwrap())])
+            .serial_number(serial_number)])
         .unwrap()
         .device_class(usbd_serial::USB_CLASS_CDC)
         .build();

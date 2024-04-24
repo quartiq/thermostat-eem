@@ -403,10 +403,9 @@ mod app {
     #[task(priority = 3, binds = EXTI15_10, local=[adc_sm, process])]
     fn adc_readout(c: adc_readout::Context) {
         let (phy, ch, adc_code) = c.local.adc_sm.handle_interrupt();
-        c.local
-            .process
-            .try_send(Data { phy, ch, adc_code })
-            .unwrap();
+        if let Err(e) = c.local.process.try_send(Data { phy, ch, adc_code }) {
+            log::warn!("Processing queue overflow: {e:?}");
+        }
     }
 
     #[task(priority = 1, shared=[usb, settings], local=[usb_terminal])]

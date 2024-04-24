@@ -52,12 +52,8 @@ pub const MONOTONIC_FREQUENCY: u32 = 1_000;
 pub type Systick = rtic_monotonics::systick::Systick;
 pub type SystemTimer = mono_clock::MonoClock<u32, MONOTONIC_FREQUENCY>;
 
-pub type SerialPort = usbd_serial::SerialPort<
-    'static,
-    crate::hardware::UsbBus,
-    &'static mut setup::SerialBufferStore,
-    &'static mut setup::SerialBufferStore,
->;
+pub type SerialPort =
+    usbd_serial::SerialPort<'static, crate::hardware::UsbBus, &'static mut [u8], &'static mut [u8]>;
 
 pub type SerialTerminal<C, const Y: usize> =
     serial_settings::Runner<'static, crate::settings::SerialSettingsPlatform<C, Y>, Y>;
