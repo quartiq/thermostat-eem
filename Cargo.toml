@@ -58,7 +58,7 @@ strum = { version = "0.26.1", default-features = false, features = ["derive"] }
 serial-settings = { version = "0.1", git = "https://github.com/quartiq/stabilizer.git", rev = "becc1c72" }
 postcard = "1"
 embedded-storage = "0.3"
-sequential-storage = "0.6"
+sequential-storage = "1.0"
 usb-device = "0.3.2"
 usbd-serial = "0.2"
 panic-persist = { version = "0.3", features = ["utf8", "custom-panic-handler"] }
