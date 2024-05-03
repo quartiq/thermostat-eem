@@ -27,7 +27,7 @@ cortex-m-rt = { version = "0.7", features = ["device"] }
 stm32h7xx-hal =  { version = "0.16.0", features = ["stm32h743v", "rt", "ethernet", "xspi", "usb_hs"] }
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_info"] }
 panic-probe = { version = "=0.3.0", features = ["print-rtt"] }
-smoltcp-nal = { version = "0.4", features = ["shared-stack"], git = "https://github.com/quartiq/smoltcp-nal.git", rev = "3e3373e" }
+smoltcp-nal = { version = "0.5", features = ["shared-stack"] }
 rtic = { version = "2.1", features = ["thumbv7-backend"] }
 rtic-monotonics = { version = "1.0", features = ["cortex-m-systick"] }
 rtic-sync = { version = "1.0" }
@@ -37,7 +37,7 @@ fugit = "0.3"
 mono-clock = "0.1"
 mutex-trait = "0.2"
 heapless = { version = "0.7", features = ["serde"] }
-minimq = "0.8"
+minimq = "0.9"
 serde = { version = "1.0.158", features = ["derive"], default-features = false }
 serde-json-core = "0.5"
 rtt-logger = "0.2"
@@ -52,10 +52,10 @@ arbitrary-int = "1.2.7"
 lm75 = "0.2"
 bytemuck = { version = "1.14.3", features = ["derive"], default-features = false }
 # Note: Keep in-sync with `py/setup.py`
-miniconf = { version = "0.10", features = ["json-core"] }
-miniconf_mqtt = "0.10"
+miniconf = { version = "0.11", features = ["json-core", "derive", "postcard"] }
+miniconf_mqtt = "0.11"
 strum = { version = "0.26.1", default-features = false, features = ["derive"] }
-serial-settings = { version = "0.1", git = "https://github.com/quartiq/stabilizer.git", rev = "becc1c72" }
+serial-settings = { version = "0.1", git = "https://github.com/quartiq/stabilizer.git", rev = "51fc553" }
 postcard = "1"
 embedded-storage = "0.3"
 sequential-storage = "0.6"
