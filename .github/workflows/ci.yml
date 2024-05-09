@@ -55,7 +55,7 @@ jobs:
     strategy:
       matrix:
         # keep MSRV in sync in ci.yaml and Cargo.toml
-        toolchain: [stable, '1.74.1']
+        toolchain: [stable, '1.75.0']
         features: ['']
         continue-on-error: [false]
         include:
