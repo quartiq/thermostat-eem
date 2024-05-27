@@ -36,7 +36,7 @@ fugit = "0.3"
 mono-clock = "0.1"
 heapless = { version = "0.7", features = ["serde"] }
 minimq = "0.9"
-serde = { version = "1.0.158", features = ["derive"], default-features = false }
+serde = { version = "1.0.203", features = ["derive"], default-features = false }
 serde-json-core = "0.5"
 rtt-logger = "0.2"
 rtt-target = { version = "0.3", features = ["cortex-m"] }
