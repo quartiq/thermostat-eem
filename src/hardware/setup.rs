@@ -205,8 +205,7 @@ where
     ccdr.peripheral
         .kernel_usb_clk_mux(stm32h7xx_hal::rcc::rec::UsbClkSel::Hsi48);
 
-    let mono_token = rtic_monotonics::create_systick_token!();
-    Systick::start(core.SYST, ccdr.clocks.sysclk().to_Hz(), mono_token);
+    Systick::start(core.SYST, ccdr.clocks.sysclk().to_Hz());
 
     // After ITCM loading.
     core.SCB.enable_icache();

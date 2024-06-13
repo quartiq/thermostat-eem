@@ -49,7 +49,7 @@ pub enum OutputChannelIdx {
 
 /// System timer (RTIC Monotonic) tick frequency
 pub const MONOTONIC_FREQUENCY: u32 = 1_000;
-pub type Systick = rtic_monotonics::systick::Systick;
+rtic_monotonics::systick_monotonic!(Systick, MONOTONIC_FREQUENCY);
 pub type SystemTimer = mono_clock::MonoClock<u32, MONOTONIC_FREQUENCY>;
 
 pub type SerialPort =
