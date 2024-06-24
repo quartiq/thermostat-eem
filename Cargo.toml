@@ -52,7 +52,7 @@ bytemuck = { version = "1.16.0", features = ["derive"], default-features = false
 # Note: Keep in-sync with `py/setup.py`
 miniconf = { version = "0.11", features = ["json-core", "derive", "postcard"] }
 miniconf_mqtt = "0.11"
-strum = { version = "0.26.1", default-features = false, features = ["derive"] }
+strum = { version = "0.26.3", default-features = false, features = ["derive"] }
 serial-settings = { version = "0.1", git = "https://github.com/quartiq/stabilizer.git", rev = "26ec6ee" }
 postcard = "1"
 embedded-storage = "0.3"
