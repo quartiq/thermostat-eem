@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[license]
+text = "MIT"
+
+[project]
+name = "thermostat"
+# Note: keep this in sync with Cargo.toml
+version = "0.2.0"
+description = "Utilities for configuring Thermostat-EEM"
+authors = [
+    { name = "Robert Jördens", email = "rj@quartiq.de" },
+    { name = "Norman Krackow", email = "nk@quartiq.de" },
+]
+dependencies = [
+    "miniconf-mqtt@git+https://github.com/quartiq/miniconf@v0.13.1#subdirectory=py/miniconf-mqtt",
+    "stabilizer@git+https://github.com/quartiq/stabilizer@8156a764#subdirectory=py",
+]
+
+[project.urls]
+Homepage = "https://github.com/quartiq/stabilizer"
+Repository = "https://github.com/quartiq/stabilizer"

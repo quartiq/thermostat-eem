@@ -18,9 +18,8 @@ use crate::{
     settings::NetSettings,
     SystemTimer,
 };
-use data_stream::{DataStream, FrameGenerator};
+use data_stream::{DataStream, FrameGenerator, StreamTarget};
 use network_processor::NetworkProcessor;
-use smoltcp_nal::embedded_nal::SocketAddr;
 use telemetry::TelemetryClient;
 
 use core::fmt::Write;
@@ -105,7 +104,8 @@ where
 
         let processor = NetworkProcessor::new(stack_manager.acquire_stack(), phy);
 
-        let prefix = get_device_prefix(app, &net_settings.id);
+        let prefix =
+            cortex_m::singleton!(: String<128> = get_device_prefix(app, &net_settings.id)).unwrap();
 
         let store = cortex_m::singleton!(: MqttStorage = MqttStorage::default()).unwrap();
 
@@ -117,7 +117,7 @@ where
 
         let settings = miniconf_mqtt::MqttClient::new(
             stack_manager.acquire_stack(),
-            &prefix,
+            prefix.as_str(),
             clock,
             miniconf_mqtt::minimq::ConfigBuilder::new(named_broker, &mut store.settings)
                 .client_id(&get_client_id(&net_settings.id, "settings"))
@@ -144,7 +144,7 @@ where
                     .unwrap(),
             );
 
-            TelemetryClient::new(mqtt, &prefix, metadata)
+            TelemetryClient::new(mqtt, prefix, metadata)
         };
 
         let (generator, stream) = data_stream::setup_streaming(stack_manager.acquire_stack());
@@ -172,7 +172,7 @@ where
     ///
     /// # Args
     /// * `remote` - The destination for the streamed data.
-    pub fn direct_stream(&mut self, remote: SocketAddr) {
+    pub fn direct_stream(&mut self, remote: StreamTarget) {
         if self.generator.is_none() {
             self.stream.set_remote(remote);
         }

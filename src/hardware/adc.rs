@@ -457,28 +457,29 @@ pub mod sm {
 
 impl sm::StateMachineContext for Adc {
     /// The data readout has to be initiated by selecting the first ADC.
-    fn start(&mut self) -> AdcPhy {
+    fn start(&mut self) -> Result<AdcPhy, ()> {
         // set up sampling sequence by selecting the first ADC according to schedule
         self.rdyn.clear_interrupt_pending_bit();
         self.cs[AdcPhy::Zero as usize].set_state(PinState::Low);
-        AdcPhy::Zero
+        Ok(AdcPhy::Zero)
     }
 
     /// Clears the interrupt pending flag (which does not trigger an interrupt right away since the currently
     /// selected ADC does not have new data), deselects the current ADC and selects the next in line.
     /// The next ADC will then trigger the interrupt again once it has finished sampling (or when it is
     /// selected if it is done at this point) and the routine will start again.
-    fn next(&mut self, phy: &AdcPhy) -> AdcPhy {
+    fn next(&mut self, phy: &AdcPhy) -> Result<AdcPhy, ()> {
         self.cs[*phy as usize].set_state(PinState::High);
         self.rdyn.clear_interrupt_pending_bit();
         let next = phy.next();
         self.cs[next as usize].set_state(PinState::Low);
-        next
+        Ok(next)
     }
 
-    fn stop(&mut self, phy: &AdcPhy) {
+    fn stop(&mut self, phy: &AdcPhy) -> Result<(), ()> {
         self.cs[*phy as usize].set_state(PinState::High);
         self.rdyn.clear_interrupt_pending_bit();
+        Ok(())
     }
 }
 

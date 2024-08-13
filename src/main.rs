@@ -58,7 +58,7 @@ pub struct Fls {
     /// # Value
     /// See [OutputChannel]
     #[tree(depth = 3)]
-    output_channel: [OutputChannel; 4],
+    output: [OutputChannel; 4],
 
     /// Alarm settings.
     ///
@@ -70,16 +70,16 @@ pub struct Fls {
     #[tree(depth = 3)]
     alarm: Alarm,
 
-    stream_target: StreamTarget,
+    stream: StreamTarget,
 }
 
 impl Default for Fls {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
-            output_channel: Default::default(),
+            output: Default::default(),
             alarm: Default::default(),
-            stream_target: Default::default(),
+            stream: Default::default(),
         }
     }
 }
@@ -259,7 +259,7 @@ mod app {
     async fn settings(c: settings::Context) {
         let pwm = c.local.pwm;
         (c.shared.network, c.shared.gpio, c.shared.settings).lock(|network, gpio, settings| {
-            for (ch, s) in OutputChannelIdx::iter().zip(settings.fls.output_channel.iter_mut()) {
+            for (ch, s) in OutputChannelIdx::iter().zip(settings.fls.output.iter_mut()) {
                 s.finalize_settings(); // clamp limits and normalize weights
                 pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
                 let [pos, neg] = s.current_limits();
@@ -269,7 +269,7 @@ mod app {
                 gpio.set_led(ch.into(), (s.state != State::Off).into()); // fix leds to channel state
             }
 
-            network.direct_stream(settings.fls.stream_target.into());
+            network.direct_stream(settings.fls.stream);
         });
     }
 
@@ -371,7 +371,7 @@ mod app {
 
                     for ch in OutputChannelIdx::iter() {
                         let idx = ch as usize;
-                        let current = settings.fls.output_channel[idx]
+                        let current = settings.fls.output[idx]
                             .update(temperature, &mut c.local.iir_state[idx])
                             as f32;
                         telemetry.output_current[idx] = current;
@@ -417,7 +417,7 @@ mod app {
             });
 
             c.shared.settings.lock(|settings| {
-                if c.local.usb_terminal.process(settings).unwrap() {
+                if c.local.usb_terminal.poll(settings).unwrap() {
                     settings::spawn().unwrap()
                 }
             });
