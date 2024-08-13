@@ -489,7 +489,7 @@ where
         let mut lm75 = lm75::Lm75::new(i2c, lm75::Address::default());
         log::info!("LM75 Temperature: {}°C", lm75.read_temperature().unwrap());
         if let Ok(()) = afe_i2c.write_read(0x50, &[0xFA], &mut eui48) {
-            log::info!("AFE EUI48: {eui48:?}");
+            log::info!("AFE EUI48: {}", smoltcp::wire::EthernetAddress(eui48));
         } else {
             log::warn!("AFE EUI48 read failure.");
         }

@@ -161,6 +161,7 @@ impl OutputChannel {
     /// Performs finalization of the output_channel miniconf settings:
     /// - Clamping of the limits
     /// - Normalization of the weights
+    ///
     /// Returns the current limits.
     pub fn finalize_settings(&mut self) {
         if let Ok(iir) = self.pid.try_into() {
