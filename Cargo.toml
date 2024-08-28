@@ -48,12 +48,12 @@ bitbybit = "1.3.2"
 arbitrary-int = "1.2.7"
 # stabilizer = "0.9.0"
 lm75 = "0.2"
-bytemuck = { version = "1.16.0", features = ["derive"], default-features = false }
+bytemuck = { version = "1.17.0", features = ["derive"], default-features = false }
 # Note: Keep in-sync with `py/setup.py`
 miniconf = { version = "0.13", features = ["json-core", "derive", "postcard"] }
 miniconf_mqtt = "0.13"
 strum = { version = "0.26.1", default-features = false, features = ["derive"] }
-serial-settings = { version = "0.1", git = "https://github.com/quartiq/stabilizer.git", rev = "8156a764" }
+serial-settings = { version = "0.1", git = "https://github.com/quartiq/stabilizer.git", rev = "7a1f48e5" }
 postcard = "1"
 embedded-storage = "0.3"
 sequential-storage = "3"
