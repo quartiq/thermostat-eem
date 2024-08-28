@@ -39,7 +39,7 @@ use settings::NetSettings;
 use statistics::{Buffer, Statistics};
 
 #[derive(Clone, Debug, Tree)]
-pub struct Fls {
+pub struct ThermostatEem {
     /// Specifies the telemetry output period in seconds.
     ///
     /// # Path
@@ -73,7 +73,7 @@ pub struct Fls {
     stream: StreamTarget,
 }
 
-impl Default for Fls {
+impl Default for ThermostatEem {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
@@ -87,7 +87,7 @@ impl Default for Fls {
 #[derive(Clone, Debug, Tree)]
 pub struct Settings {
     #[tree(depth = 4)]
-    pub fls: Fls,
+    pub thermostat_eem: ThermostatEem,
 
     #[tree(depth = 1)]
     pub net: NetSettings,
@@ -97,7 +97,7 @@ impl settings::AppSettings for Settings {
     fn new(net: NetSettings) -> Self {
         Self {
             net,
-            fls: Fls::default(),
+            thermostat_eem: ThermostatEem::default(),
         }
     }
 
@@ -109,7 +109,7 @@ impl settings::AppSettings for Settings {
 impl serial_settings::Settings<5> for Settings {
     fn reset(&mut self) {
         *self = Self {
-            fls: Fls::default(),
+            thermostat_eem: ThermostatEem::default(),
             net: NetSettings::new(self.net.mac),
         }
     }
@@ -168,7 +168,7 @@ mod app {
     #[shared]
     struct Shared {
         usb: UsbDevice,
-        network: NetworkUsers<Fls, 4>,
+        network: NetworkUsers<ThermostatEem, 4>,
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
@@ -246,7 +246,7 @@ mod app {
     fn idle(mut c: idle::Context) -> ! {
         loop {
             (&mut c.shared.network, &mut c.shared.settings).lock(|net, settings| {
-                match net.update(&mut settings.fls) {
+                match net.update(&mut settings.thermostat_eem) {
                     NetworkState::SettingsChanged => settings::spawn().unwrap(),
                     NetworkState::Updated => {}
                     NetworkState::NoChange => {}
@@ -259,7 +259,7 @@ mod app {
     async fn settings(c: settings::Context) {
         let pwm = c.local.pwm;
         (c.shared.network, c.shared.gpio, c.shared.settings).lock(|network, gpio, settings| {
-            for (ch, s) in OutputChannelIdx::iter().zip(settings.fls.output.iter_mut()) {
+            for (ch, s) in OutputChannelIdx::iter().zip(settings.thermostat_eem.output.iter_mut()) {
                 s.finalize_settings(); // clamp limits and normalize weights
                 pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
                 let [pos, neg] = s.current_limits();
@@ -269,7 +269,7 @@ mod app {
                 gpio.set_led(ch.into(), (s.state != State::Off).into()); // fix leds to channel state
             }
 
-            network.direct_stream(settings.fls.stream);
+            network.direct_stream(settings.thermostat_eem.stream);
         });
     }
 
@@ -311,7 +311,7 @@ mod app {
             let telemetry_period = c
                 .shared
                 .settings
-                .lock(|settings| settings.fls.telemetry_period);
+                .lock(|settings| settings.thermostat_eem.telemetry_period);
             Systick::delay((telemetry_period as u32).secs()).await;
         }
     }
@@ -322,7 +322,7 @@ mod app {
             let alarm = c
                 .shared
                 .settings
-                .lock(|settings| settings.fls.alarm.clone());
+                .lock(|settings| settings.thermostat_eem.alarm.clone());
             if alarm.armed {
                 let temperatures = c.shared.temperature.lock(|temp| *temp);
                 let mut alarms = [[None; 4]; 4];
@@ -371,7 +371,7 @@ mod app {
 
                     for ch in OutputChannelIdx::iter() {
                         let idx = ch as usize;
-                        let current = settings.fls.output[idx]
+                        let current = settings.thermostat_eem.output[idx]
                             .update(temperature, &mut c.local.iir_state[idx])
                             as f32;
                         telemetry.output_current[idx] = current;

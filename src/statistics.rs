@@ -18,7 +18,7 @@ impl From<Buffer> for Option<Statistics> {
         if buff.counter > 0 {
             let c = 1.0 / buff.counter as f32;
             let mean = buff.m1 * c;
-            let var = buff.m2 * c - mean.powi(2);
+            let var = buff.m2 * c - mean * mean;
             Some(Statistics {
                 mean: mean + buff.x0,
                 ptp: buff.max - buff.min,
@@ -63,7 +63,7 @@ impl Default for Buffer {
             counter: 0,
             m1: 0.,
             m2: 0.,
-            x0: 0.,
+            x0: f32::NAN,
             max: f32::NEG_INFINITY,
             min: f32::INFINITY,
         }

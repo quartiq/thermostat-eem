@@ -113,7 +113,8 @@ pub struct OutputChannel {
 
     /// Thermostat input channel weights. Each input temperature of an enabled channel
     /// is multiplied by its weight and the accumulated output is fed into the IIR.
-    /// The weights will be internally normalized to one (sum of the absolute values).
+    /// The weights will be internally normalized to one (sum of the absolute values)
+    /// if they are not all zero.
     ///
     /// # Path
     /// `weights/<adc>/<channel>`
@@ -139,12 +140,8 @@ impl Default for OutputChannel {
 
 impl OutputChannel {
     /// compute weighted iir input, iir state and return the new output
-    pub fn update(
-        &mut self,
-        channel_temperatures: &[[f64; 4]; 4],
-        iir_state: &mut [f64; 4],
-    ) -> f64 {
-        let weighted_temperature = channel_temperatures
+    pub fn update(&mut self, temperatures: &[[f64; 4]; 4], iir_state: &mut [f64; 4]) -> f64 {
+        let temperature = temperatures
             .iter()
             .flatten()
             .zip(self.weights.iter().flatten())
@@ -155,7 +152,7 @@ impl OutputChannel {
         } else {
             &iir::Biquad::HOLD
         };
-        iir.update(iir_state, weighted_temperature)
+        iir.update(iir_state, temperature)
     }
 
     /// Performs finalization of the output_channel miniconf settings:
@@ -175,7 +172,7 @@ impl OutputChannel {
         self.iir
             .set_min(self.iir.min().clamp(-range as _, range as _));
         self.voltage_limit = self.voltage_limit.clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
-        let divisor: f32 = self.weights.iter().flatten().map(|w| w.abs()).sum::<f32>();
+        let divisor: f32 = self.weights.iter().flatten().map(|w| w.abs()).sum();
         // Note: The weights which are not 'None' should always affect an enabled channel and therefore count for normalization.
         if divisor != 0.0 {
             let n = divisor.recip();
