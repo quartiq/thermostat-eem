@@ -11,10 +11,14 @@
 //! required immediately before transmission. This ensures that any slower computation required
 //! for unit conversion can be off-loaded to lower priority tasks.
 use heapless::String;
+use minimq::{DeferredPublication, Publication};
 use serde::Serialize;
 
 use super::NetworkReference;
-use crate::{hardware::metadata::ApplicationMetadata, SystemTimer};
+use crate::hardware::{metadata::ApplicationMetadata, SystemTimer};
+
+/// Default metadata message if formatting errors occur.
+const DEFAULT_METADATA: &str = "{\"message\":\"Truncated: See USB terminal\"}";
 
 /// The telemetry client for reporting telemetry data over MQTT.
 pub struct TelemetryClient {
@@ -34,7 +38,7 @@ impl TelemetryClient {
     ///
     /// # Args
     /// * `mqtt` - The MQTT client
-    /// * `prefix` - The device prefix to use for MQTT telemetry reporting
+    /// * `prefix` - The device prefix to use for MQTT telemetry reporting.
     ///
     /// # Returns
     /// A new telemetry client.
@@ -50,8 +54,8 @@ impl TelemetryClient {
     ) -> Self {
         Self {
             mqtt,
-            prefix,
             meta_published: false,
+            prefix,
             metadata,
         }
     }
@@ -71,11 +75,12 @@ impl TelemetryClient {
         self.mqtt
             .client()
             .publish(
-                minimq::DeferredPublication::new(|buf| serde_json_core::to_slice(&telemetry, buf))
+                minimq::DeferredPublication::new(|buf| serde_json_core::to_slice(telemetry, buf))
                     .topic(&topic)
                     .finish()
                     .unwrap(),
             )
+            .map_err(|e| log::error!("Telemetry publishing error: {:?}", e))
             .ok();
     }
 
@@ -90,6 +95,7 @@ impl TelemetryClient {
                     .finish()
                     .unwrap(),
             )
+            .map_err(|e| log::error!("Alarm publishing error: {:?}", e))
             .ok();
     }
 
@@ -105,7 +111,7 @@ impl TelemetryClient {
                 smoltcp_nal::smoltcp::socket::tcp::ConnectError::Unaddressable,
             ))) => {}
 
-            Err(error) => log::info!("Unexpected MQTT error: {:?}", error),
+            Err(error) => log::info!("Unexpected error: {:?}", error),
             _ => {}
         }
 
@@ -116,28 +122,30 @@ impl TelemetryClient {
 
         // Publish application metadata
         if !self.meta_published && self.mqtt.client().can_publish(minimq::QoS::AtMostOnce) {
+            let Self {
+                ref mut mqtt,
+                metadata,
+                ..
+            } = self;
+
             let mut topic: String<128> = self.prefix.try_into().unwrap();
             topic.push_str("/meta").unwrap();
 
-            if self
-                .mqtt
+            if mqtt
                 .client()
                 .publish(
-                    minimq::DeferredPublication::new(|buf| {
-                        serde_json_core::to_slice(&self.metadata, buf)
-                    })
-                    .topic(&topic)
-                    .finish()
-                    .unwrap(),
+                    DeferredPublication::new(|buf| serde_json_core::to_slice(&metadata, buf))
+                        .topic(&topic)
+                        .finish()
+                        .unwrap(),
                 )
                 .is_err()
             {
                 // Note(unwrap): We can guarantee that this message will be sent because we checked
                 // for ability to publish above.
-                self.mqtt
-                    .client()
+                mqtt.client()
                     .publish(
-                        minimq::Publication::new("{\"message\":\"Truncated\"}".as_bytes())
+                        Publication::new(DEFAULT_METADATA.as_bytes())
                             .topic(&topic)
                             .finish()
                             .unwrap(),
