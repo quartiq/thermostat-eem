@@ -1087,7 +1087,8 @@ dependencies = [
 [[package]]
 name = "serial-settings"
 version = "0.1.0"
-source = "git+https://github.com/quartiq/stabilizer.git?rev=7a1f48e5#7a1f48e5cdcf230f35745178913495f7581cfb54"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74e625da19d0598abfecd5f8ead895ec4542c79a3139234cc7fd9cb3fe3ba0ff"
 dependencies = [
  "embedded-io",
  "heapless 0.8.0",
@@ -1323,7 +1324,7 @@ dependencies = [
 
 [[package]]
 name = "thermostat-eem"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "arbitrary-int",
  "bitbybit",
