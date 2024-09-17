@@ -64,7 +64,7 @@ def _main():
     parser.add_argument(
         "--setpoint",
         type=float,
-        default=0,
+        default=25.0,
         help="The channel output offset (%(default)s A)",
     )
     parser.add_argument(
@@ -84,7 +84,7 @@ def _main():
     parser.add_argument(
         "--voltage-limit",
         type=float,
-        default=1,
+        default=5.0,
         help="Channel voltage limit (%(default)s V)",
     )
 
@@ -109,13 +109,13 @@ def _main():
     parser.add_argument(
         "--li",
         type=float,
-        default=1e20,
+        default=1e30,
         help="Integrator limit (%(default)s A/K)",
     )
     parser.add_argument(
         "--ld",
         type=float,
-        default=1e20,
+        default=1e30,
         help="Derivative limit (%(default)s A/K)",
     )
 
@@ -144,15 +144,16 @@ def _main():
             thermostat = Miniconf(client, prefix)
 
             # TODO: sequence!
-            for k in "min max setpoint ki kp kd li ld".split():
-                await thermostat.set(
-                    f"/output/{args.output}/pid/{k}",
-                    getattr(args, k),
-                )
-            for k in "state voltage_limit weights".split():
+            await thermostat.set(
+                f"/output/{args.output}/state",
+                "Hold",
+            )
+            for (
+                k
+            ) in "pid/min pid/max pid/setpoint pid/ki pid/kp pid/kd pid/li pid/ld voltage_limit weights state".split():
                 await thermostat.set(
                     f"/output/{args.output}/{k}",
-                    getattr(args, k),
+                    getattr(args, k.split("/")[-1]),
                 )
 
     asyncio.run(run())

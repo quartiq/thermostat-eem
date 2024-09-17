@@ -8,7 +8,7 @@ text = "MIT"
 [project]
 name = "thermostat"
 # Note: keep this in sync with Cargo.toml
-version = "0.2.0"
+version = "0.3.0"
 description = "Utilities for configuring Thermostat-EEM"
 authors = [
     { name = "Robert Jördens", email = "rj@quartiq.de" },
@@ -16,7 +16,7 @@ authors = [
 ]
 dependencies = [
     "miniconf-mqtt@git+https://github.com/quartiq/miniconf@v0.13.1#subdirectory=py/miniconf-mqtt",
-    "stabilizer@git+https://github.com/quartiq/stabilizer@8156a764#subdirectory=py",
+    "stabilizer@git+https://github.com/quartiq/stabilizer@v0.10.0#subdirectory=py",
 ]
 
 [project.urls]
