@@ -9,6 +9,7 @@ pub mod adc;
 pub mod adc_internal;
 pub mod dac;
 pub mod delay;
+pub mod dt670;
 pub mod fan;
 pub mod flash;
 pub mod gpio;
