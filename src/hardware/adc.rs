@@ -100,14 +100,30 @@ pub struct Mux {
 /// ADC configuration structure.
 #[derive(Clone, Copy, Debug)]
 pub enum Sensor {
+    /// code * gain + offset
+    Linear {
+        /// Units: output
+        offset: f32,
+        /// Units: output/input
+        gain: f32,
+    },
+    /// Beta equation (Steinhart-Hart with c=0)
     Ntc {
-        t0_inv: f32,   // inverse reference temperature in 1/K
+        t0_inv: f32,   // inverse reference temperature (1/K)
         r_rel: f32,    // reference resistor over NTC resistance at t0,
         beta_inv: f32, // inverse beta
+    },
+    /// DT-670 Silicon diode
+    Dt670 {
+        v_ref_inv: f32, // effective inverse reference voltage (V)
     },
 }
 
 impl Sensor {
+    pub fn linear(offset: f32, gain: f32) -> Self {
+        Self::Linear { offset, gain }
+    }
+
     pub fn ntc(t0: f32, r0: f32, r_ref: f32, beta: f32) -> Self {
         Self::Ntc {
             t0_inv: 1.0 / (t0 + ZERO_C),
@@ -115,19 +131,24 @@ impl Sensor {
             beta_inv: 1.0 / beta,
         }
     }
+
+    pub fn dt670(v_ref: f32) -> Self {
+        Self::Dt670 { v_ref_inv: v_ref }
+    }
 }
 
 const ZERO_C: f32 = 273.15; // 0°C in °K
 
 impl Default for Sensor {
     fn default() -> Self {
-        Self::ntc(25.0, 10.0e3, 10.0e3, 3988.0)
+        Self::linear(0.0, 1.0)
     }
 }
 
 impl Sensor {
     pub fn convert(&self, code: AdcCode) -> f64 {
         match self {
+            Self::Linear { offset, gain } => (f32::from(code) * gain) as f64 + *offset as f64,
             Self::Ntc {
                 t0_inv,
                 r_rel,
@@ -150,6 +171,16 @@ impl Sensor {
                     relative_voltage / (1.0 - relative_voltage) * *r_rel as f64;
                 // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
                 1.0 / (*t0_inv as f64 + *beta_inv as f64 * relative_resistance.ln()) - ZERO_C as f64
+            }
+            Self::Dt670 { v_ref_inv } => {
+                let voltage = f32::from(code) * v_ref_inv;
+                let curve = &super::dt670::CURVE;
+                let idx = curve.partition_point(|&(_t, v, _dvdt)| v < voltage);
+                curve
+                    .get(idx)
+                    .or(curve.last())
+                    .map(|&(t, v, dvdt)| (t + (voltage - v) * 1.0e3 / dvdt) as f64)
+                    .unwrap()
             }
         }
     }

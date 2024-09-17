@@ -384,14 +384,14 @@ where
                 ainpos: ad7172::Mux::Ain0,
                 ainneg: ad7172::Mux::Ain1,
             },
-            Sensor::default(),
+            Sensor::ntc(25.0, 10.0e3, 10.0e3, 3988.0),
         )),
         Some((
             Mux {
                 ainpos: ad7172::Mux::Ain2,
                 ainneg: ad7172::Mux::Ain3,
             },
-            Sensor::default(),
+            Sensor::ntc(25.0, 10.0e3, 10.0e3, 3988.0),
         )),
         None,
         None,

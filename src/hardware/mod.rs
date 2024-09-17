@@ -17,6 +17,7 @@ pub mod platform;
 pub mod pwm;
 pub mod setup;
 pub mod system_timer;
+pub mod dt670;
 
 // Number of TX descriptors in the ethernet descriptor ring.
 const TX_DESRING_CNT: usize = 4;
