@@ -63,7 +63,7 @@ jobs:
             features: ''
             continue-on-error: true
           - toolchain: nightly
-            features: nightly
+            features: ''
             continue-on-error: true
     steps:
       - uses: actions/checkout@v2
