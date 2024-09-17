@@ -115,7 +115,7 @@ pub enum Sensor {
     },
     /// DT-670 Silicon diode
     Dt670 {
-        v_ref_inv: f32, // effective inverse reference voltage (V)
+        v_ref: f32, // effective reference voltage (V)
     },
 }
 
@@ -133,7 +133,7 @@ impl Sensor {
     }
 
     pub fn dt670(v_ref: f32) -> Self {
-        Self::Dt670 { v_ref_inv: v_ref }
+        Self::Dt670 { v_ref }
     }
 }
 
@@ -172,8 +172,8 @@ impl Sensor {
                 // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
                 1.0 / (*t0_inv as f64 + *beta_inv as f64 * relative_resistance.ln()) - ZERO_C as f64
             }
-            Self::Dt670 { v_ref_inv } => {
-                let voltage = f32::from(code) * v_ref_inv;
+            Self::Dt670 { v_ref } => {
+                let voltage = f32::from(code) * v_ref;
                 let curve = &super::dt670::CURVE;
                 let idx = curve.partition_point(|&(_t, v, _dvdt)| v < voltage);
                 curve
