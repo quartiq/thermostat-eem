@@ -15,8 +15,8 @@ use panic_probe as _; // global panic handler
 use strum::IntoEnumIterator;
 
 use hardware::{
-    adc::AdcPhy,
     adc::{sm::StateMachine, Adc, AdcCode},
+    adc::{AdcConfig, AdcPhy},
     adc_internal::AdcInternal,
     dac::{Dac, DacCode},
     gpio::{Gpio, PoePower},
@@ -24,6 +24,7 @@ use hardware::{
     pwm::{Limit, Pwm},
     OutputChannelIdx, SerialTerminal, SystemTimer, Systick, UsbDevice,
 };
+
 use rtic_monotonics::Monotonic;
 use rtic_sync::{channel::*, make_channel};
 
@@ -186,6 +187,7 @@ mod app {
         iir_state: [[f64; 4]; 4],
         generator: FrameGenerator,
         process: Sender<'static, Data, 4>,
+        adc_input_config: AdcConfig,
     }
 
     #[init]
@@ -218,6 +220,7 @@ mod app {
             dac: thermostat.dac,
             generator,
             process,
+            adc_input_config: thermostat.adc_input_config,
         };
 
         let shared = Shared {
@@ -349,10 +352,11 @@ mod app {
     }
 
     // Higher priority than telemetry but lower than adc data readout.
-    #[task(priority = 2, shared=[temperature, statistics, telemetry, settings], local=[iir_state, generator, dac])]
+    #[task(priority = 2, shared=[temperature, statistics, telemetry, settings], local=[adc_input_config, iir_state, generator, dac])]
     async fn process(mut c: process::Context, mut data: Receiver<'static, Data, 4>) {
         while let Ok(Data { phy, ch, adc_code }) = data.recv().await {
-            let temp = adc_code.into();
+            let (_mux, sensor) = c.local.adc_input_config[phy as usize][ch].as_ref().unwrap();
+            let temp = sensor.convert(adc_code);
             (
                 &mut c.shared.temperature,
                 &mut c.shared.statistics,

@@ -2,10 +2,15 @@ use core::fmt::Write;
 use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::hardware::{ad7172::Mux, adc::AdcConfig, platform};
+use crate::hardware::{
+    ad7172,
+    adc::{Mux, Sensor},
+    platform,
+};
 use heapless::String;
 use smoltcp_nal::smoltcp;
 
+use super::adc::AdcConfig;
 use super::hal::{
     self as hal,
     ethernet::{self, PHY},
@@ -106,7 +111,7 @@ pub struct ThermostatDevices<C: serial_settings::Settings<Y> + 'static, const Y:
     pub fan: Fan,
     pub adc_internal: AdcInternal,
     pub adc_sm: StateMachine<Adc>,
-    pub adc_channels: [[bool; 4]; 4],
+    pub adc_input_config: AdcConfig,
     pub usb_serial: super::SerialTerminal<C, Y>,
     pub usb: super::UsbDevice,
     pub metadata: &'static ApplicationMetadata,
@@ -372,68 +377,57 @@ where
     // enable MCO 2MHz clock output to ADCs
     gpioa.pa8.into_alternate::<0>();
 
-    // Each ADC has two differential inputs
     #[cfg(feature = "all_differential")]
-    #[allow(unused_variables)]
-    let adc_input_config = AdcConfig {
-        input_config: [
-            [
-                Some((Mux::Ain0, Mux::Ain1)),
-                Some((Mux::Ain2, Mux::Ain3)),
-                None,
-                None,
-            ],
-            [
-                Some((Mux::Ain0, Mux::Ain1)),
-                Some((Mux::Ain2, Mux::Ain3)),
-                None,
-                None,
-            ],
-            [
-                Some((Mux::Ain0, Mux::Ain1)),
-                Some((Mux::Ain2, Mux::Ain3)),
-                None,
-                None,
-            ],
-            [
-                Some((Mux::Ain0, Mux::Ain1)),
-                Some((Mux::Ain2, Mux::Ain3)),
-                None,
-                None,
-            ],
-        ],
-    };
+    let adc_input_config = [[
+        Some((
+            Mux {
+                ainpos: ad7172::Mux::Ain0,
+                ainneg: ad7172::Mux::Ain1,
+            },
+            Sensor::default(),
+        )),
+        Some((
+            Mux {
+                ainpos: ad7172::Mux::Ain2,
+                ainneg: ad7172::Mux::Ain3,
+            },
+            Sensor::default(),
+        )),
+        None,
+        None,
+    ]; 4];
 
-    #[cfg(feature = "ai_artiq")]
-    let adc_input_config = AdcConfig {
-        input_config: [
-            [
-                Some((Mux::Ain0, Mux::Ain1)),
-                Some((Mux::Ain2, Mux::Ain3)),
-                None,
-                None,
-            ],
-            [
-                Some((Mux::Ain0, Mux::Ain1)),
-                Some((Mux::Ain2, Mux::Ain3)),
-                None,
-                None,
-            ],
-            [
-                Some((Mux::Ain0, Mux::Ain1)),
-                Some((Mux::Ain2, Mux::Ain3)),
-                None,
-                None,
-            ],
-            // last ADC has single ended inputs negatively referenced to the positive reference input
-            [
-                Some((Mux::RefP, Mux::Ain0)),
-                Some((Mux::RefP, Mux::Ain1)),
-                Some((Mux::RefP, Mux::Ain2)),
-                Some((Mux::RefP, Mux::Ain3)),
-            ],
-        ],
-    };
+    #[cfg(feature = "all_single_ended")]
+    let adc_input_config = [[
+        Some((
+            Mux {
+                ainpos: ad7172::Mux::Ain0,
+                ainneg: ad7172::Mux::RefN,
+            },
+            Sensor::ntc(25.0, 10.0e3, 5.0e3, 3988.0),
+        )),
+        Some((
+            Mux {
+                ainpos: ad7172::Mux::RefP,
+                ainneg: ad7172::Mux::Ain1,
+            },
+            Sensor::ntc(25.0, 10.0e3, 5.0e3, 3988.0),
+        )),
+        Some((
+            Mux {
+                ainpos: ad7172::Mux::Ain2,
+                ainneg: ad7172::Mux::RefN,
+            },
+            Sensor::ntc(25.0, 10.0e3, 5.0e3, 3988.0),
+        )),
+        Some((
+            Mux {
+                ainpos: ad7172::Mux::RefP,
+                ainneg: ad7172::Mux::Ain3,
+            },
+            Sensor::ntc(25.0, 10.0e3, 5.0e3, 3988.0),
+        )),
+    ]; 4];
 
     let adc = Adc::new(
         &mut delay,
@@ -455,11 +449,9 @@ where
             rdyn: gpioc.pc11.into_pull_up_input(),
             sync: gpiob.pb11.into_push_pull_output(),
         },
-        adc_input_config,
+        &adc_input_config,
     )
     .unwrap();
-
-    let adc_channels = adc.channels();
 
     let mut adc_sm = StateMachine::new(adc);
     adc_sm.start(&mut device.EXTI, &mut device.SYSCFG);
@@ -736,7 +728,7 @@ where
         fan,
         adc_internal,
         adc_sm,
-        adc_channels,
+        adc_input_config,
         usb_serial: usb_terminal,
         settings,
         usb: usb_device,

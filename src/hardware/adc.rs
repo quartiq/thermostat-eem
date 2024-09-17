@@ -20,20 +20,6 @@ use super::hal::{
 /// Might be extended to support different input types (other NTCs, ref resistors etc.) in the future.
 #[derive(Copy, Clone, Debug)]
 pub struct AdcCode(u32);
-impl AdcCode {
-    const GAIN: f32 = 0x555555 as _; // Default ADC gain from datasheet.
-    const R_REF: f32 = 2.0 * 5000.0; // Ratiometric 5.0K high and low side or single ended 10K.
-    const ZERO_C: f32 = 273.15; // 0°C in °K
-    const B: f32 = 3988.0; // NTC beta value.
-    const T_N: f32 = 25.0 + AdcCode::ZERO_C; // Reference Temperature for B-parameter equation.
-    const R_N: f32 = 10000.0; // TEC resistance at T_N.
-
-    // ADC relative full scale per LSB
-    // Inverted equation from datasheet p. 40 with V_Ref normalized to 1 as this cancels out in resistance.
-    const FS_PER_LSB: f32 = 0x400000 as f32 / (2.0 * (1 << 23) as f32 * AdcCode::GAIN * 0.75);
-    // Relative resistance
-    const R_REF_N: f32 = AdcCode::R_REF / AdcCode::R_N;
-}
 
 impl From<u32> for AdcCode {
     /// Construct an ADC code from a provided binary (ADC-formatted) code.
@@ -49,41 +35,12 @@ impl From<AdcCode> for u32 {
 }
 
 impl From<AdcCode> for f32 {
-    /// Convert raw ADC codes to temperature value in °C using the AD7172 input voltage to code
-    /// relation, the ratiometric resistor setup and the "B-parameter" equation (a simple form of the
-    /// Steinhart-Hart equation). This is a tradeoff between computation and absolute temperature
-    /// accuracy. The f32 output dataformat leads to an output quantization of about 31 uK.
-    /// Additionally there is some error (in addition to the re-quantization) introduced during the
-    /// various computation steps. If the input data has less than about 5 bit RMS noise, f32 should be
-    /// avoided.
-    /// Valid under the following conditions:
-    /// * Unipolar ADC input
-    /// * Unchanged ADC GAIN and OFFSET registers (default reset values)
-    /// * Resistor setup as on Thermostat-EEM breakout board/AI-ARTIQ headboard
-    ///   (either ratiometric 5.0K high and low side or single ended 10K)
-    /// * Input values not close to minimum/maximum (~1000 codes difference)
-    ///
-    /// Maybe this will be extended in the future to support more complex temperature sensing configurations.
-    fn from(code: AdcCode) -> f32 {
-        let relative_voltage = code.0 as f32 * AdcCode::FS_PER_LSB;
-        // Voltage divider normalized to V_Ref = 1, inverted to get to NTC resistance.
-        let relative_resistance = relative_voltage / (1.0 - relative_voltage) * AdcCode::R_REF_N;
-        // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
-        let temperature_kelvin_inv =
-            1.0 / AdcCode::T_N + 1.0 / AdcCode::B * relative_resistance.ln();
-        1.0 / temperature_kelvin_inv - AdcCode::ZERO_C
-    }
-}
-
-impl From<AdcCode> for f64 {
-    /// Like `From<AdcCode> for f32` but for `f64` and correspondingly higher dynamic range.
-    fn from(code: AdcCode) -> f64 {
-        let relative_voltage = (code.0 as f32 * AdcCode::FS_PER_LSB) as f64;
-        let relative_resistance =
-            relative_voltage / (1.0 - relative_voltage) * AdcCode::R_REF_N as f64;
-        let temperature_kelvin_inv =
-            1.0 / AdcCode::T_N as f64 + 1.0 / AdcCode::B as f64 * relative_resistance.ln();
-        1.0 / temperature_kelvin_inv - AdcCode::ZERO_C as f64
+    fn from(value: AdcCode) -> Self {
+        const GAIN: f32 = 0x555555 as _; // Default ADC gain from datasheet.
+                                         // ADC relative full scale per LSB
+                                         // Inverted equation from datasheet p. 40 with V_Ref normalized to 1
+        const FS_PER_LSB: f32 = 0x400000 as f32 / (2.0 * (1 << 23) as f32 * GAIN * 0.75);
+        value.0 as Self * FS_PER_LSB
     }
 }
 
@@ -134,14 +91,71 @@ pub struct AdcPins {
     pub sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
 }
 
-/// ADC configuration structure.
-/// Could be extended with further configuration options for the ADCs in the future.
 #[derive(Clone, Copy, Debug)]
-pub struct AdcConfig {
-    /// Configuration for all ADC inputs. Four ADCs with four inputs each.
-    /// `Some(([AdcInput], [AdcInput]))` positive and negative channel inputs or None to disable the channel.
-    pub input_config: [[Option<(ad7172::Mux, ad7172::Mux)>; 4]; 4],
+pub struct Mux {
+    pub ainpos: ad7172::Mux,
+    pub ainneg: ad7172::Mux,
 }
+
+/// ADC configuration structure.
+#[derive(Clone, Copy, Debug)]
+pub enum Sensor {
+    Ntc {
+        t0_inv: f32,   // inverse reference temperature in 1/K
+        r_rel: f32,    // reference resistor over NTC resistance at t0,
+        beta_inv: f32, // inverse beta
+    },
+}
+
+impl Sensor {
+    pub fn ntc(t0: f32, r0: f32, r_ref: f32, beta: f32) -> Self {
+        Self::Ntc {
+            t0_inv: 1.0 / (t0 + ZERO_C),
+            r_rel: r_ref / r0,
+            beta_inv: 1.0 / beta,
+        }
+    }
+}
+
+const ZERO_C: f32 = 273.15; // 0°C in °K
+
+impl Default for Sensor {
+    fn default() -> Self {
+        Self::ntc(25.0, 10.0e3, 10.0e3, 3988.0)
+    }
+}
+
+impl Sensor {
+    pub fn convert(&self, code: AdcCode) -> f64 {
+        match self {
+            Self::Ntc {
+                t0_inv,
+                r_rel,
+                beta_inv,
+            } => {
+                // Convert raw ADC codes to temperature value in °C using the AD7172 input voltage to code
+                // relation, the ratiometric resistor setup and the "B-parameter" equation (a simple form of the
+                // Steinhart-Hart equation). This is a tradeoff between computation and absolute temperature
+                // accuracy. A f32 output dataformat leads to an output quantization of about 31 uK.
+                // Additionally there is some error (in addition to the re-quantization) introduced during the
+                // various computation steps. If the input data has less than about 5 bit RMS noise, f32 should be
+                // avoided.
+                // Valid under the following conditions:
+                // * Unchanged ADC GAIN and OFFSET registers (default reset values)
+                // * Input values not close to minimum/maximum (~1000 codes difference)
+                //
+                // Voltage divider normalized to V_Ref = 1, inverted to get to NTC resistance.
+                let relative_voltage = f32::from(code) as f64;
+                let relative_resistance =
+                    relative_voltage / (1.0 - relative_voltage) * *r_rel as f64;
+                // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
+                1.0 / (*t0_inv as f64 + *beta_inv as f64 * relative_resistance.ln()) - ZERO_C as f64
+            }
+        }
+    }
+}
+
+pub type AdcConfig = [[Option<(Mux, Sensor)>; 4]; 4];
 
 /// Full Adc structure which holds all the ADC peripherals and auxillary pins on Thermostat-EEM and the configuration.
 pub struct Adc {
@@ -149,7 +163,6 @@ pub struct Adc {
     cs: [gpio::ErasedPin<gpio::Output>; 4],
     rdyn: gpioc::PC11<gpio::Input>,
     sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
-    config: AdcConfig,
 }
 
 impl Adc {
@@ -167,7 +180,7 @@ impl Adc {
         spi4_rec: rcc::rec::Spi4,
         spi4: stm32::SPI4,
         pins: AdcPins,
-        config: AdcConfig,
+        config: &AdcConfig,
     ) -> Result<Self, Error> {
         let rdyn_pullup = pins.rdyn.internal_pull_up(true);
         // SPI MODE_3: idle high, capture on second transition
@@ -179,7 +192,6 @@ impl Adc {
             cs: pins.cs,
             rdyn: rdyn_pullup,
             sync: pins.sync,
-            config,
         };
 
         adc.setup(delay, config)?;
@@ -187,7 +199,7 @@ impl Adc {
     }
 
     /// Setup all ADCs to the specifies [AdcConfig].
-    fn setup(&mut self, delay: &mut impl DelayUs<u16>, config: AdcConfig) -> Result<(), Error> {
+    fn setup(&mut self, delay: &mut impl DelayUs<u16>, config: &AdcConfig) -> Result<(), Error> {
         // deassert all CS first
         for pin in self.cs.iter_mut() {
             pin.set_state(PinState::High);
@@ -198,29 +210,12 @@ impl Adc {
 
         for phy in AdcPhy::iter() {
             log::info!("AD7172 {:?}", phy);
-            self.selected(phy, |adc| {
-                adc.setup_adc(delay, config.input_config[phy as usize])
-            })?;
+            self.selected(phy, |adc| adc.setup_adc(delay, &config[phy as usize]))?;
         }
 
         // set sync high after initialization of all ADCs
         self.sync.set_high();
         Ok(())
-    }
-
-    /// Returns the configuration of which ADC channels are enabled.
-    pub fn channels(&self) -> [[bool; 4]; 4] {
-        let mut result = [[false; 4]; 4];
-        for (cfg, ch) in self
-            .config
-            .input_config
-            .iter()
-            .flatten()
-            .zip(result.iter_mut().flatten())
-        {
-            *ch = cfg.is_some();
-        }
-        result
     }
 
     /// Call a closure while the given `AdcPhy` is selected (while its chip
@@ -362,7 +357,7 @@ impl Adc {
     fn setup_adc(
         &mut self,
         delay: &mut impl DelayUs<u16>,
-        input_config: [Option<(ad7172::Mux, ad7172::Mux)>; 4],
+        input_config: &[Option<(Mux, Sensor)>; 4],
     ) -> Result<(), Error> {
         self.adcs.reset();
         delay.delay_us(500);
@@ -402,9 +397,9 @@ impl Adc {
             ad7172::Register::CH3,
         ]) {
             let ch = ad7172::Channel::DEFAULT;
-            let ch = if let Some(cfg) = cfg {
-                ch.with_ainneg(cfg.1)
-                    .with_ainpos(cfg.0)
+            let ch = if let Some((mux, _sensor)) = cfg {
+                ch.with_ainneg(mux.ainneg)
+                    .with_ainpos(mux.ainpos)
                     .with_setup_sel(u2::new(0)) // only Setup 0 for now
                     .with_en(true)
             } else {
