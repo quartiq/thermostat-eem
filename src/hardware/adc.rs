@@ -36,6 +36,7 @@ impl From<AdcCode> for u32 {
 
 impl From<AdcCode> for f32 {
     fn from(value: AdcCode) -> Self {
+        // Unchanged ADC GAIN and OFFSET registers (default reset values)
         const GAIN: f32 = 0x555555 as _; // Default ADC gain from datasheet.
                                          // ADC relative full scale per LSB
                                          // Inverted equation from datasheet p. 40 with V_Ref normalized to 1
@@ -154,31 +155,23 @@ impl Sensor {
                 r_rel,
                 beta_inv,
             } => {
-                // Convert raw ADC codes to temperature value in °C using the AD7172 input voltage to code
-                // relation, the ratiometric resistor setup and the "B-parameter" equation (a simple form of the
-                // Steinhart-Hart equation). This is a tradeoff between computation and absolute temperature
-                // accuracy. A f32 output dataformat leads to an output quantization of about 31 uK.
+                // A f32 output dataformat leads to an output quantization of about 31 uK at T0.
                 // Additionally there is some error (in addition to the re-quantization) introduced during the
                 // various computation steps. If the input data has less than about 5 bit RMS noise, f32 should be
-                // avoided.
-                // Valid under the following conditions:
-                // * Unchanged ADC GAIN and OFFSET registers (default reset values)
-                // * Input values not close to minimum/maximum (~1000 codes difference)
-                //
-                // Voltage divider normalized to V_Ref = 1, inverted to get to NTC resistance.
+                // avoided. Input values must not close to minimum/maximum (~1000 codes difference)
+                // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
                 let relative_voltage = f32::from(code) as f64;
                 let relative_resistance =
                     relative_voltage / (1.0 - relative_voltage) * *r_rel as f64;
-                // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
                 1.0 / (*t0_inv as f64 + *beta_inv as f64 * relative_resistance.ln()) - ZERO_C as f64
             }
             Self::Dt670 { v_ref } => {
                 let voltage = f32::from(code) * v_ref;
-                let curve = &super::dt670::CURVE;
-                let idx = curve.partition_point(|&(_t, v, _dvdt)| v < voltage);
-                curve
+                const CURVE: &[(f32, f32, f32)] = &super::dt670::CURVE;
+                let idx = CURVE.partition_point(|&(_t, v, _dvdt)| v < voltage);
+                CURVE
                     .get(idx)
-                    .or(curve.last())
+                    .or(CURVE.last())
                     .map(|&(t, v, dvdt)| (t + (voltage - v) * 1.0e3 / dvdt) as f64)
                     .unwrap()
             }
