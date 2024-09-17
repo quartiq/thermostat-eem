@@ -1,7 +1,7 @@
 /// DT-670 Silicon Diode curve
-/// 
+///
 /// https://www.lakeshore.com/docs/default-source/product-downloads/catalog/lstc_dt670_l.pdf
-/// 
+///
 /// (T (K), voltage (V), dV/dT (mV/K))
 pub const CURVE: [(f32, f32, f32); 144] = [
     (1.4, 1.644290, -12.5),
