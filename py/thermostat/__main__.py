@@ -143,14 +143,16 @@ def _main():
 
             thermostat = Miniconf(client, prefix)
 
-            # TODO: sequence!
-            await thermostat.set(
-                f"/output/{args.output}/state",
-                "Hold",
-            )
-            for (
-                k
-            ) in "pid/min pid/max pid/setpoint pid/ki pid/kp pid/kd pid/li pid/ld voltage_limit weights state".split():
+            if args.state == "On":
+                await thermostat.set(
+                    f"/output/{args.output}/state",
+                    "Hold",
+                )
+
+            for k in (
+                "pid/min pid/max pid/setpoint pid/ki pid/kp pid/kd pid/li pid/ld "
+                "voltage_limit weights state"
+            ).split():
                 await thermostat.set(
                     f"/output/{args.output}/{k}",
                     getattr(args, k.split("/")[-1]),
