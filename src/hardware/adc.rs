@@ -4,7 +4,7 @@ use arbitrary_int::u2;
 use miniconf::Tree;
 use num_traits::float::Float;
 use smlang::statemachine;
-use strum::IntoEnumIterator;
+use strum::{AsRefStr, EnumString, IntoEnumIterator};
 
 use super::ad7172;
 
@@ -125,12 +125,31 @@ impl Convert for Linear {
     }
 }
 
+impl Default for Linear {
+    fn default() -> Self {
+        Self {
+            offset: 0.,
+            gain: 1.,
+        }
+    }
+}
+
 /// Beta equation (Steinhart-Hart with c=0)
 #[derive(Clone, Copy, Debug, Tree)]
 pub struct Ntc {
     t0_inv: f32,   // inverse reference temperature (1/K)
     r_rel: f32,    // reference resistor over NTC resistance at t0,
     beta_inv: f32, // inverse beta
+}
+
+impl Ntc {
+    pub fn new(t0: f32, r0: f32, r_ref: f32, beta: f32) -> Self {
+        Self {
+            t0_inv: 1.0 / (t0 + ZERO_C),
+            r_rel: r_ref / r0,
+            beta_inv: 1.0 / beta,
+        }
+    }
 }
 
 impl Convert for Ntc {
@@ -146,10 +165,27 @@ impl Convert for Ntc {
     }
 }
 
+impl Default for Ntc {
+    fn default() -> Self {
+        Self {
+            t0_inv: 1. / (25. + ZERO_C),
+            #[allow(clippy::eq_op)]
+            r_rel: 10.0e3 / 10.0e3,
+            beta_inv: 1. / 3988.,
+        }
+    }
+}
+
 /// DT-670 Silicon diode
 #[derive(Clone, Copy, Debug, Tree)]
 pub struct Dt670 {
     v_ref: f32, // effective reference voltage (V)
+}
+
+impl Default for Dt670 {
+    fn default() -> Self {
+        Self { v_ref: 5. }
+    }
 }
 
 impl Convert for Dt670 {
@@ -166,36 +202,18 @@ impl Convert for Dt670 {
 }
 
 /// ADC configuration structure.
-#[derive(Clone, Copy, Debug, Tree)]
+#[derive(Clone, Copy, Debug, Tree, EnumString, AsRefStr)]
 pub enum Sensor {
     Linear(#[tree(depth = 1)] Linear),
     Ntc(#[tree(depth = 1)] Ntc),
     Dt670(#[tree(depth = 1)] Dt670),
 }
 
-impl Sensor {
-    pub fn linear(offset: f32, gain: f32) -> Self {
-        Self::Linear(Linear { offset, gain })
-    }
-
-    pub fn ntc(t0: f32, r0: f32, r_ref: f32, beta: f32) -> Self {
-        Self::Ntc(Ntc {
-            t0_inv: 1.0 / (t0 + ZERO_C),
-            r_rel: r_ref / r0,
-            beta_inv: 1.0 / beta,
-        })
-    }
-
-    pub fn dt670(v_ref: f32) -> Self {
-        Self::Dt670(Dt670 { v_ref })
-    }
-}
-
 const ZERO_C: f32 = 273.15; // 0°C in °K
 
 impl Default for Sensor {
     fn default() -> Self {
-        Self::linear(0.0, 1.0)
+        Self::Linear(Linear::default())
     }
 }
 

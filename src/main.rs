@@ -29,7 +29,7 @@ use rtic_monotonics::Monotonic;
 use rtic_sync::{channel::*, make_channel};
 
 use fugit::ExtU32;
-use miniconf::Tree;
+use miniconf::{TreeDeserialize, TreeKey, TreeSerialize};
 use net::{
     data_stream::{FrameGenerator, StreamFormat, StreamTarget},
     Alarm, NetworkState, NetworkUsers,
@@ -39,7 +39,26 @@ use serde::Serialize;
 use settings::NetSettings;
 use statistics::{Buffer, Statistics};
 
-#[derive(Clone, Debug, Tree)]
+#[derive(Clone, Debug, TreeSerialize, TreeDeserialize, TreeKey, Default)]
+pub struct InputChannel {
+    #[tree(typ="&str", get=Self::get_typ, validate=Self::validate_typ)]
+    typ: (),
+    #[tree(depth = 2)]
+    sensor: Sensor,
+}
+
+impl InputChannel {
+    fn get_typ(&self) -> Result<&str, &'static str> {
+        Ok(self.sensor.as_ref())
+    }
+
+    fn validate_typ(&mut self, value: &str) -> Result<(), &'static str> {
+        self.sensor = Sensor::try_from(value).or(Err("invalid sensor type"))?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, TreeSerialize, TreeDeserialize, TreeKey)]
 pub struct ThermostatEem {
     /// Specifies the telemetry output period in seconds.
     ///
@@ -51,8 +70,8 @@ pub struct ThermostatEem {
     telemetry_period: f32,
 
     /// Input sensor configuration
-    #[tree(depth = 5)]
-    input: [[Option<Sensor>; 4]; 4],
+    #[tree(depth = 6)]
+    input: [[Option<InputChannel>; 4]; 4],
 
     /// Array of settings for the Thermostat output channels.
     ///
@@ -90,9 +109,9 @@ impl Default for ThermostatEem {
     }
 }
 
-#[derive(Clone, Debug, Tree)]
+#[derive(Clone, Debug, TreeSerialize, TreeDeserialize, TreeKey)]
 pub struct Settings {
-    #[tree(depth = 6)]
+    #[tree(depth = 7)]
     pub thermostat_eem: ThermostatEem,
 
     #[tree(depth = 1)]
@@ -112,7 +131,7 @@ impl settings::AppSettings for Settings {
     }
 }
 
-impl serial_settings::Settings<7> for Settings {
+impl serial_settings::Settings<8> for Settings {
     fn reset(&mut self) {
         *self = Self {
             thermostat_eem: ThermostatEem::default(),
@@ -169,12 +188,14 @@ struct Data {
 
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
 mod app {
+    use hardware::adc::Ntc;
+
     use super::*;
 
     #[shared]
     struct Shared {
         usb: UsbDevice,
-        network: NetworkUsers<ThermostatEem, 6>,
+        network: NetworkUsers<ThermostatEem, 7>,
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
@@ -184,7 +205,7 @@ mod app {
 
     #[local]
     struct Local {
-        usb_terminal: SerialTerminal<Settings, 7>,
+        usb_terminal: SerialTerminal<Settings, 8>,
         adc_sm: StateMachine<Adc>,
         dac: Dac,
         pwm: Pwm,
@@ -200,9 +221,9 @@ mod app {
         let clock = SystemTimer::new(|| Systick::now().ticks());
 
         // setup Thermostat hardware
-        let mut thermostat = hardware::setup::setup::<Settings, 7>(c.core, c.device, clock);
+        let mut thermostat = hardware::setup::setup::<Settings, 8>(c.core, c.device, clock);
 
-        for (sensor, mux) in thermostat
+        for (channel, mux) in thermostat
             .settings
             .thermostat_eem
             .input
@@ -212,7 +233,10 @@ mod app {
         {
             if let Some(mux) = mux {
                 let r_ref = if mux.is_single_ended() { 5.0e3 } else { 10.0e3 };
-                *sensor = Some(Sensor::ntc(25.0, 10.0e3, r_ref, 3988.0));
+                *channel = Some(InputChannel {
+                    sensor: Sensor::Ntc(Ntc::new(25.0, 10.0e3, r_ref, 3988.0)),
+                    ..Default::default()
+                });
             }
         }
 
@@ -373,10 +397,10 @@ mod app {
     async fn process(mut c: process::Context, mut data: Receiver<'static, Data, 4>) {
         while let Ok(Data { phy, ch, adc_code }) = data.recv().await {
             let temp = c.shared.settings.lock(|settings| {
-                let sensor = settings.thermostat_eem.input[phy as usize][ch]
+                let input = settings.thermostat_eem.input[phy as usize][ch]
                     .as_ref()
                     .unwrap();
-                sensor.convert(adc_code)
+                input.sensor.convert(adc_code)
             });
             (
                 &mut c.shared.temperature,
