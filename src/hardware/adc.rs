@@ -1,6 +1,7 @@
 // Thermostat ADC struct.
 
 use arbitrary_int::u2;
+use miniconf::Tree;
 use num_traits::float::Float;
 use smlang::statemachine;
 use strum::IntoEnumIterator;
@@ -98,43 +99,95 @@ pub struct Mux {
     pub ainneg: ad7172::Mux,
 }
 
+impl Mux {
+    pub fn is_single_ended(&self) -> bool {
+        const REF: [ad7172::Mux; 2] = [ad7172::Mux::RefN, ad7172::Mux::RefP];
+        REF.contains(&self.ainpos) || REF.contains(&self.ainneg)
+    }
+}
+
+pub trait Convert {
+    fn convert(&self, code: AdcCode) -> f64;
+}
+
+/// relative_voltage * gain + offset
+#[derive(Clone, Copy, Debug, Tree)]
+pub struct Linear {
+    /// Units: output
+    offset: f32,
+    /// Units: output/input
+    gain: f32,
+}
+
+impl Convert for Linear {
+    fn convert(&self, code: AdcCode) -> f64 {
+        (f32::from(code) * self.gain) as f64 + self.offset as f64
+    }
+}
+
+/// Beta equation (Steinhart-Hart with c=0)
+#[derive(Clone, Copy, Debug, Tree)]
+pub struct Ntc {
+    t0_inv: f32,   // inverse reference temperature (1/K)
+    r_rel: f32,    // reference resistor over NTC resistance at t0,
+    beta_inv: f32, // inverse beta
+}
+
+impl Convert for Ntc {
+    fn convert(&self, code: AdcCode) -> f64 {
+        // A f32 output dataformat leads to an output quantization of about 31 uK at T0.
+        // Additionally there is some error (in addition to the re-quantization) introduced during the
+        // various computation steps. If the input data has less than about 5 bit RMS noise, f32 should be
+        // avoided. Input values must not close to minimum/maximum (~1000 codes difference)
+        // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
+        let relative_voltage = f32::from(code) as f64;
+        let relative_resistance = relative_voltage / (1.0 - relative_voltage) * self.r_rel as f64;
+        1.0 / (self.t0_inv as f64 + self.beta_inv as f64 * relative_resistance.ln()) - ZERO_C as f64
+    }
+}
+
+/// DT-670 Silicon diode
+#[derive(Clone, Copy, Debug, Tree)]
+pub struct Dt670 {
+    v_ref: f32, // effective reference voltage (V)
+}
+
+impl Convert for Dt670 {
+    fn convert(&self, code: AdcCode) -> f64 {
+        let voltage = f32::from(code) * self.v_ref;
+        const CURVE: &[(f32, f32, f32)] = &super::dt670::CURVE;
+        let idx = CURVE.partition_point(|&(_t, v, _dvdt)| v < voltage);
+        CURVE
+            .get(idx)
+            .or(CURVE.last())
+            .map(|&(t, v, dvdt)| (t + (voltage - v) * 1.0e3 / dvdt) as f64)
+            .unwrap()
+    }
+}
+
 /// ADC configuration structure.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Tree)]
 pub enum Sensor {
-    /// code * gain + offset
-    Linear {
-        /// Units: output
-        offset: f32,
-        /// Units: output/input
-        gain: f32,
-    },
-    /// Beta equation (Steinhart-Hart with c=0)
-    Ntc {
-        t0_inv: f32,   // inverse reference temperature (1/K)
-        r_rel: f32,    // reference resistor over NTC resistance at t0,
-        beta_inv: f32, // inverse beta
-    },
-    /// DT-670 Silicon diode
-    Dt670 {
-        v_ref: f32, // effective reference voltage (V)
-    },
+    Linear(#[tree(depth = 1)] Linear),
+    Ntc(#[tree(depth = 1)] Ntc),
+    Dt670(#[tree(depth = 1)] Dt670),
 }
 
 impl Sensor {
     pub fn linear(offset: f32, gain: f32) -> Self {
-        Self::Linear { offset, gain }
+        Self::Linear(Linear { offset, gain })
     }
 
     pub fn ntc(t0: f32, r0: f32, r_ref: f32, beta: f32) -> Self {
-        Self::Ntc {
+        Self::Ntc(Ntc {
             t0_inv: 1.0 / (t0 + ZERO_C),
             r_rel: r_ref / r0,
             beta_inv: 1.0 / beta,
-        }
+        })
     }
 
     pub fn dt670(v_ref: f32) -> Self {
-        Self::Dt670 { v_ref }
+        Self::Dt670(Dt670 { v_ref })
     }
 }
 
@@ -149,37 +202,14 @@ impl Default for Sensor {
 impl Sensor {
     pub fn convert(&self, code: AdcCode) -> f64 {
         match self {
-            Self::Linear { offset, gain } => (f32::from(code) * gain) as f64 + *offset as f64,
-            Self::Ntc {
-                t0_inv,
-                r_rel,
-                beta_inv,
-            } => {
-                // A f32 output dataformat leads to an output quantization of about 31 uK at T0.
-                // Additionally there is some error (in addition to the re-quantization) introduced during the
-                // various computation steps. If the input data has less than about 5 bit RMS noise, f32 should be
-                // avoided. Input values must not close to minimum/maximum (~1000 codes difference)
-                // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
-                let relative_voltage = f32::from(code) as f64;
-                let relative_resistance =
-                    relative_voltage / (1.0 - relative_voltage) * *r_rel as f64;
-                1.0 / (*t0_inv as f64 + *beta_inv as f64 * relative_resistance.ln()) - ZERO_C as f64
-            }
-            Self::Dt670 { v_ref } => {
-                let voltage = f32::from(code) * v_ref;
-                const CURVE: &[(f32, f32, f32)] = &super::dt670::CURVE;
-                let idx = CURVE.partition_point(|&(_t, v, _dvdt)| v < voltage);
-                CURVE
-                    .get(idx)
-                    .or(CURVE.last())
-                    .map(|&(t, v, dvdt)| (t + (voltage - v) * 1.0e3 / dvdt) as f64)
-                    .unwrap()
-            }
+            Self::Linear(linear) => linear.convert(code),
+            Self::Ntc(ntc) => ntc.convert(code),
+            Self::Dt670(dt670) => dt670.convert(code),
         }
     }
 }
 
-pub type AdcConfig = [[Option<(Mux, Sensor)>; 4]; 4];
+pub type AdcConfig = [[Option<Mux>; 4]; 4];
 
 /// Full Adc structure which holds all the ADC peripherals and auxillary pins on Thermostat-EEM and the configuration.
 pub struct Adc {
@@ -381,7 +411,7 @@ impl Adc {
     fn setup_adc(
         &mut self,
         delay: &mut impl DelayUs<u16>,
-        input_config: &[Option<(Mux, Sensor)>; 4],
+        input_config: &[Option<Mux>; 4],
     ) -> Result<(), Error> {
         self.adcs.reset();
         delay.delay_us(500);
@@ -421,7 +451,7 @@ impl Adc {
             ad7172::Register::CH3,
         ]) {
             let ch = ad7172::Channel::DEFAULT;
-            let ch = if let Some((mux, _sensor)) = cfg {
+            let ch = if let Some(mux) = cfg {
                 ch.with_ainneg(mux.ainneg)
                     .with_ainpos(mux.ainpos)
                     .with_setup_sel(u2::new(0)) // only Setup 0 for now

@@ -15,8 +15,8 @@ use panic_probe as _; // global panic handler
 use strum::IntoEnumIterator;
 
 use hardware::{
-    adc::{sm::StateMachine, Adc, AdcCode},
-    adc::{AdcConfig, AdcPhy},
+    adc::AdcPhy,
+    adc::{sm::StateMachine, Adc, AdcCode, Sensor},
     adc_internal::AdcInternal,
     dac::{Dac, DacCode},
     gpio::{Gpio, PoePower},
@@ -50,6 +50,10 @@ pub struct ThermostatEem {
     /// Any positive non-zero value. Will be rounded to milliseconds.
     telemetry_period: f32,
 
+    /// Input sensor configuration
+    #[tree(depth = 5)]
+    input: [[Option<Sensor>; 4]; 4],
+
     /// Array of settings for the Thermostat output channels.
     ///
     /// # Path
@@ -78,6 +82,7 @@ impl Default for ThermostatEem {
     fn default() -> Self {
         Self {
             telemetry_period: 1.0,
+            input: Default::default(),
             output: Default::default(),
             alarm: Default::default(),
             stream: Default::default(),
@@ -87,7 +92,7 @@ impl Default for ThermostatEem {
 
 #[derive(Clone, Debug, Tree)]
 pub struct Settings {
-    #[tree(depth = 4)]
+    #[tree(depth = 6)]
     pub thermostat_eem: ThermostatEem,
 
     #[tree(depth = 1)]
@@ -107,7 +112,7 @@ impl settings::AppSettings for Settings {
     }
 }
 
-impl serial_settings::Settings<5> for Settings {
+impl serial_settings::Settings<7> for Settings {
     fn reset(&mut self) {
         *self = Self {
             thermostat_eem: ThermostatEem::default(),
@@ -169,7 +174,7 @@ mod app {
     #[shared]
     struct Shared {
         usb: UsbDevice,
-        network: NetworkUsers<ThermostatEem, 4>,
+        network: NetworkUsers<ThermostatEem, 6>,
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
@@ -179,7 +184,7 @@ mod app {
 
     #[local]
     struct Local {
-        usb_terminal: SerialTerminal<Settings, 5>,
+        usb_terminal: SerialTerminal<Settings, 7>,
         adc_sm: StateMachine<Adc>,
         dac: Dac,
         pwm: Pwm,
@@ -187,7 +192,6 @@ mod app {
         iir_state: [[f64; 4]; 4],
         generator: FrameGenerator,
         process: Sender<'static, Data, 4>,
-        adc_input_config: AdcConfig,
     }
 
     #[init]
@@ -196,7 +200,21 @@ mod app {
         let clock = SystemTimer::new(|| Systick::now().ticks());
 
         // setup Thermostat hardware
-        let thermostat = hardware::setup::setup::<Settings, 5>(c.core, c.device, clock);
+        let mut thermostat = hardware::setup::setup::<Settings, 7>(c.core, c.device, clock);
+
+        for (sensor, mux) in thermostat
+            .settings
+            .thermostat_eem
+            .input
+            .iter_mut()
+            .flatten()
+            .zip(thermostat.adc_input_config.iter_mut().flatten())
+        {
+            if let Some(mux) = mux {
+                let r_ref = if mux.is_single_ended() { 5.0e3 } else { 10.0e3 };
+                *sensor = Some(Sensor::ntc(25.0, 10.0e3, r_ref, 3988.0));
+            }
+        }
 
         let mut network = NetworkUsers::new(
             thermostat.net.stack,
@@ -220,7 +238,6 @@ mod app {
             dac: thermostat.dac,
             generator,
             process,
-            adc_input_config: thermostat.adc_input_config,
         };
 
         let shared = Shared {
@@ -352,11 +369,15 @@ mod app {
     }
 
     // Higher priority than telemetry but lower than adc data readout.
-    #[task(priority = 2, shared=[temperature, statistics, telemetry, settings], local=[adc_input_config, iir_state, generator, dac])]
+    #[task(priority = 2, shared=[temperature, statistics, telemetry, settings], local=[iir_state, generator, dac])]
     async fn process(mut c: process::Context, mut data: Receiver<'static, Data, 4>) {
         while let Ok(Data { phy, ch, adc_code }) = data.recv().await {
-            let (_mux, sensor) = c.local.adc_input_config[phy as usize][ch].as_ref().unwrap();
-            let temp = sensor.convert(adc_code);
+            let temp = c.shared.settings.lock(|settings| {
+                let sensor = settings.thermostat_eem.input[phy as usize][ch]
+                    .as_ref()
+                    .unwrap();
+                sensor.convert(adc_code)
+            });
             (
                 &mut c.shared.temperature,
                 &mut c.shared.statistics,
