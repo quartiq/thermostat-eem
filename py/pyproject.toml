@@ -15,8 +15,8 @@ authors = [
     { name = "Norman Krackow", email = "nk@quartiq.de" },
 ]
 dependencies = [
-    "miniconf-mqtt@git+https://github.com/quartiq/miniconf@v0.13.1#subdirectory=py/miniconf-mqtt",
-    "stabilizer@git+https://github.com/quartiq/stabilizer@v0.10.0#subdirectory=py",
+    "miniconf-mqtt@git+https://github.com/quartiq/miniconf@v0.14.0#subdirectory=py/miniconf-mqtt",
+    "stabilizer@git+https://github.com/quartiq/stabilizer@c8b4723#subdirectory=py",
 ]
 
 [project.urls]

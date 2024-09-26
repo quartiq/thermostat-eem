@@ -65,8 +65,8 @@ bytemuck = { version = "1.18.0", features = [
 	"derive",
 ], default-features = false }
 # Note: Keep in-sync with `py/setup.py`
-miniconf = { version = "0.13", features = ["json-core", "derive", "postcard"] }
-miniconf_mqtt = { version = "0.13" }
+miniconf = { version = "0.14", features = ["json-core", "derive", "postcard"] }
+miniconf_mqtt = { version = "0.14" }
 strum = { version = "0.26.1", default-features = false, features = ["derive"] }
 serial-settings = "0.1"
 postcard = "1"
@@ -97,5 +97,4 @@ codegen-units = 1
 built = { version = "0.7", features = ["git2"], default-features = false }
 
 [patch.crates-io]
-miniconf = { git = "http://github.com/quartiq/miniconf.git", branch = "enum" }
-miniconf_mqtt = { git = "http://github.com/quartiq/miniconf.git", branch = "enum" }
+serial-settings = { git = "https://github.com/quartiq/stabilizer.git" }
