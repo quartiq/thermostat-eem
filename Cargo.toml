@@ -14,8 +14,6 @@ keywords = ["ethernet", "stm32h7", "adc", "dac", "physics"]
 repository = "https://github.com/quartiq/thermostat-eem"
 readme = "README.md"
 exclude = [".gitignore"]
-# keep MSRV in sync in ci.yaml and Cargo.toml
-rust-version = "1.75.0"
 
 [features]
 default = ["all_differential"]
@@ -65,8 +63,8 @@ bytemuck = { version = "1.18.0", features = [
 	"derive",
 ], default-features = false }
 # Note: Keep in-sync with `py/setup.py`
-miniconf = { version = "0.13", features = ["json-core", "derive", "postcard"] }
-miniconf_mqtt = "0.13"
+miniconf = { version = "0.14", features = ["json-core", "derive", "postcard"] }
+miniconf_mqtt = { version = "0.14" }
 strum = { version = "0.26.1", default-features = false, features = ["derive"] }
 serial-settings = "0.1"
 postcard = "1"
@@ -95,3 +93,6 @@ codegen-units = 1
 
 [build-dependencies]
 built = { version = "0.7", features = ["git2"], default-features = false }
+
+[patch.crates-io]
+serial-settings = { git = "https://github.com/quartiq/stabilizer.git" }

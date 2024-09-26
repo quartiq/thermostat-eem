@@ -2,11 +2,7 @@ use core::fmt::Write;
 use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::hardware::{
-    ad7172,
-    adc::{Mux, Sensor},
-    platform,
-};
+use crate::hardware::{ad7172, adc::Mux, platform};
 use heapless::String;
 use smoltcp_nal::smoltcp;
 
@@ -379,54 +375,37 @@ where
 
     #[cfg(feature = "all_differential")]
     let adc_input_config = [[
-        Some((
-            Mux {
-                ainpos: ad7172::Mux::Ain0,
-                ainneg: ad7172::Mux::Ain1,
-            },
-            Sensor::ntc(25.0, 10.0e3, 10.0e3, 3988.0),
-        )),
-        Some((
-            Mux {
-                ainpos: ad7172::Mux::Ain2,
-                ainneg: ad7172::Mux::Ain3,
-            },
-            Sensor::ntc(25.0, 10.0e3, 10.0e3, 3988.0),
-        )),
+        Some(Mux {
+            ainpos: ad7172::Mux::Ain0,
+            ainneg: ad7172::Mux::Ain1,
+        }),
+        Some(Mux {
+            ainpos: ad7172::Mux::Ain2,
+            ainneg: ad7172::Mux::Ain3,
+        }),
         None,
         None,
     ]; 4];
+    //    Sensor::ntc(25.0, 10.0e3, 5.0e3, 3988.0),
 
     #[cfg(feature = "all_single_ended")]
     let adc_input_config = [[
-        Some((
-            Mux {
-                ainpos: ad7172::Mux::Ain0,
-                ainneg: ad7172::Mux::RefN,
-            },
-            Sensor::ntc(25.0, 10.0e3, 5.0e3, 3988.0),
-        )),
-        Some((
-            Mux {
-                ainpos: ad7172::Mux::RefP,
-                ainneg: ad7172::Mux::Ain1,
-            },
-            Sensor::ntc(25.0, 10.0e3, 5.0e3, 3988.0),
-        )),
-        Some((
-            Mux {
-                ainpos: ad7172::Mux::Ain2,
-                ainneg: ad7172::Mux::RefN,
-            },
-            Sensor::ntc(25.0, 10.0e3, 5.0e3, 3988.0),
-        )),
-        Some((
-            Mux {
-                ainpos: ad7172::Mux::RefP,
-                ainneg: ad7172::Mux::Ain3,
-            },
-            Sensor::ntc(25.0, 10.0e3, 5.0e3, 3988.0),
-        )),
+        Some(Mux {
+            ainpos: ad7172::Mux::Ain0,
+            ainneg: ad7172::Mux::RefN,
+        }),
+        Some(Mux {
+            ainpos: ad7172::Mux::RefP,
+            ainneg: ad7172::Mux::Ain1,
+        }),
+        Some(Mux {
+            ainpos: ad7172::Mux::Ain2,
+            ainneg: ad7172::Mux::RefN,
+        }),
+        Some(Mux {
+            ainpos: ad7172::Mux::RefP,
+            ainneg: ad7172::Mux::Ain3,
+        }),
     ]; 4];
 
     let adc = Adc::new(
