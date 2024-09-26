@@ -14,8 +14,6 @@ keywords = ["ethernet", "stm32h7", "adc", "dac", "physics"]
 repository = "https://github.com/quartiq/thermostat-eem"
 readme = "README.md"
 exclude = [".gitignore"]
-# keep MSRV in sync in ci.yaml and Cargo.toml
-rust-version = "1.75.0"
 
 [features]
 default = ["all_differential"]
