@@ -72,10 +72,26 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           target: thumbv7em-none-eabihf
           override: true
+          components: llvm-tools-preview
+      - name: Install binary utils
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: |
+            cargo-binutils
       - uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release --features "${{ matrix.features }}"
+      - name: Objcopy release binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: objcopy
+          args: --release --bin thermostat-eem -- -O binary ${{ matrix.toolchain }}-thermostat-eem.bin
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v3.2.1-node20
+        with:
+          path: ${{ matrix.toolchain }}-thermostat-eem.bin
 
   doc:
     runs-on: ubuntu-latest
