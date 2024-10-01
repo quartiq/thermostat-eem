@@ -126,9 +126,7 @@ pub fn setup<C, const Y: usize>(
     clock: crate::SystemTimer,
 ) -> ThermostatDevices<C, Y>
 where
-    C: serial_settings::Settings<Y>
-        + for<'d> miniconf::JsonCoreSlash<'d, Y>
-        + crate::settings::AppSettings,
+    C: serial_settings::Settings<Y> + crate::settings::AppSettings,
 {
     // Set up RTT logging
     {
