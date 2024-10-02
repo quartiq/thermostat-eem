@@ -66,32 +66,23 @@ jobs:
             features: ''
             continue-on-error: true
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.toolchain }}
-          target: thumbv7em-none-eabihf
-          override: true
+          targets: thumbv7em-none-eabihf
           components: llvm-tools-preview
-      - name: Install binary utils
-        uses: actions-rs/cargo@v1
+      - run: cargo build --release --features "${{ matrix.features }}"
+      - name: Extract Stable Binary Using cargo-binutils
+        if: matrix.toolchain == 'stable' && github.ref == 'refs/heads/main'
+        run: |
+          cargo install cargo-binutils
+          cargo objcopy --release --bin thermostat-eem -- -O binary thermostat-eem.bin
+      - name: Upload Artifacts
+        if: matrix.toolchain == 'stable' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4.4.0
         with:
-          command: install
-          args: |
-            cargo-binutils
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --features "${{ matrix.features }}"
-      - name: Objcopy release binary
-        uses: actions-rs/cargo@v1
-        with:
-          command: objcopy
-          args: --release --bin thermostat-eem -- -O binary ${{ matrix.toolchain }}-thermostat-eem.bin
-      - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v3.2.1-node20
-        with:
-          path: ${{ matrix.toolchain }}-thermostat-eem.bin
+          path: thermostat-eem.bin
 
   doc:
     runs-on: ubuntu-latest
