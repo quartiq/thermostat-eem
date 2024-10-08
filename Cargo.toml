@@ -63,8 +63,8 @@ bytemuck = { version = "1.18.0", features = [
 	"derive",
 ], default-features = false }
 # Note: Keep in-sync with `py/setup.py`
-miniconf = { version = "0.15", features = ["json-core", "derive", "postcard"] }
-miniconf_mqtt = { version = "0.15" }
+miniconf = { version = "0.16", features = ["json-core", "derive", "postcard"] }
+miniconf_mqtt = { version = "0.16" }
 strum = { version = "0.26.1", default-features = false, features = ["derive"] }
 serial-settings = "0.1"
 postcard = "1"
