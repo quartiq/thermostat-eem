@@ -586,9 +586,9 @@ dependencies = [
 
 [[package]]
 name = "miniconf_mqtt"
-version = "0.16.0"
+version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a8e3219f5030190d975951d7d7428b9227a94730d1bfde750cdf06564a4e264"
+checksum = "052f576f313d9bbec2786e1d749e84142f4efc547117ef8c039c6d974211d6ff"
 dependencies = [
  "embedded-io",
  "heapless 0.8.0",
