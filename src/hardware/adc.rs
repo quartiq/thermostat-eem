@@ -1,7 +1,7 @@
 // Thermostat ADC struct.
 
 use arbitrary_int::u2;
-use miniconf::Tree;
+use miniconf::{Leaf, Tree};
 use num_traits::float::Float;
 use smlang::statemachine;
 use strum::{AsRefStr, EnumString, IntoEnumIterator};
@@ -114,22 +114,22 @@ pub trait Convert {
 #[derive(Clone, Copy, Debug, Tree)]
 pub struct Linear {
     /// Units: output
-    offset: f32,
+    offset: Leaf<f32>,
     /// Units: output/input
-    gain: f32,
+    gain: Leaf<f32>,
 }
 
 impl Convert for Linear {
     fn convert(&self, code: AdcCode) -> f64 {
-        (f32::from(code) * self.gain) as f64 + self.offset as f64
+        (f32::from(code) * *self.gain) as f64 + *self.offset as f64
     }
 }
 
 impl Default for Linear {
     fn default() -> Self {
         Self {
-            offset: 0.,
-            gain: 1.,
+            offset: 0.0.into(),
+            gain: 1.0.into(),
         }
     }
 }
@@ -137,17 +137,17 @@ impl Default for Linear {
 /// Beta equation (Steinhart-Hart with c=0)
 #[derive(Clone, Copy, Debug, Tree)]
 pub struct Ntc {
-    t0_inv: f32,   // inverse reference temperature (1/K)
-    r_rel: f32,    // reference resistor over NTC resistance at t0,
-    beta_inv: f32, // inverse beta
+    t0_inv: Leaf<f32>,   // inverse reference temperature (1/K)
+    r_rel: Leaf<f32>,    // reference resistor over NTC resistance at t0,
+    beta_inv: Leaf<f32>, // inverse beta
 }
 
 impl Ntc {
     pub fn new(t0: f32, r0: f32, r_ref: f32, beta: f32) -> Self {
         Self {
-            t0_inv: 1.0 / (t0 + ZERO_C),
-            r_rel: r_ref / r0,
-            beta_inv: 1.0 / beta,
+            t0_inv: (1.0 / (t0 + ZERO_C)).into(),
+            r_rel: (r_ref / r0).into(),
+            beta_inv: (1.0 / beta).into(),
         }
     }
 }
@@ -160,37 +160,33 @@ impl Convert for Ntc {
         // avoided. Input values must not close to minimum/maximum (~1000 codes difference)
         // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
         let relative_voltage = f32::from(code) as f64;
-        let relative_resistance = relative_voltage / (1.0 - relative_voltage) * self.r_rel as f64;
-        1.0 / (self.t0_inv as f64 + self.beta_inv as f64 * relative_resistance.ln()) - ZERO_C as f64
+        let relative_resistance = relative_voltage / (1.0 - relative_voltage) * *self.r_rel as f64;
+        1.0 / (*self.t0_inv as f64 + *self.beta_inv as f64 * relative_resistance.ln())
+            - ZERO_C as f64
     }
 }
 
 impl Default for Ntc {
     fn default() -> Self {
-        Self {
-            t0_inv: 1. / (25. + ZERO_C),
-            #[allow(clippy::eq_op)]
-            r_rel: 10.0e3 / 10.0e3,
-            beta_inv: 1. / 3988.,
-        }
+        Self::new(25., 10.0e3, 10.0e3, 3988.)
     }
 }
 
 /// DT-670 Silicon diode
 #[derive(Clone, Copy, Debug, Tree)]
 pub struct Dt670 {
-    v_ref: f32, // effective reference voltage (V)
+    v_ref: Leaf<f32>, // effective reference voltage (V)
 }
 
 impl Default for Dt670 {
     fn default() -> Self {
-        Self { v_ref: 5. }
+        Self { v_ref: 5.0.into() }
     }
 }
 
 impl Convert for Dt670 {
     fn convert(&self, code: AdcCode) -> f64 {
-        let voltage = f32::from(code) * self.v_ref;
+        let voltage = f32::from(code) * *self.v_ref;
         const CURVE: &[(f32, f32, f32)] = &super::dt670::CURVE;
         let idx = CURVE.partition_point(|&(_t, v, _dvdt)| v < voltage);
         CURVE
@@ -204,9 +200,9 @@ impl Convert for Dt670 {
 /// ADC configuration structure.
 #[derive(Clone, Copy, Debug, Tree, EnumString, AsRefStr)]
 pub enum Sensor {
-    Linear(#[tree(depth = 1)] Linear),
-    Ntc(#[tree(depth = 1)] Ntc),
-    Dt670(#[tree(depth = 1)] Dt670),
+    Linear(Linear),
+    Ntc(Ntc),
+    Dt670(Dt670),
 }
 
 const ZERO_C: f32 = 273.15; // 0°C in °K

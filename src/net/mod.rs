@@ -24,7 +24,7 @@ use telemetry::TelemetryClient;
 
 use core::fmt::Write;
 use heapless::String;
-use miniconf::{Tree, TreeDeserializeOwned, TreeSerialize};
+use miniconf::{Leaf, Tree, TreeDeserializeOwned, TreeKey, TreeSerialize};
 
 pub type NetworkReference = smoltcp_nal::shared::NetworkStackProxy<'static, NetworkStack>;
 
@@ -57,7 +57,7 @@ pub enum NetworkState {
 /// A structure of Stabilizer's default network users.
 pub struct NetworkUsers<S, const Y: usize>
 where
-    S: Default + TreeDeserializeOwned<Y> + TreeSerialize<Y> + Clone,
+    S: Default + TreeDeserializeOwned + TreeSerialize + TreeKey + Clone,
 {
     pub miniconf: miniconf_mqtt::MqttClient<
         'static,
@@ -75,7 +75,7 @@ where
 
 impl<S, const Y: usize> NetworkUsers<S, Y>
 where
-    S: Default + TreeDeserializeOwned<Y> + TreeSerialize<Y> + Clone,
+    S: Default + TreeDeserializeOwned + TreeSerialize + TreeKey + Clone,
 {
     /// Construct Stabilizer's default network users.
     ///
@@ -251,7 +251,7 @@ pub struct Alarm {
     ///
     /// # Value
     /// True to arm, false to disarm.
-    pub armed: bool,
+    pub armed: Leaf<bool>,
 
     /// Alarm target.
     /// The alarm will publish its state (true or false) onto this mqtt path.
@@ -259,14 +259,14 @@ pub struct Alarm {
     ///
     /// # Value
     /// Any string up to 128 characters.
-    pub target: String<128>,
+    pub target: Leaf<String<128>>,
 
     /// Alarm period in milliseconds.
     /// The alarm will publish its state with this period.
     ///
     /// # Value
     /// f32
-    pub period: f32,
+    pub period: Leaf<f32>,
 
     /// Temperature limits for the alarm.
     ///
@@ -281,16 +281,15 @@ pub struct Alarm {
     ///
     /// # Value
     /// `[f32, f32]` or `None`
-    #[tree(depth = 2)]
-    pub temperature_limits: [[Option<[f32; 2]>; 4]; 4],
+    pub temperature_limits: [[Option<[Leaf<f32>; 2]>; 4]; 4],
 }
 
 impl Default for Alarm {
     fn default() -> Self {
         Self {
-            armed: false,
+            armed: false.into(),
             target: Default::default(),
-            period: 1.0,
+            period: 1.0.into(),
             temperature_limits: Default::default(),
         }
     }
