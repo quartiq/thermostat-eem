@@ -384,7 +384,6 @@ where
         None,
         None,
     ]; 4];
-    //    Sensor::ntc(25.0, 10.0e3, 5.0e3, 3988.0),
 
     #[cfg(feature = "all_single_ended")]
     let adc_input_config = [[
