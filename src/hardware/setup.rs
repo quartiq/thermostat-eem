@@ -98,7 +98,7 @@ pub struct NetworkDevices {
 }
 
 /// The available hardware interfaces on Thermostat.
-pub struct ThermostatDevices<C: serial_settings::Settings<Y> + 'static, const Y: usize> {
+pub struct ThermostatDevices<C: serial_settings::Settings + 'static, const Y: usize> {
     pub clocks: hal::rcc::CoreClocks,
     pub net: NetworkDevices,
     pub dac: Dac,
@@ -126,7 +126,7 @@ pub fn setup<C, const Y: usize>(
     clock: crate::SystemTimer,
 ) -> ThermostatDevices<C, Y>
 where
-    C: serial_settings::Settings<Y> + crate::settings::AppSettings,
+    C: serial_settings::Settings + crate::settings::AppSettings,
 {
     // Set up RTT logging
     {
@@ -472,7 +472,7 @@ where
         };
 
         let mut settings = C::new(crate::NetSettings::new(mac_addr));
-        crate::settings::SerialSettingsPlatform::load(&mut settings, &mut flash);
+        crate::settings::SerialSettingsPlatform::<_, Y>::load(&mut settings, &mut flash);
         (flash, settings)
     };
 

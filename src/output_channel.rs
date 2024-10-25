@@ -3,32 +3,32 @@
 
 use crate::{hardware::pwm::Pwm, DacCode};
 use idsp::iir;
-use miniconf::Tree;
+use miniconf::{Leaf, Tree};
 use num_traits::Float;
 
 #[derive(Copy, Clone, Debug, Tree)]
 pub struct Pid {
-    pub ki: f32,
-    pub kp: f32, // sign reference for all gains and limits
-    pub kd: f32,
-    pub li: f32,
-    pub ld: f32,
-    pub setpoint: f32,
-    pub min: f32,
-    pub max: f32,
+    pub ki: Leaf<f32>,
+    pub kp: Leaf<f32>, // sign reference for all gains and limits
+    pub kd: Leaf<f32>,
+    pub li: Leaf<f32>,
+    pub ld: Leaf<f32>,
+    pub setpoint: Leaf<f32>,
+    pub min: Leaf<f32>,
+    pub max: Leaf<f32>,
 }
 
 impl Default for Pid {
     fn default() -> Self {
         Self {
-            ki: 0.,
-            kp: 0., // positive default
-            kd: 0.,
-            li: f32::INFINITY,
-            ld: f32::INFINITY,
-            setpoint: 25.,
-            min: f32::NEG_INFINITY,
-            max: f32::INFINITY,
+            ki: 0.0.into(),
+            kp: 0.0.into(), // positive default
+            kd: 0.0.into(),
+            li: f32::INFINITY.into(),
+            ld: f32::INFINITY.into(),
+            setpoint: 25.0.into(),
+            min: f32::NEG_INFINITY.into(),
+            max: f32::INFINITY.into(),
         }
     }
 }
@@ -38,37 +38,37 @@ impl TryFrom<Pid> for iir::Biquad<f64> {
     fn try_from(value: Pid) -> Result<Self, Self::Error> {
         let mut biquad: iir::Biquad<f64> = iir::Pid::<f64>::default()
             .period(1.0 / 1007.0) // ADC sample rate (ODR) including zero-oder-holds
-            .gain(iir::Action::Ki, value.ki.copysign(value.kp) as _)
-            .gain(iir::Action::Kp, value.kp as _)
-            .gain(iir::Action::Kd, value.kd.copysign(value.kp) as _)
+            .gain(iir::Action::Ki, value.ki.copysign(*value.kp) as _)
+            .gain(iir::Action::Kp, *value.kp as _)
+            .gain(iir::Action::Kd, value.kd.copysign(*value.kp) as _)
             .limit(
                 iir::Action::Ki,
                 if value.li.is_finite() {
-                    value.li
+                    *value.li
                 } else {
                     f32::INFINITY
                 }
-                .copysign(value.kp) as _,
+                .copysign(*value.kp) as _,
             )
             .limit(
                 iir::Action::Kd,
                 if value.ld.is_finite() {
-                    value.ld
+                    *value.ld
                 } else {
                     f32::INFINITY
                 }
-                .copysign(value.kp) as _,
+                .copysign(*value.kp) as _,
             )
             .build()?
             .into();
-        biquad.set_input_offset(-value.setpoint as _);
+        biquad.set_input_offset(-*value.setpoint as _);
         biquad.set_min(if value.min.is_finite() {
-            value.min
+            *value.min
         } else {
             f32::NEG_INFINITY
         } as _);
         biquad.set_max(if value.max.is_finite() {
-            value.max
+            *value.max
         } else {
             f32::INFINITY
         } as _);
@@ -91,16 +91,15 @@ pub enum State {
 
 #[derive(Copy, Clone, Debug, Tree)]
 pub struct OutputChannel {
-    pub state: State,
+    pub state: Leaf<State>,
 
     /// Maximum absolute (positive and negative) TEC voltage in volt.
     /// These will be clamped to the maximum of 4.3 V.
     ///
     /// # Value
     /// 0.0 to 4.3
-    pub voltage_limit: f32,
+    pub voltage_limit: Leaf<f32>,
 
-    #[tree(depth = 1)]
     pub pid: Pid,
 
     /// IIR filter parameters.
@@ -123,14 +122,14 @@ pub struct OutputChannel {
     ///
     /// # Value
     /// f32
-    pub weights: [[f32; 4]; 4],
+    pub weights: Leaf<[[f32; 4]; 4]>,
 }
 
 impl Default for OutputChannel {
     fn default() -> Self {
         Self {
-            state: State::Off,
-            voltage_limit: Pwm::MAX_VOLTAGE_LIMIT,
+            state: State::Off.into(),
+            voltage_limit: Pwm::MAX_VOLTAGE_LIMIT.into(),
             pid: Default::default(),
             iir: Default::default(),
             weights: Default::default(),
@@ -147,7 +146,7 @@ impl OutputChannel {
             .zip(self.weights.iter().flatten())
             .map(|(t, w)| t * *w as f64)
             .sum();
-        let iir = if self.state == State::On {
+        let iir = if *self.state == State::On {
             &self.iir
         } else {
             &iir::Biquad::HOLD
@@ -171,7 +170,7 @@ impl OutputChannel {
             .set_max(self.iir.max().clamp(-range as _, range as _));
         self.iir
             .set_min(self.iir.min().clamp(-range as _, range as _));
-        self.voltage_limit = self.voltage_limit.clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
+        *self.voltage_limit = (*self.voltage_limit).clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
         let divisor: f32 = self.weights.iter().flatten().map(|w| w.abs()).sum();
         // Note: The weights which are not 'None' should always affect an enabled channel and therefore count for normalization.
         if divisor != 0.0 {
