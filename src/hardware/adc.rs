@@ -110,7 +110,9 @@ pub trait Convert {
     fn convert(&self, code: AdcCode) -> f64;
 }
 
-/// relative_voltage * gain + offset
+/// Relative_voltage * gain + offset
+///
+/// Use also for RTD
 #[derive(Clone, Copy, Debug, Tree)]
 pub struct Linear {
     /// Units: output
@@ -180,7 +182,7 @@ pub struct Dt670 {
 
 impl Default for Dt670 {
     fn default() -> Self {
-        Self { v_ref: 5.0.into() }
+        Self { v_ref: 2.5.into() }
     }
 }
 
@@ -188,12 +190,12 @@ impl Convert for Dt670 {
     fn convert(&self, code: AdcCode) -> f64 {
         let voltage = f32::from(code) * *self.v_ref;
         const CURVE: &[(f32, f32, f32)] = &super::dt670::CURVE;
-        let idx = CURVE.partition_point(|&(_t, v, _dvdt)| v < voltage);
-        CURVE
-            .get(idx)
-            .or(CURVE.last())
-            .map(|&(t, v, dvdt)| (t + (voltage - v) * 1.0e3 / dvdt) as f64)
-            .unwrap()
+        // This is clearly simplistic.
+        // It is discontinuous at LUT jumps due to dvdt precision.
+        // Should use proper interpolation, there are some crates.
+        let idx = CURVE.partition_point(|&(_, v, _)| v < voltage);
+        let (t, v, dvdt) = CURVE.get(idx).or(CURVE.last()).unwrap();
+        (t + (voltage - v) * 1.0e3 / dvdt) as f64
     }
 }
 

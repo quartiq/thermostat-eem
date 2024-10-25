@@ -16,7 +16,7 @@ use strum::IntoEnumIterator;
 
 use hardware::{
     adc::AdcPhy,
-    adc::{sm::StateMachine, Adc, AdcCode, Sensor},
+    adc::{sm::StateMachine, Adc, AdcCode, Ntc, Sensor},
     adc_internal::AdcInternal,
     dac::{Dac, DacCode},
     gpio::{Gpio, PoePower},
@@ -172,8 +172,6 @@ struct Data {
 
 #[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
 mod app {
-    use hardware::adc::Ntc;
-
     use super::*;
 
     #[shared]
@@ -211,13 +209,14 @@ mod app {
             .settings
             .thermostat_eem
             .input
+            .as_flattened_mut()
             .iter_mut()
-            .flatten()
-            .zip(thermostat.adc_input_config.iter_mut().flatten())
+            .zip(thermostat.adc_input_config.as_flattened().iter())
         {
             if let Some(mux) = mux {
                 let r_ref = if mux.is_single_ended() { 5.0e3 } else { 10.0e3 };
                 *channel = Some(InputChannel {
+                    // This isn't ideal as it confilcts with the default/clear notion of serial-settings.
                     sensor: Sensor::Ntc(Ntc::new(25.0, 10.0e3, r_ref, 3988.0)).into(),
                     ..Default::default()
                 });
@@ -354,16 +353,16 @@ mod app {
             if *alarm.armed {
                 let temperatures = c.shared.temperature.lock(|temp| *temp);
                 let mut alarms = [[None; 4]; 4];
-                let mut alarm_state = false;
-                for phy_i in 0..4 {
-                    for cfg_i in 0..4 {
-                        if let Some(l) = &alarm.temperature_limits[phy_i][cfg_i] {
-                            let a = !(*l[0]..*l[1]).contains(&(temperatures[phy_i][cfg_i] as _));
-                            alarms[phy_i][cfg_i] = Some(a);
-                            alarm_state |= a;
-                        }
-                    }
-                }
+                let alarm_state = alarm
+                    .temperature_limits
+                    .as_flattened()
+                    .iter()
+                    .zip(temperatures.as_flattened().iter())
+                    .zip(alarms.as_flattened_mut().iter_mut())
+                    .any(|((l, t), a)| {
+                        *a = l.map(|l| !(*l[0]..*l[1]).contains(&(*t as _)));
+                        a.unwrap_or_default()
+                    });
                 c.shared
                     .telemetry
                     .lock(|telemetry| telemetry.alarm = alarms);
@@ -416,9 +415,9 @@ mod app {
                     };
                     for (t, u) in s
                         .temperature
+                        .as_flattened_mut()
                         .iter_mut()
-                        .flatten()
-                        .zip(temperature.iter().flatten())
+                        .zip(temperature.as_flattened().iter())
                     {
                         *t = *u as _;
                     }

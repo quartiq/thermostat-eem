@@ -8,13 +8,39 @@ use num_traits::Float;
 
 #[derive(Copy, Clone, Debug, Tree)]
 pub struct Pid {
+    /// Integral gain
+    ///
+    /// Units: output/input per second
     pub ki: Leaf<f32>,
-    pub kp: Leaf<f32>, // sign reference for all gains and limits
+    /// Proportional gain
+    ///
+    /// Note that this is the sign reference for all gains and limits
+    ///
+    /// Units: output/input
+    pub kp: Leaf<f32>,
+    /// Derivative gain
+    ///
+    /// Units: output/input*second
     pub kd: Leaf<f32>,
+    /// Integral gain limit
+    ///
+    /// Units: output/input
     pub li: Leaf<f32>,
+    /// Derivative gain limit
+    ///
+    /// Units: output/input
     pub ld: Leaf<f32>,
+    /// Setpoint
+    ///
+    /// Units: input
     pub setpoint: Leaf<f32>,
+    /// Output lower limit
+    ///
+    /// Units: output
     pub min: Leaf<f32>,
+    /// Output upper limit
+    ///
+    /// Units: output
     pub max: Leaf<f32>,
 }
 
@@ -100,28 +126,18 @@ pub struct OutputChannel {
     /// 0.0 to 4.3
     pub voltage_limit: Leaf<f32>,
 
+    /// PID/Biquad/IIR filter parameters
+    ///
+    /// The y limits will be clamped to the maximum output current of +-3 A.
     pub pid: Pid,
 
-    /// IIR filter parameters.
-    /// The y limits will be clamped to the maximum output current of +-3 A.
-    ///
-    /// # Value
-    /// See [iir::Biquad]
     #[tree(skip)]
     pub iir: iir::Biquad<f64>,
 
-    /// Thermostat input channel weights. Each input temperature of an enabled channel
+    /// Thermostat input channel weights. Each input of an enabled input channel
     /// is multiplied by its weight and the accumulated output is fed into the IIR.
     /// The weights will be internally normalized to one (sum of the absolute values)
     /// if they are not all zero.
-    ///
-    /// # Path
-    /// `weights/<adc>/<channel>`
-    /// * `<adc> := [0, 1, 2, 3]` specifies which adc to configure.
-    /// * `<channel>` specifies which channel of an ADC to configure. Only the enabled channels for the specific ADC are available.
-    ///
-    /// # Value
-    /// f32
     pub weights: Leaf<[[f32; 4]; 4]>,
 }
 
@@ -141,9 +157,9 @@ impl OutputChannel {
     /// compute weighted iir input, iir state and return the new output
     pub fn update(&mut self, temperatures: &[[f64; 4]; 4], iir_state: &mut [f64; 4]) -> f64 {
         let temperature = temperatures
+            .as_flattened()
             .iter()
-            .flatten()
-            .zip(self.weights.iter().flatten())
+            .zip(self.weights.as_flattened().iter())
             .map(|(t, w)| t * *w as f64)
             .sum();
         let iir = if *self.state == State::On {
@@ -175,7 +191,7 @@ impl OutputChannel {
         // Note: The weights which are not 'None' should always affect an enabled channel and therefore count for normalization.
         if divisor != 0.0 {
             let n = divisor.recip();
-            for w in self.weights.iter_mut().flatten() {
+            for w in self.weights.as_flattened_mut().iter_mut() {
                 *w *= n;
             }
         }
