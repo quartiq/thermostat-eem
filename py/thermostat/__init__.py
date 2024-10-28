@@ -2,4 +2,4 @@
 """Thermostat EEM utilities"""
 
 # Sample period in seconds for all channels.
-SAMPLE_PERIOD = 1 / 503.5  # ADC ODR 1007 split between two channels per ADC
+SAMPLE_PERIOD = 1 / 1007  # ADC ODR 1007 split between ADC channels. But with the ZOH the IIR updates at full rate.
