@@ -42,6 +42,11 @@ pub struct Pid {
     ///
     /// Units: output
     pub max: Leaf<f32>,
+    /// Update/sample period
+    ///
+    /// Units: seconds
+    #[tree(skip)]
+    pub period: f32,
 }
 
 impl Default for Pid {
@@ -52,9 +57,10 @@ impl Default for Pid {
             kd: 0.0.into(),
             li: f32::INFINITY.into(),
             ld: f32::INFINITY.into(),
-            setpoint: 25.0.into(),
+            setpoint: 0.0.into(),
             min: f32::NEG_INFINITY.into(),
             max: f32::INFINITY.into(),
+            period: 1.0,
         }
     }
 }
@@ -63,7 +69,7 @@ impl TryFrom<Pid> for iir::Biquad<f64> {
     type Error = iir::PidError;
     fn try_from(value: Pid) -> Result<Self, Self::Error> {
         let mut biquad: iir::Biquad<f64> = iir::Pid::<f64>::default()
-            .period(1.0 / 1007.0) // ADC sample rate (ODR) including zero-oder-holds
+            .period(value.period as _) // ADC sample rate (ODR) including zero-oder-holds
             .gain(iir::Action::Ki, value.ki.copysign(*value.kp) as _)
             .gain(iir::Action::Kp, *value.kp as _)
             .gain(iir::Action::Kd, value.kd.copysign(*value.kp) as _)
@@ -124,11 +130,13 @@ pub struct OutputChannel {
     ///
     /// # Value
     /// 0.0 to 4.3
+    #[tree(validate=self.validate_voltage_limit)]
     pub voltage_limit: Leaf<f32>,
 
     /// PID/Biquad/IIR filter parameters
     ///
     /// The y limits will be clamped to the maximum output current of +-3 A.
+    #[tree(validate=self.validate_pid)]
     pub pid: Pid,
 
     #[tree(skip)]
@@ -138,18 +146,29 @@ pub struct OutputChannel {
     /// is multiplied by its weight and the accumulated output is fed into the IIR.
     /// The weights will be internally normalized to one (sum of the absolute values)
     /// if they are not all zero.
+    #[tree(validate=self.validate_weights)]
     pub weights: Leaf<[[f32; 4]; 4]>,
 }
 
 impl Default for OutputChannel {
     fn default() -> Self {
-        Self {
+        let mut s = Self {
             state: State::Off.into(),
             voltage_limit: Pwm::MAX_VOLTAGE_LIMIT.into(),
-            pid: Default::default(),
+            pid: Pid {
+                period: 1.0 / 1007.0,
+                max: 0.01.into(),
+                min: (-0.01).into(),
+                setpoint: 25.0.into(),
+                ..Default::default()
+            },
             iir: Default::default(),
             weights: Default::default(),
-        }
+        };
+        s.validate_pid(0).unwrap();
+        s.validate_voltage_limit(0).unwrap();
+        s.validate_weights(0).unwrap();
+        s
     }
 }
 
@@ -170,24 +189,27 @@ impl OutputChannel {
         iir.update(iir_state, temperature)
     }
 
-    /// Performs finalization of the output_channel miniconf settings:
-    /// - Clamping of the limits
-    /// - Normalization of the weights
-    ///
-    /// Returns the current limits.
-    pub fn finalize_settings(&mut self) {
+    fn validate_pid(&mut self, depth: usize) -> Result<usize, &'static str> {
         if let Ok(iir) = self.pid.try_into() {
             self.iir = iir;
         } else {
-            log::info!("Pid build failure, update not applied.");
+            return Err("Pid build failure, update not applied.");
         }
         let range = DacCode::MAX_CURRENT.min(Pwm::MAX_CURRENT_LIMIT);
         self.iir
             .set_max(self.iir.max().clamp(-range as _, range as _));
         self.iir
             .set_min(self.iir.min().clamp(-range as _, range as _));
+        Ok(depth)
+    }
+
+    fn validate_voltage_limit(&mut self, depth: usize) -> Result<usize, &'static str> {
         *self.voltage_limit = (*self.voltage_limit).clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
-        let divisor: f32 = self.weights.iter().flatten().map(|w| w.abs()).sum();
+        Ok(depth)
+    }
+
+    fn validate_weights(&mut self, depth: usize) -> Result<usize, &'static str> {
+        let divisor: f32 = self.weights.as_flattened().iter().map(|w| w.abs()).sum();
         // Note: The weights which are not 'None' should always affect an enabled channel and therefore count for normalization.
         if divisor != 0.0 {
             let n = divisor.recip();
@@ -195,6 +217,7 @@ impl OutputChannel {
                 *w *= n;
             }
         }
+        Ok(depth)
     }
 
     pub fn current_limits(&self) -> [f32; 2] {

@@ -287,7 +287,6 @@ mod app {
         let pwm = c.local.pwm;
         (c.shared.network, c.shared.gpio, c.shared.settings).lock(|network, gpio, settings| {
             for (ch, s) in OutputChannelIdx::iter().zip(settings.thermostat_eem.output.iter_mut()) {
-                s.finalize_settings(); // clamp limits and normalize weights
                 pwm.set_limit(Limit::Voltage(ch), *s.voltage_limit).unwrap();
                 let [pos, neg] = s.current_limits();
                 pwm.set_limit(Limit::PositiveCurrent(ch), pos).unwrap();
