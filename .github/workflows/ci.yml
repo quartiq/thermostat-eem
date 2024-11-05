@@ -66,16 +66,23 @@ jobs:
             features: ''
             continue-on-error: true
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.toolchain }}
-          target: thumbv7em-none-eabihf
-          override: true
-      - uses: actions-rs/cargo@v1
+          targets: thumbv7em-none-eabihf
+          components: llvm-tools-preview
+      - run: cargo build --release --features "${{ matrix.features }}"
+      - name: Extract Stable Binary Using cargo-binutils
+        if: matrix.toolchain == 'stable' && github.ref == 'refs/heads/main'
+        run: |
+          cargo install cargo-binutils
+          cargo objcopy --release --bin thermostat-eem -- -O binary thermostat-eem.bin
+      - name: Upload Artifacts
+        if: matrix.toolchain == 'stable' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4.4.0
         with:
-          command: build
-          args: --release --features "${{ matrix.features }}"
+          path: thermostat-eem.bin
 
   doc:
     runs-on: ubuntu-latest
