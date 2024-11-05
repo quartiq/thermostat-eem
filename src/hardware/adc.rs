@@ -163,7 +163,7 @@ impl Convert for Ntc {
         // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
         let relative_voltage = f32::from(code) as f64;
         let relative_resistance = relative_voltage / (1.0 - relative_voltage) * *self.r_rel as f64;
-        1.0 / (*self.t0_inv as f64 + *self.beta_inv as f64 * relative_resistance.ln())
+        (*self.t0_inv as f64 + *self.beta_inv as f64 * relative_resistance.ln()).recip()
             - ZERO_C as f64
     }
 }
@@ -327,52 +327,64 @@ impl Adc {
 
         for (name, refsel, ainposneg, scale) in [
             (
-                "Avdd-Avss (int ref=2.5V)",
+                "Temperature (K) (vs internal reference)",
+                ad7172::RefSel::Internal,
+                (ad7172::Mux::TempP, ad7172::Mux::TempN),
+                2.5 / 477e-6,
+            ),
+            (
+                "Avdd-Avss vs internal reference",
                 ad7172::RefSel::Internal,
                 (ad7172::Mux::AvddAvss5P, ad7172::Mux::AvddAvss5N),
                 5.0 * 2.5,
             ),
             (
-                "Avdd-Avss (ext ref=5V)",
+                "Avdd-Avss vs external referenve (5V)",
                 ad7172::RefSel::External,
                 (ad7172::Mux::AvddAvss5P, ad7172::Mux::AvddAvss5N),
                 5.0 * 5.0,
             ),
             (
-                "Ain0-Ain4 (ext ref=5V)",
-                ad7172::RefSel::External,
-                (ad7172::Mux::Ain0, ad7172::Mux::Ain4),
+                "RefP-RefN vs AvddAvss (5V)",
+                ad7172::RefSel::AvddAvss,
+                (ad7172::Mux::RefP, ad7172::Mux::RefN),
                 5.0,
             ),
             (
-                "Ain1-Ain4 (ext ref=5V)",
-                ad7172::RefSel::External,
-                (ad7172::Mux::Ain1, ad7172::Mux::Ain4),
-                5.0,
-            ),
-            (
-                "Ain2-Ain4 (ext ref=5V)",
-                ad7172::RefSel::External,
-                (ad7172::Mux::Ain2, ad7172::Mux::Ain4),
-                5.0,
-            ),
-            (
-                "Ain3-Ain4 (ext ref=5V)",
-                ad7172::RefSel::External,
-                (ad7172::Mux::Ain3, ad7172::Mux::Ain4),
-                5.0,
-            ),
-            (
-                "Ref--Ain4 (ext ref=5V)",
-                ad7172::RefSel::External,
+                "RefN-Ain4 vs AvddAvss (5V)",
+                ad7172::RefSel::AvddAvss,
                 (ad7172::Mux::RefN, ad7172::Mux::Ain4),
                 5.0,
             ),
             (
-                "Temperature (K) (int ref=2.5V)",
-                ad7172::RefSel::Internal,
-                (ad7172::Mux::TempP, ad7172::Mux::TempN),
-                2.5 / 477e-6,
+                "RefP-Ain4 vs AvddAvss (5V)",
+                ad7172::RefSel::AvddAvss,
+                (ad7172::Mux::RefP, ad7172::Mux::Ain4),
+                5.0,
+            ),
+            (
+                "Ain0-Ain4 vs AvddAvss (5V)",
+                ad7172::RefSel::AvddAvss,
+                (ad7172::Mux::Ain0, ad7172::Mux::Ain4),
+                5.0,
+            ),
+            (
+                "Ain1-Ain4 vs AvddAvss (5V)",
+                ad7172::RefSel::AvddAvss,
+                (ad7172::Mux::Ain1, ad7172::Mux::Ain4),
+                5.0,
+            ),
+            (
+                "Ain2-Ain4 vs AvddAvss (5V)",
+                ad7172::RefSel::AvddAvss,
+                (ad7172::Mux::Ain2, ad7172::Mux::Ain4),
+                5.0,
+            ),
+            (
+                "Ain3-Ain4 vs AvddAvss (5V)",
+                ad7172::RefSel::AvddAvss,
+                (ad7172::Mux::Ain3, ad7172::Mux::Ain4),
+                5.0,
             ),
         ] {
             self.adcs.write(
