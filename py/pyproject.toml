@@ -2,9 +2,6 @@
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-[license]
-text = "MIT"
-
 [project]
 name = "thermostat"
 # Note: keep this in sync with Cargo.toml
@@ -17,6 +14,9 @@ authors = [
 dependencies = [
     "miniconf-mqtt@git+https://github.com/quartiq/miniconf@v0.18.1#subdirectory=py/miniconf-mqtt",
     "stabilizer@git+https://github.com/quartiq/stabilizer@v0.11.0#subdirectory=py",
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
 ]
 
 [project.urls]
