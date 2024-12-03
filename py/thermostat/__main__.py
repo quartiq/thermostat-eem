@@ -9,7 +9,7 @@ import logging
 import sys
 import os
 
-from miniconf import Client, Miniconf, MQTTv5, one, discover, MiniconfException
+from miniconf import Client, Miniconf, MQTTv5, one, discover
 
 if sys.platform.lower() == "win32" or os.name.lower() == "nt":
     from asyncio import set_event_loop_policy, WindowsSelectorEventLoopPolicy
