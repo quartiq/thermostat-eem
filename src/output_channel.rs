@@ -1,12 +1,16 @@
 //! # Thermostat_EEM IIR wrapper.
 //!
 
+use core::iter::Take;
+
 use crate::{hardware::pwm::Pwm, DacCode};
-use idsp::iir;
+use idsp::{
+    iir, {AccuOsc, Sweep},
+};
 use miniconf::{Leaf, Tree};
 use num_traits::Float;
 
-#[derive(Copy, Clone, Debug, Tree)]
+#[derive(Clone, Debug, Tree)]
 pub struct Pid {
     /// Integral gain
     ///
@@ -65,42 +69,41 @@ impl Default for Pid {
     }
 }
 
-impl TryFrom<Pid> for iir::Biquad<f64> {
-    type Error = iir::PidError;
-    fn try_from(value: Pid) -> Result<Self, Self::Error> {
+impl Pid {
+    fn biquad(&self) -> Result<iir::Biquad<f64>, iir::PidError> {
         let mut biquad: iir::Biquad<f64> = iir::Pid::<f64>::default()
-            .period(value.period as _) // ADC sample rate (ODR) including zero-oder-holds
-            .gain(iir::Action::Ki, value.ki.copysign(*value.kp) as _)
-            .gain(iir::Action::Kp, *value.kp as _)
-            .gain(iir::Action::Kd, value.kd.copysign(*value.kp) as _)
+            .period(self.period as _) // ADC sample rate (ODR) including zero-oder-holds
+            .gain(iir::Action::Ki, self.ki.copysign(*self.kp) as _)
+            .gain(iir::Action::Kp, *self.kp as _)
+            .gain(iir::Action::Kd, self.kd.copysign(*self.kp) as _)
             .limit(
                 iir::Action::Ki,
-                if value.li.is_finite() {
-                    *value.li
+                if self.li.is_finite() {
+                    *self.li
                 } else {
                     f32::INFINITY
                 }
-                .copysign(*value.kp) as _,
+                .copysign(*self.kp) as _,
             )
             .limit(
                 iir::Action::Kd,
-                if value.ld.is_finite() {
-                    *value.ld
+                if self.ld.is_finite() {
+                    *self.ld
                 } else {
                     f32::INFINITY
                 }
-                .copysign(*value.kp) as _,
+                .copysign(*self.kp) as _,
             )
             .build()?
             .into();
-        biquad.set_input_offset(-*value.setpoint as _);
-        biquad.set_min(if value.min.is_finite() {
-            *value.min
+        biquad.set_input_offset(-*self.setpoint as _);
+        biquad.set_min(if self.min.is_finite() {
+            *self.min
         } else {
             f32::NEG_INFINITY
         } as _);
-        biquad.set_max(if value.max.is_finite() {
-            *value.max
+        biquad.set_max(if self.max.is_finite() {
+            *self.max
         } else {
             f32::INFINITY
         } as _);
@@ -121,17 +124,14 @@ pub enum State {
     Off,
 }
 
-#[derive(Copy, Clone, Debug, Tree)]
+#[derive(Clone, Debug, Tree)]
 pub struct OutputChannel {
-    pub state: Leaf<State>,
-
-    /// Maximum absolute (positive and negative) TEC voltage in volt.
-    /// These will be clamped to the maximum of 4.3 V.
-    ///
-    /// # Value
-    /// 0.0 to 4.3
-    #[tree(validate=self.validate_voltage_limit)]
-    pub voltage_limit: Leaf<f32>,
+    /// Thermostat input channel weights. Each input of an enabled input channel
+    /// is multiplied by its weight and the accumulated output is fed into the IIR.
+    /// The weights will be internally normalized to one (sum of the absolute values)
+    /// if they are not all zero.
+    #[tree(validate=self.validate_weights)]
+    pub weights: Leaf<[[f32; 4]; 4]>,
 
     /// PID/Biquad/IIR filter parameters
     ///
@@ -142,12 +142,68 @@ pub struct OutputChannel {
     #[tree(skip)]
     pub iir: iir::Biquad<f64>,
 
-    /// Thermostat input channel weights. Each input of an enabled input channel
-    /// is multiplied by its weight and the accumulated output is fed into the IIR.
-    /// The weights will be internally normalized to one (sum of the absolute values)
-    /// if they are not all zero.
-    #[tree(validate=self.validate_weights)]
-    pub weights: Leaf<[[f32; 4]; 4]>,
+    #[tree(skip)]
+    iir_state: [f64; 4],
+
+    pub state: Leaf<State>,
+
+    pub sweep: SineSweep,
+
+    /// Maximum absolute (positive and negative) TEC voltage in volt.
+    /// These will be clamped to the maximum of 4.3 V.
+    ///
+    /// # Value
+    /// 0.0 to 4.3
+    #[tree(validate=self.validate_voltage_limit)]
+    pub voltage_limit: Leaf<f32>,
+}
+
+#[derive(Clone, Debug, Tree)]
+pub struct SineSweep {
+    #[tree(skip)]
+    sweep: Take<AccuOsc<Sweep>>,
+
+    rate: Leaf<i32>,
+    cycles: Leaf<i32>,
+    length: Leaf<usize>,
+    amp: Leaf<f32>,
+    #[tree(validate=self.trigger)]
+    trigger: Leaf<bool>,
+}
+
+impl Default for SineSweep {
+    fn default() -> Self {
+        Self {
+            sweep: AccuOsc::new(Sweep::new(0, 0)).take(0),
+            rate: Leaf(0),
+            cycles: Leaf(0),
+            length: Leaf(0),
+            amp: Leaf(0.0),
+            trigger: Leaf(false),
+        }
+    }
+}
+
+impl Iterator for SineSweep {
+    type Item = f32;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        const SCALE: f32 = 1.0 / (1i64 << 31) as f32;
+        self.sweep.next().map(|c| (c.im as f32 * SCALE * *self.amp))
+    }
+}
+
+impl SineSweep {
+    fn trigger(&mut self, depth: usize) -> Result<usize, &'static str> {
+        self.sweep = AccuOsc::new(Sweep::new(
+            *self.rate,
+            ((*self.rate * *self.cycles) as i64) << 32,
+        ))
+        .take(*self.length);
+        self.trigger = Leaf(false);
+        Ok(depth)
+    }
 }
 
 impl Default for OutputChannel {
@@ -163,7 +219,9 @@ impl Default for OutputChannel {
                 ..Default::default()
             },
             iir: Default::default(),
+            iir_state: Default::default(),
             weights: Default::default(),
+            sweep: Default::default(),
         };
         s.validate_pid(0).unwrap();
         s.validate_voltage_limit(0).unwrap();
@@ -174,7 +232,7 @@ impl Default for OutputChannel {
 
 impl OutputChannel {
     /// compute weighted iir input, iir state and return the new output
-    pub fn update(&mut self, temperatures: &[[f64; 4]; 4], iir_state: &mut [f64; 4]) -> f64 {
+    pub fn update(&mut self, temperatures: &[[f64; 4]; 4]) -> f32 {
         let temperature = temperatures
             .as_flattened()
             .iter()
@@ -186,11 +244,13 @@ impl OutputChannel {
         } else {
             &iir::Biquad::HOLD
         };
-        iir.update(iir_state, temperature)
+        let y = iir.update(&mut self.iir_state, temperature);
+        let s = self.sweep.next().unwrap_or_default();
+        y as f32 + s
     }
 
     fn validate_pid(&mut self, depth: usize) -> Result<usize, &'static str> {
-        if let Ok(iir) = self.pid.try_into() {
+        if let Ok(iir) = self.pid.biquad() {
             self.iir = iir;
         } else {
             return Err("Pid build failure, update not applied.");

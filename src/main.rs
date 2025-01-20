@@ -192,7 +192,6 @@ mod app {
         dac: Dac,
         pwm: Pwm,
         adc_internal: AdcInternal,
-        iir_state: [[f64; 4]; 4],
         generator: FrameGenerator,
         process: Sender<'static, Data, 4>,
     }
@@ -241,7 +240,6 @@ mod app {
             adc_sm: thermostat.adc_sm,
             pwm: thermostat.pwm,
             adc_internal: thermostat.adc_internal,
-            iir_state: Default::default(),
             dac: thermostat.dac,
             generator,
             process,
@@ -375,7 +373,7 @@ mod app {
     }
 
     // Higher priority than telemetry but lower than adc data readout.
-    #[task(priority = 2, shared=[temperature, statistics, telemetry, settings], local=[iir_state, generator, dac])]
+    #[task(priority = 2, shared=[temperature, statistics, telemetry, settings], local=[generator, dac])]
     async fn process(mut c: process::Context, mut data: Receiver<'static, Data, 4>) {
         while let Ok(Data { phy, ch, adc_code }) = data.recv().await {
             let temp = c.shared.settings.lock(|settings| {
@@ -402,9 +400,7 @@ mod app {
 
                     for ch in OutputChannelIdx::iter() {
                         let idx = ch as usize;
-                        let current = settings.thermostat_eem.output[idx]
-                            .update(temperature, &mut c.local.iir_state[idx])
-                            as f32;
+                        let current = settings.thermostat_eem.output[idx].update(temperature);
                         telemetry.output_current[idx] = current;
                         c.local.dac.set(ch, DacCode::try_from(current).unwrap());
                     }
