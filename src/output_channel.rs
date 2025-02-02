@@ -1,8 +1,12 @@
 //! # Thermostat_EEM IIR wrapper.
 //!
 
+use core::iter::Take;
+
 use crate::{hardware::pwm::Pwm, DacCode};
-use idsp::iir;
+use idsp::{
+    iir, {AccuOsc, Sweep},
+};
 use miniconf::{Leaf, StrLeaf, Tree};
 use num_traits::Float;
 
@@ -21,15 +25,12 @@ pub enum State {
 
 #[derive(Clone, Debug, Tree)]
 pub struct OutputChannel {
-    pub state: Leaf<State>,
-
-    /// Maximum absolute (positive and negative) TEC voltage in volt.
-    /// These will be clamped to the maximum of 4.3 V.
-    ///
-    /// # Value
-    /// 0.0 to 4.3
-    #[tree(validate=self.validate_voltage_limit)]
-    pub voltage_limit: Leaf<f32>,
+    /// Thermostat input channel weights. Each input of an enabled input channel
+    /// is multiplied by its weight and the accumulated output is fed into the IIR.
+    /// The weights will be internally normalized to one (sum of the absolute values)
+    /// if they are not all zero.
+    #[tree(validate=self.validate_weights)]
+    pub weights: Leaf<[[f32; 4]; 4]>,
 
     /// PID/Biquad/IIR filter parameters
     ///
@@ -47,12 +48,67 @@ pub struct OutputChannel {
     #[tree(skip)]
     pub iir: iir::Biquad<f64>,
 
-    /// Thermostat input channel weights. Each input of an enabled input channel
-    /// is multiplied by its weight and the accumulated output is fed into the IIR.
-    /// The weights will be internally normalized to one (sum of the absolute values)
-    /// if they are not all zero.
-    #[tree(validate=self.validate_weights)]
-    pub weights: Leaf<[[f32; 4]; 4]>,
+    #[tree(skip)]
+    iir_state: [f64; 4],
+
+    pub state: Leaf<State>,
+
+    pub sweep: SineSweep,
+
+    /// Maximum absolute (positive and negative) TEC voltage in volt.
+    /// These will be clamped to the maximum of 4.3 V.
+    ///
+    /// # Value
+    /// 0.0 to 4.3
+    #[tree(validate=self.validate_voltage_limit)]
+    pub voltage_limit: Leaf<f32>,
+}
+
+#[derive(Clone, Debug, Tree)]
+pub struct SineSweep {
+    #[tree(skip)]
+    sweep: Take<AccuOsc<Sweep>>,
+    rate: Leaf<i32>,
+    cycles: Leaf<i32>,
+    length: Leaf<usize>,
+    amp: Leaf<f32>,
+    #[tree(validate=self.trigger)]
+    trigger: Leaf<bool>,
+}
+
+impl Default for SineSweep {
+    fn default() -> Self {
+        Self {
+            sweep: AccuOsc::new(Sweep::new(0, 0)).take(0),
+            rate: Leaf(0),
+            cycles: Leaf(0),
+            length: Leaf(0),
+            amp: Leaf(0.0),
+            trigger: Leaf(false),
+        }
+    }
+}
+
+impl Iterator for SineSweep {
+    type Item = f32;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        const SCALE: f32 = 1.0 / (1i64 << 31) as f32;
+        self.sweep.next().map(|c| (c.im as f32 * SCALE * *self.amp))
+    }
+}
+
+impl SineSweep {
+    fn trigger(&mut self, depth: usize) -> Result<usize, &'static str> {
+        self.sweep = AccuOsc::new(Sweep::new(
+            *self.rate,
+            ((*self.rate * *self.cycles) as i64) << 32,
+        ))
+        .take(*self.length);
+        self.trigger = Leaf(false);
+        Ok(depth)
+    }
 }
 
 impl Default for OutputChannel {
@@ -68,7 +124,9 @@ impl Default for OutputChannel {
             })),
             _biquad: (),
             iir: Default::default(),
+            iir_state: Default::default(),
             weights: Default::default(),
+            sweep: Default::default(),
         };
         s.validate_pid(0).unwrap();
         s.validate_voltage_limit(0).unwrap();
@@ -79,7 +137,7 @@ impl Default for OutputChannel {
 
 impl OutputChannel {
     /// compute weighted iir input, iir state and return the new output
-    pub fn update(&mut self, temperatures: &[[f64; 4]; 4], iir_state: &mut [f64; 4]) -> f64 {
+    pub fn update(&mut self, temperatures: &[[f64; 4]; 4]) -> f32 {
         let temperature = temperatures
             .as_flattened()
             .iter()
@@ -91,7 +149,9 @@ impl OutputChannel {
         } else {
             &iir::Biquad::HOLD
         };
-        iir.update(iir_state, temperature)
+        let y = iir.update(&mut self.iir_state, temperature);
+        let s = self.sweep.next().unwrap_or_default();
+        y as f32 + s
     }
 
     fn validate_pid(&mut self, depth: usize) -> Result<usize, &'static str> {
