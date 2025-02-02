@@ -35,13 +35,14 @@ pub struct OutputChannel {
     /// PID/Biquad/IIR filter parameters
     ///
     /// The y limits will be clamped to the maximum output current of +-3 A.
-    #[tree(validate=self.validate_pid, rename="typ")]
+    #[tree(validate=self.validate_biquad, rename="typ")]
     pub biquad: StrLeaf<iir::BiquadRepr<f32, f64>>,
 
     #[tree(
         rename = "biquad",
         typ = "iir::BiquadRepr<f32, f32>",
-        defer = "*self.biquad"
+        defer = "*self.biquad",
+        validate=self.validate_biquad,
     )]
     pub _biquad: (),
 
@@ -128,7 +129,7 @@ impl Default for OutputChannel {
             weights: Default::default(),
             sweep: Default::default(),
         };
-        s.validate_pid(0).unwrap();
+        s.validate_biquad(0).unwrap();
         s.validate_voltage_limit(0).unwrap();
         s.validate_weights(0).unwrap();
         s
@@ -154,7 +155,7 @@ impl OutputChannel {
         y as f32 + s
     }
 
-    fn validate_pid(&mut self, depth: usize) -> Result<usize, &'static str> {
+    fn validate_biquad(&mut self, depth: usize) -> Result<usize, &'static str> {
         self.iir = self.biquad.build::<f64>(1007.0.recip(), 1.0);
         let range = DacCode::MAX_CURRENT.min(Pwm::MAX_CURRENT_LIMIT);
         self.iir
