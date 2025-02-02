@@ -589,13 +589,15 @@ dependencies = [
 
 [[package]]
 name = "idsp"
-version = "0.15.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99b7ec7ce4a9fa0c4801301dc2dfc836bc98ea06e8e7f04372c86cfcd171a80e"
+version = "0.17.0"
+source = "git+https://github.com/quartiq/idsp.git#2dabd6750b067a26c73170d79865d44eb4ef02a5"
 dependencies = [
+ "miniconf",
  "num-complex 0.4.6",
  "num-traits",
  "serde",
+ "strum",
+ "thiserror",
 ]
 
 [[package]]
@@ -1506,18 +1508,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.4"
+version = "2.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f49a1853cf82743e3b7950f77e0f4d622ca36cf4317cba00c767838bac8d490"
+checksum = "d452f284b73e6d76dd36758a0c8684b1d5be31f92b89d07fd5822175732206fc"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.4"
+version = "2.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8381894bb3efe0c4acac3ded651301ceee58a15d47c2e34885ed1908ad667061"
+checksum = "26afc1baea8a989337eeb52b6e72a039780ce45c3edfcc9c5b9d112feeb173c2"
 dependencies = [
  "proc-macro2",
  "quote",
