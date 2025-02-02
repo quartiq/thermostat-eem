@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [UNRELEASED](https://github.com/quartiq/thermostat-eem/compare/v0.3.0...HEAD) - DATE
+
+### Added
+
+* Swept sine signal generator for transfer function and distortion measurements
+* Comprehensive unified generic biquad representations for standard filters from `idsp`
+* Support for other sensor transfer functions (linear, DT-670)
+* Supoprt for runtime sensor calibration/parameter changes
+* Support for any combinations of differential/single ended sensors
+
+### Changed
+
+* MQTT/USB/flash settings layout
+
 ## [v0.3.0](https://github.com/quartiq/thermostat-eem/compare/v0.2.0...v0.3.0)
 
 ### Changed

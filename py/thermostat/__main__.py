@@ -147,8 +147,9 @@ def _main():
                 )
 
             for k in (
-                "pid/min pid/max pid/setpoint pid/ki pid/kp pid/kd pid/li pid/ld "
-                "voltage_limit weights state"
+                "biquad/Pid/min biquad/Pid/max biquad/Pid/setpoint "
+                "biquad/Pid/ki biquad/Pid/kp biquad/Pid/kd biquad/Pid/li "
+                "biquad/Pid/ld voltage_limit weights state"
             ).split():
                 await thermostat.set(
                     f"/output/{args.output}/{k}",

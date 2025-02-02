@@ -82,7 +82,7 @@ serde_with = { version = "3.12", default-features = false, features = [
 [profile.dev]
 codegen-units = 1
 incremental = false
-opt-level = 3
+opt-level = "s"
 
 [profile.release]
 opt-level = "s"
@@ -92,3 +92,7 @@ codegen-units = 1
 
 [build-dependencies]
 built = { version = "0.7", features = ["git2"], default-features = false }
+
+[patch.crates-io]
+#idsp = { path = "../idsp" }
+idsp = { git = "https://github.com/quartiq/idsp.git" }

@@ -7,109 +7,8 @@ use crate::{hardware::pwm::Pwm, DacCode};
 use idsp::{
     iir, {AccuOsc, Sweep},
 };
-use miniconf::{Leaf, Tree};
+use miniconf::{Leaf, StrLeaf, Tree};
 use num_traits::Float;
-
-#[derive(Clone, Debug, Tree)]
-pub struct Pid {
-    /// Integral gain
-    ///
-    /// Units: output/input per second
-    pub ki: Leaf<f32>,
-    /// Proportional gain
-    ///
-    /// Note that this is the sign reference for all gains and limits
-    ///
-    /// Units: output/input
-    pub kp: Leaf<f32>,
-    /// Derivative gain
-    ///
-    /// Units: output/input*second
-    pub kd: Leaf<f32>,
-    /// Integral gain limit
-    ///
-    /// Units: output/input
-    pub li: Leaf<f32>,
-    /// Derivative gain limit
-    ///
-    /// Units: output/input
-    pub ld: Leaf<f32>,
-    /// Setpoint
-    ///
-    /// Units: input
-    pub setpoint: Leaf<f32>,
-    /// Output lower limit
-    ///
-    /// Units: output
-    pub min: Leaf<f32>,
-    /// Output upper limit
-    ///
-    /// Units: output
-    pub max: Leaf<f32>,
-    /// Update/sample period
-    ///
-    /// Units: seconds
-    #[tree(skip)]
-    pub period: f32,
-}
-
-impl Default for Pid {
-    fn default() -> Self {
-        Self {
-            ki: 0.0.into(),
-            kp: 0.0.into(), // positive default
-            kd: 0.0.into(),
-            li: f32::INFINITY.into(),
-            ld: f32::INFINITY.into(),
-            setpoint: 0.0.into(),
-            min: f32::NEG_INFINITY.into(),
-            max: f32::INFINITY.into(),
-            period: 1.0,
-        }
-    }
-}
-
-impl Pid {
-    fn biquad(&self) -> Result<iir::Biquad<f64>, iir::PidError> {
-        let mut biquad: iir::Biquad<f64> = iir::Pid::<f64>::default()
-            .period(self.period as _) // ADC sample rate (ODR) including zero-oder-holds
-            .gain(iir::Action::Ki, self.ki.copysign(*self.kp) as _)
-            .gain(iir::Action::Kp, *self.kp as _)
-            .gain(iir::Action::Kd, self.kd.copysign(*self.kp) as _)
-            .limit(
-                iir::Action::Ki,
-                if self.li.is_finite() {
-                    *self.li
-                } else {
-                    f32::INFINITY
-                }
-                .copysign(*self.kp) as _,
-            )
-            .limit(
-                iir::Action::Kd,
-                if self.ld.is_finite() {
-                    *self.ld
-                } else {
-                    f32::INFINITY
-                }
-                .copysign(*self.kp) as _,
-            )
-            .build()?
-            .into();
-        biquad.set_input_offset(-*self.setpoint as _);
-        biquad.set_min(if self.min.is_finite() {
-            *self.min
-        } else {
-            f32::NEG_INFINITY
-        } as _);
-        biquad.set_max(if self.max.is_finite() {
-            *self.max
-        } else {
-            f32::INFINITY
-        } as _);
-        Ok(biquad)
-    }
-}
 
 #[derive(
     Copy, Clone, Default, Debug, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
@@ -136,8 +35,15 @@ pub struct OutputChannel {
     /// PID/Biquad/IIR filter parameters
     ///
     /// The y limits will be clamped to the maximum output current of +-3 A.
-    #[tree(validate=self.validate_pid)]
-    pub pid: Pid,
+    #[tree(validate=self.validate_pid, rename="typ")]
+    pub biquad: StrLeaf<iir::BiquadRepr<f32, f64>>,
+
+    #[tree(
+        rename = "biquad",
+        typ = "iir::BiquadRepr<f32, f32>",
+        defer = "*self.biquad"
+    )]
+    pub _biquad: (),
 
     #[tree(skip)]
     pub iir: iir::Biquad<f64>,
@@ -162,7 +68,6 @@ pub struct OutputChannel {
 pub struct SineSweep {
     #[tree(skip)]
     sweep: Take<AccuOsc<Sweep>>,
-
     rate: Leaf<i32>,
     cycles: Leaf<i32>,
     length: Leaf<usize>,
@@ -211,13 +116,13 @@ impl Default for OutputChannel {
         let mut s = Self {
             state: State::Off.into(),
             voltage_limit: Pwm::MAX_VOLTAGE_LIMIT.into(),
-            pid: Pid {
-                period: 1.0 / 1007.0,
-                max: 0.01.into(),
-                min: (-0.01).into(),
-                setpoint: 25.0.into(),
+            biquad: StrLeaf(iir::BiquadRepr::Pid(iir::Pid {
+                max: Leaf(0.01),
+                min: Leaf(-0.01),
+                setpoint: Leaf(25.0),
                 ..Default::default()
-            },
+            })),
+            _biquad: (),
             iir: Default::default(),
             iir_state: Default::default(),
             weights: Default::default(),
@@ -250,11 +155,7 @@ impl OutputChannel {
     }
 
     fn validate_pid(&mut self, depth: usize) -> Result<usize, &'static str> {
-        if let Ok(iir) = self.pid.biquad() {
-            self.iir = iir;
-        } else {
-            return Err("Pid build failure, update not applied.");
-        }
+        self.iir = self.biquad.build::<f64>(1007.0.recip(), 1.0);
         let range = DacCode::MAX_CURRENT.min(Pwm::MAX_CURRENT_LIMIT);
         self.iir
             .set_max(self.iir.max().clamp(-range as _, range as _));
