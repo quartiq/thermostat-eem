@@ -12,7 +12,7 @@ authors = [
     { name = "Norman Krackow", email = "nk@quartiq.de" },
 ]
 dependencies = [
-    "miniconf-mqtt@git+https://github.com/quartiq/miniconf@v0.18.1#subdirectory=py/miniconf-mqtt",
+    "miniconf-mqtt@git+https://github.com/quartiq/miniconf@v0.18.2#subdirectory=py/miniconf-mqtt",
     # "stabilizer@git+https://github.com/quartiq/stabilizer@v0.11.0#subdirectory=py",
 ]
 classifiers = [
