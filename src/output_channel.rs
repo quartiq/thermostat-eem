@@ -3,7 +3,7 @@
 
 use crate::{hardware::pwm::Pwm, DacCode};
 use idsp::iir;
-use miniconf::{Leaf, Tree};
+use miniconf::{Leaf, StrLeaf, Tree};
 use num_traits::Float;
 
 #[derive(
@@ -34,8 +34,15 @@ pub struct OutputChannel {
     /// PID/Biquad/IIR filter parameters
     ///
     /// The y limits will be clamped to the maximum output current of +-3 A.
-    #[tree(validate=self.validate_pid)]
-    pub pid: iir::BiquadRepr<f32, f64>,
+    #[tree(validate=self.validate_pid, rename="typ")]
+    pub biquad: StrLeaf<iir::BiquadRepr<f32, f64>>,
+
+    #[tree(
+        rename = "biquad",
+        typ = "iir::BiquadRepr<f32, f32>",
+        defer = "*self.biquad"
+    )]
+    pub _biquad: (),
 
     #[tree(skip)]
     pub iir: iir::Biquad<f64>,
@@ -53,12 +60,13 @@ impl Default for OutputChannel {
         let mut s = Self {
             state: State::Off.into(),
             voltage_limit: Pwm::MAX_VOLTAGE_LIMIT.into(),
-            pid: iir::BiquadRepr::Pid(iir::Pid {
+            biquad: StrLeaf(iir::BiquadRepr::Pid(iir::Pid {
                 max: Leaf(0.01),
                 min: Leaf(-0.01),
                 setpoint: Leaf(25.0),
                 ..Default::default()
-            }),
+            })),
+            _biquad: (),
             iir: Default::default(),
             weights: Default::default(),
         };
@@ -87,7 +95,7 @@ impl OutputChannel {
     }
 
     fn validate_pid(&mut self, depth: usize) -> Result<usize, &'static str> {
-        self.iir = self.pid.build::<f64>(1007.0.recip(), 1.0);
+        self.iir = self.biquad.build::<f64>(1007.0.recip(), 1.0);
         let range = DacCode::MAX_CURRENT.min(Pwm::MAX_CURRENT_LIMIT);
         self.iir
             .set_max(self.iir.max().clamp(-range as _, range as _));
