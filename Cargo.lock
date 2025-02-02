@@ -1485,6 +1485,7 @@ dependencies = [
  "minimq",
  "mono-clock",
  "num-traits",
+ "num_enum",
  "panic-persist",
  "panic-probe",
  "postcard",

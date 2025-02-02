@@ -79,6 +79,7 @@ embedded-storage-async = "0.4"
 serde_with = { version = "3.12", default-features = false, features = [
 	"macros",
 ] }
+num_enum = { version = "0.7.3", default-features = false }
 
 [profile.dev]
 codegen-units = 1
