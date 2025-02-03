@@ -46,7 +46,7 @@ embedded-time = "0.12.1"
 fugit = "0.3"
 mono-clock = "0.1"
 heapless = { version = "0.8", features = ["serde"] }
-minimq = "0.9"
+minimq = "0.10"
 serde = { version = "1.0.217", features = ["derive"], default-features = false }
 serde-json-core = "0.6"
 rtt-logger = "0.2"
