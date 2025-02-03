@@ -416,11 +416,9 @@ mod app {
                     {
                         *t = *u as _;
                     }
-                    let b = bytemuck::bytes_of(&s);
                     c.local.generator.add(|buf| {
-                        for (b, s) in buf.iter_mut().zip(b.iter()) {
-                            b.write(*s);
-                        }
+                        let b = bytemuck::cast_slice(bytemuck::bytes_of(&s));
+                        buf[..b.len()].copy_from_slice(b);
                         b.len()
                     });
                 });

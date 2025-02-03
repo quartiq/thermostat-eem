@@ -60,6 +60,7 @@ arbitrary-int = "1.3.0"
 lm75 = "0.2"
 bytemuck = { version = "1.21.0", features = [
 	"derive",
+	"zeroable_maybe_uninit",
 ], default-features = false }
 # Note: Keep in-sync with `py/setup.py`
 miniconf = { version = "0.18", features = ["json-core", "derive", "postcard"] }
@@ -78,6 +79,7 @@ embedded-storage-async = "0.4"
 serde_with = { version = "3.12", default-features = false, features = [
 	"macros",
 ] }
+num_enum = { version = "0.7.3", default-features = false }
 
 [profile.dev]
 codegen-units = 1

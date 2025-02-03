@@ -1,10 +1,10 @@
 //! Stabilizer data stream capabilities
 //!
 //! # Design
-//! Data streamining utilizes UDP packets to send live data streams at high throughput.
+//! Data streamining utilizes UDP packets to send data streams at high throughput.
 //! Packets are always sent in a best-effort fashion, and data may be dropped.
 //!
-//! Stabilizer organizes livestreamed data into batches within a "Frame" that will be sent as a UDP
+//! Stabilizer organizes streamed data into batches within a "Frame" that will be sent as a UDP
 //! packet. Each frame consits of a header followed by sequential batch serializations. The packet
 //! header is constant for all streaming capabilities, but the serialization format after the header
 //! is application-defined.
@@ -21,7 +21,7 @@
 //!
 //! # Example
 //! A sample Python script is available in `scripts/stream_throughput.py` to demonstrate reception
-//! of livestreamed data.
+//! of streamed data.
 
 #![allow(non_camel_case_types)] // https://github.com/rust-embedded/heapless/issues/411
 
@@ -32,6 +32,7 @@ use heapless::{
     spsc::{Consumer, Producer, Queue},
     String,
 };
+use num_enum::IntoPrimitive;
 use serde::Serialize;
 use serde_with::DeserializeFromStr;
 use smoltcp_nal::embedded_nal::{nb, SocketAddr, UdpClientStack};
@@ -51,8 +52,8 @@ const FRAME_COUNT: usize = 4;
 
 // The size of each frame in bytes.
 // Ensure the resulting ethernet frame is within the MTU:
-// 1500 MTU - 40 IP6 header - 8 UDP header
-const FRAME_SIZE: usize = 1500 - 40 - 8;
+// 1500 MTU - 40 IP6 header - 8 UDP header - 32 VPN - 20 IP4
+const FRAME_SIZE: usize = 1500 - 40 - 8 - 32 - 20;
 
 // The size of the frame queue must be at least as large as the number of frame buffers. Every
 // allocated frame buffer should fit in the queue.
@@ -61,29 +62,6 @@ const FRAME_QUEUE_SIZE: usize = FRAME_COUNT * 2;
 type Frame = [MaybeUninit<u8>; FRAME_SIZE];
 
 box_pool!(FRAME_POOL: Frame);
-
-/// Specifies the format of streamed data
-#[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum StreamFormat {
-    /// Reserved, unused format specifier.
-    Unknown = 0,
-
-    /// Streamed data contains ADC0, ADC1, DAC0, and DAC1 sequentially in little-endian format.
-    ///
-    /// # Example
-    /// With a batch size of 2, the serialization would take the following form:
-    /// ```
-    /// <ADC0[0]> <ADC0[1]> <ADC1[0]> <ADC1[1]> <DAC0[0]> <DAC0[1]> <DAC1[0]> <DAC1[1]>
-    /// ```
-    AdcDacData = 1,
-
-    /// Streamed data in FLS (fiber length stabilization) format. See the FLS application for
-    /// detailed definition.
-    Fls = 2,
-
-    ThermostatEem = 3,
-}
 
 /// Represents the destination for the UDP stream to send data to.
 ///
@@ -121,10 +99,27 @@ impl core::str::FromStr for StreamTarget {
     }
 }
 
-impl core::fmt::Display for StreamTarget {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        self.0.fmt(f)
-    }
+/// Specifies the format of streamed data
+#[repr(u8)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, IntoPrimitive)]
+pub enum StreamFormat {
+    /// Reserved, unused format specifier.
+    Unknown = 0,
+
+    /// ADC0, ADC1, DAC0, and DAC1 sequentially in little-endian format.
+    ///
+    /// # Example
+    /// With a batch size of 2, the serialization would take the following form:
+    /// ```
+    /// <ADC0[0]> <ADC0[1]> <ADC1[0]> <ADC1[1]> <DAC0[0]> <DAC0[1]> <DAC1[0]> <DAC1[1]>
+    /// ```
+    AdcDacData = 1,
+
+    /// FLS (fiber length stabilization) format. See the FLS application.
+    Fls = 2,
+
+    /// Thermostat-EEM data. See `thermostat-eem` repo and application.
+    ThermostatEem = 3,
 }
 
 /// Configure streaming on a device.
@@ -144,19 +139,19 @@ pub fn setup_streaming(stack: NetworkReference) -> (FrameGenerator, DataStream) 
 
     #[allow(clippy::declare_interior_mutable_const)]
     const FRAME: BoxBlock<Frame> = BoxBlock::new();
-
-    let memory =
-        cortex_m::singleton!(FRAME_DATA: [BoxBlock<Frame>; FRAME_COUNT] = [FRAME; FRAME_COUNT])
-            .unwrap();
+    let memory = cortex_m::singleton!(FRAME_DATA: [BoxBlock<Frame>; FRAME_COUNT] =
+    [FRAME; FRAME_COUNT])
+    .unwrap();
 
     for block in memory.iter_mut() {
         FRAME_POOL.manage(block);
     }
 
-    (
-        FrameGenerator::new(producer),
-        DataStream::new(stack, consumer),
-    )
+    let generator = FrameGenerator::new(producer);
+
+    let stream = DataStream::new(stack, consumer);
+
+    (generator, stream)
 }
 
 #[derive(Debug)]
@@ -206,7 +201,6 @@ impl StreamFrame {
 }
 
 /// The data generator for a stream.
-/// The data generator for a stream.
 pub struct FrameGenerator {
     queue: Producer<'static, StreamFrame, FRAME_QUEUE_SIZE>,
     current_frame: Option<StreamFrame>,
@@ -218,7 +212,7 @@ impl FrameGenerator {
     fn new(queue: Producer<'static, StreamFrame, FRAME_QUEUE_SIZE>) -> Self {
         Self {
             queue,
-            format: StreamFormat::Unknown as _,
+            format: StreamFormat::Unknown.into(),
             current_frame: None,
             sequence_number: 0,
         }
@@ -248,29 +242,33 @@ impl FrameGenerator {
         let sequence_number = self.sequence_number;
         self.sequence_number = self.sequence_number.wrapping_add(1);
 
-        if self.current_frame.is_none() {
-            if let Ok(buffer) = FRAME_POOL.alloc([MaybeUninit::uninit(); FRAME_SIZE]) {
-                self.current_frame
-                    .replace(StreamFrame::new(buffer, self.format, sequence_number));
-            } else {
-                return;
+        let current_frame = match self.current_frame.as_mut() {
+            None => {
+                if let Ok(buffer) = FRAME_POOL.alloc([MaybeUninit::uninit(); FRAME_SIZE]) {
+                    self.current_frame.insert(StreamFrame::new(
+                        buffer,
+                        self.format,
+                        sequence_number,
+                    ))
+                } else {
+                    return;
+                }
             }
-        }
-
-        // Note(unwrap): We ensure the frame is present above.
-        let current_frame = self.current_frame.as_mut().unwrap();
+            Some(frame) => frame,
+        };
 
         let len = current_frame.add_batch(func);
 
         if current_frame.is_full(len) {
             // Note(unwrap): The queue is designed to be at least as large as the frame buffer
             // count, so this enqueue should always succeed.
-            self.queue
-                .enqueue(self.current_frame.take().unwrap())
-                .unwrap();
+            if let Some(frame) = self.current_frame.take() {
+                self.queue.enqueue(frame).unwrap();
+            }
         }
     }
 }
+
 /// The "consumer" portion of the data stream.
 ///
 /// # Note
@@ -361,10 +359,7 @@ impl DataStream {
                     // Transmit the frame and return it to the pool.
                     let buf = frame.finish();
                     let data = unsafe {
-                        core::slice::from_raw_parts(
-                            buf.as_ptr() as *const u8,
-                            core::mem::size_of_val(buf),
-                        )
+                        core::slice::from_raw_parts(buf.as_ptr() as *const u8, size_of_val(buf))
                     };
 
                     // If we fail to send, it can only be because the socket got closed on us (i.e.
