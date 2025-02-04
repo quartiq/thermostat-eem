@@ -70,7 +70,7 @@ pub struct SineSweep {
     #[tree(skip)]
     sweep: Take<AccuOsc<Sweep>>,
     rate: Leaf<i32>,
-    cycles: Leaf<i32>,
+    state: Leaf<i64>,
     length: Leaf<usize>,
     amp: Leaf<f32>,
     #[tree(validate=self.trigger)]
@@ -82,7 +82,7 @@ impl Default for SineSweep {
         Self {
             sweep: AccuOsc::new(Sweep::new(0, 0)).take(0),
             rate: Leaf(0),
-            cycles: Leaf(0),
+            state: Leaf(0),
             length: Leaf(0),
             amp: Leaf(0.0),
             trigger: Leaf(false),
@@ -102,11 +102,7 @@ impl Iterator for SineSweep {
 
 impl SineSweep {
     fn trigger(&mut self, depth: usize) -> Result<usize, &'static str> {
-        self.sweep = AccuOsc::new(Sweep::new(
-            *self.rate,
-            ((*self.rate * *self.cycles) as i64) << 32,
-        ))
-        .take(*self.length);
+        self.sweep = AccuOsc::new(Sweep::new(*self.rate, *self.state)).take(*self.length);
         self.trigger = Leaf(false);
         Ok(depth)
     }
