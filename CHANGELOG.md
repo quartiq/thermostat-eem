@@ -12,9 +12,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 * Swept sine signal generator for transfer function and distortion measurements
 * Comprehensive unified generic biquad representations for standard filters from `idsp`
+* Support for I² and D² controllers
 * Support for other sensor transfer functions (linear, DT-670)
 * Supoprt for runtime sensor calibration/parameter changes
 * Support for any combinations of differential/single ended sensors
+* Removed python utilities as there is little added value now
 
 ### Changed
 
