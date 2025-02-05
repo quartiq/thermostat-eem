@@ -67,14 +67,15 @@ pub struct OutputChannel {
 
 #[derive(Clone, Debug, Tree)]
 pub struct SineSweep {
-    #[tree(skip)]
-    sweep: Take<AccuOsc<Sweep>>,
     rate: Leaf<i32>,
     state: Leaf<i64>,
     length: Leaf<usize>,
     amp: Leaf<f32>,
-    #[tree(validate=self.trigger)]
-    trigger: Leaf<bool>,
+    /// Trigger both signal sources
+    #[tree(validate=self.validate_trigger)]
+    trigger: Leaf<()>,
+    #[tree(skip)]
+    sweep: Take<AccuOsc<Sweep>>,
 }
 
 impl Default for SineSweep {
@@ -85,7 +86,7 @@ impl Default for SineSweep {
             state: Leaf(0),
             length: Leaf(0),
             amp: Leaf(0.0),
-            trigger: Leaf(false),
+            trigger: Leaf(()),
         }
     }
 }
@@ -101,9 +102,8 @@ impl Iterator for SineSweep {
 }
 
 impl SineSweep {
-    fn trigger(&mut self, depth: usize) -> Result<usize, &'static str> {
+    fn validate_trigger(&mut self, depth: usize) -> Result<usize, &'static str> {
         self.sweep = AccuOsc::new(Sweep::new(*self.rate, *self.state)).take(*self.length);
-        self.trigger = Leaf(false);
         Ok(depth)
     }
 }
