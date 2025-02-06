@@ -152,7 +152,7 @@ impl OutputChannel {
     }
 
     fn validate_biquad(&mut self, depth: usize) -> Result<usize, &'static str> {
-        self.iir = self.biquad.build::<f64>(1007.0.recip(), 1.0);
+        self.iir = self.biquad.build::<f64>(1007.0.recip(), 1.0, 1.0);
         let range = DacCode::MAX_CURRENT.min(Pwm::MAX_CURRENT_LIMIT);
         self.iir
             .set_max(self.iir.max().clamp(-range as _, range as _));
