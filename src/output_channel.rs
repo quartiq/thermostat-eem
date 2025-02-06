@@ -26,10 +26,8 @@ pub enum State {
 #[derive(Clone, Debug, Tree)]
 pub struct OutputChannel {
     /// Thermostat input channel weights. Each input of an enabled input channel
-    /// is multiplied by its weight and the accumulated output is fed into the IIR.
-    /// The weights will be internally normalized to one (sum of the absolute values)
-    /// if they are not all zero.
-    #[tree(validate=self.validate_weights)]
+    /// is multiplied by the corresponding weight and the accumulated output is
+    /// fed into the IIR.
     pub weights: Leaf<[[f32; 4]; 4]>,
 
     /// PID/Biquad/IIR filter parameters
@@ -111,15 +109,15 @@ impl SineSweep {
 impl Default for OutputChannel {
     fn default() -> Self {
         let mut s = Self {
-            state: State::Off.into(),
-            voltage_limit: Pwm::MAX_VOLTAGE_LIMIT.into(),
+            state: Default::default(),
+            voltage_limit: Leaf(Pwm::MAX_VOLTAGE_LIMIT),
             biquad: StrLeaf(iir::BiquadRepr::Pid(iir::Pid {
                 max: Leaf(0.01),
                 min: Leaf(-0.01),
                 setpoint: Leaf(25.0),
                 ..Default::default()
             })),
-            _biquad: (),
+            _biquad: Default::default(),
             iir: Default::default(),
             iir_state: Default::default(),
             weights: Default::default(),
@@ -127,7 +125,6 @@ impl Default for OutputChannel {
         };
         s.validate_biquad(0).unwrap();
         s.validate_voltage_limit(0).unwrap();
-        s.validate_weights(0).unwrap();
         s
     }
 }
@@ -163,18 +160,6 @@ impl OutputChannel {
 
     fn validate_voltage_limit(&mut self, depth: usize) -> Result<usize, &'static str> {
         *self.voltage_limit = (*self.voltage_limit).clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
-        Ok(depth)
-    }
-
-    fn validate_weights(&mut self, depth: usize) -> Result<usize, &'static str> {
-        let divisor: f32 = self.weights.as_flattened().iter().map(|w| w.abs()).sum();
-        // Note: The weights which are not 'None' should always affect an enabled channel and therefore count for normalization.
-        if divisor != 0.0 {
-            let n = divisor.recip();
-            for w in self.weights.as_flattened_mut().iter_mut() {
-                *w *= n;
-            }
-        }
         Ok(depth)
     }
 
