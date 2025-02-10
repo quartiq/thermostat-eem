@@ -64,7 +64,7 @@ bytemuck = { version = "1.21.0", features = [
 ], default-features = false }
 miniconf = { version = "0.18", features = ["json-core", "derive", "postcard"] }
 miniconf_mqtt = { version = "0.18" }
-strum = { version = "0.26.1", default-features = false, features = ["derive"] }
+strum = { version = "0.27.0", default-features = false, features = ["derive"] }
 serial-settings = "0.2"
 postcard = "1"
 embedded-storage = "0.3"
