@@ -57,7 +57,7 @@ pub type SerialPort =
     usbd_serial::SerialPort<'static, crate::hardware::UsbBus, &'static mut [u8], &'static mut [u8]>;
 
 pub type SerialTerminal<C, const Y: usize> =
-    serial_settings::Runner<'static, crate::settings::SerialSettingsPlatform<C, Y>, Y>;
+    serial_settings::Runner<'static, crate::settings::SerialSettingsPlatform<C>, Y>;
 
 pub type UsbBus = stm32h7xx_hal::usb_hs::UsbBus<stm32h7xx_hal::usb_hs::USB2>;
 
