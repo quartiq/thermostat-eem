@@ -38,7 +38,7 @@ log = { version = "0.4", features = [
 	"release_max_level_info",
 ] }
 panic-probe = { version = "=0.3.0", features = ["print-rtt"] }
-smoltcp-nal = { version = "0.5", features = ["shared-stack"] }
+smoltcp-nal = { version = "0.6", features = ["shared-stack"] }
 rtic = { version = "2.1", features = ["thumbv7-backend"] }
 rtic-monotonics = { version = "2.0", features = ["cortex-m-systick"] }
 rtic-sync = { version = "1.0" }
@@ -46,7 +46,7 @@ embedded-time = "0.12.1"
 fugit = "0.3"
 mono-clock = "0.1"
 heapless = { version = "0.8", features = ["serde"] }
-minimq = "0.9"
+minimq = "0.10"
 serde = { version = "1.0.217", features = ["derive"], default-features = false }
 serde-json-core = "0.6"
 rtt-logger = "0.2"
@@ -64,7 +64,7 @@ bytemuck = { version = "1.21.0", features = [
 ], default-features = false }
 miniconf = { version = "0.18", features = ["json-core", "derive", "postcard"] }
 miniconf_mqtt = { version = "0.18" }
-strum = { version = "0.26.1", default-features = false, features = ["derive"] }
+strum = { version = "0.27", default-features = false, features = ["derive"] }
 serial-settings = "0.2"
 postcard = "1"
 embedded-storage = "0.3"
@@ -97,3 +97,7 @@ built = { version = "0.7", features = ["git2"], default-features = false }
 [patch.crates-io]
 #idsp = { path = "../idsp" }
 idsp = { git = "https://github.com/quartiq/idsp.git" }
+miniconf = { git = "https://github.com/quartiq/miniconf.git" }
+miniconf_derive = { git = "https://github.com/quartiq/miniconf.git" }
+miniconf_mqtt = { git = "https://github.com/quartiq/miniconf.git" }
+serial-settings = { git = "https://github.com/quartiq/stabilizer.git" }

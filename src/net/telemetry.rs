@@ -11,7 +11,7 @@
 //! required immediately before transmission. This ensures that any slower computation required
 //! for unit conversion can be off-loaded to lower priority tasks.
 use heapless::String;
-use minimq::{DeferredPublication, Publication};
+use minimq::Publication;
 use serde::Serialize;
 
 use super::NetworkReference;
@@ -74,12 +74,9 @@ impl TelemetryClient {
 
         self.mqtt
             .client()
-            .publish(
-                minimq::DeferredPublication::new(|buf| serde_json_core::to_slice(telemetry, buf))
-                    .topic(&topic)
-                    .finish()
-                    .unwrap(),
-            )
+            .publish(Publication::new(&topic, |buf: &mut [u8]| {
+                serde_json_core::to_slice(telemetry, buf)
+            }))
             .map_err(|e| log::error!("Telemetry publishing error: {:?}", e))
             .ok();
     }
@@ -89,12 +86,9 @@ impl TelemetryClient {
     pub fn publish_alarm(&mut self, alarm_topic: &String<128>, alarm: &bool) {
         self.mqtt
             .client()
-            .publish(
-                minimq::DeferredPublication::new(|buf| serde_json_core::to_slice(alarm, buf))
-                    .topic(alarm_topic)
-                    .finish()
-                    .unwrap(),
-            )
+            .publish(Publication::new(alarm_topic, |buf: &mut [u8]| {
+                serde_json_core::to_slice(alarm, buf)
+            }))
             .map_err(|e| log::error!("Alarm publishing error: {:?}", e))
             .ok();
     }
@@ -133,23 +127,15 @@ impl TelemetryClient {
 
             if mqtt
                 .client()
-                .publish(
-                    DeferredPublication::new(|buf| serde_json_core::to_slice(&metadata, buf))
-                        .topic(&topic)
-                        .finish()
-                        .unwrap(),
-                )
+                .publish(Publication::new(&topic, |buf: &mut [u8]| {
+                    serde_json_core::to_slice(&metadata, buf)
+                }))
                 .is_err()
             {
                 // Note(unwrap): We can guarantee that this message will be sent because we checked
                 // for ability to publish above.
                 mqtt.client()
-                    .publish(
-                        Publication::new(DEFAULT_METADATA.as_bytes())
-                            .topic(&topic)
-                            .finish()
-                            .unwrap(),
-                    )
+                    .publish(Publication::new(&topic, DEFAULT_METADATA.as_bytes()))
                     .unwrap();
             }
 
