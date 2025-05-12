@@ -1,3 +1,4 @@
+use arbitrary_int::u3;
 use strum::IntoEnumIterator;
 
 use super::hal::{
@@ -78,28 +79,12 @@ impl From<TecFrequency> for PinState {
     }
 }
 
-#[derive(Copy, Clone, Debug, strum::EnumIter)]
-#[repr(usize)]
-pub enum Led {
-    Led0 = 0,
-    Led1 = 1,
-    Led2 = 2,
-    Led3 = 3,
-    Led4 = 4,
-    Led5 = 5,
-    Led6 = 6,
-    Led7 = 7,
-}
+pub type Led = u3;
 
 // Channel enabled indicator LEDs. First set of four from top to bottom.
 impl From<OutputChannelIdx> for Led {
     fn from(other: OutputChannelIdx) -> Led {
-        match other {
-            OutputChannelIdx::Zero => Led::Led0,
-            OutputChannelIdx::One => Led::Led1,
-            OutputChannelIdx::Two => Led::Led2,
-            OutputChannelIdx::Three => Led::Led3,
-        }
+        Led::new(other as _)
     }
 }
 
@@ -116,8 +101,8 @@ impl Gpio {
         for i in OutputChannelIdx::iter() {
             self.set_shutdown(i, State::Assert);
         }
-        for i in Led::iter() {
-            self.set_led(i, State::Deassert);
+        for i in 0u8..8 {
+            self.set_led(Led::new(i), State::Deassert);
         }
         self.set_eem_pwr(false);
         self.set_tec_frequency(TecFrequency::Low);
@@ -133,7 +118,7 @@ impl Gpio {
     }
 
     pub fn set_led(&mut self, led: Led, state: State) {
-        self.led[led as usize].set_state(PinState::from(state));
+        self.led[led.value() as usize].set_state(PinState::from(state));
     }
 
     pub fn hwrev(&self) -> u8 {

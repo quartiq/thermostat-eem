@@ -1,5 +1,4 @@
 use core::fmt::Write;
-use core::mem::MaybeUninit;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::hardware::{ad7172, adc::Mux, platform};
@@ -116,9 +115,9 @@ pub struct ThermostatDevices<C: serial_settings::Settings + 'static, const Y: us
 
 #[link_section = ".sram3.eth"]
 /// Static storage for the ethernet DMA descriptor ring.
-static mut DES_RING: MaybeUninit<
+static DES_RING: grounded::uninit::GroundedCell<
     ethernet::DesRing<{ super::TX_DESRING_CNT }, { super::RX_DESRING_CNT }>,
-> = MaybeUninit::uninit();
+> = grounded::uninit::GroundedCell::uninit();
 
 pub fn setup<C, const Y: usize>(
     mut core: stm32h7xx_hal::stm32::CorePeripherals,
@@ -500,7 +499,11 @@ where
             (ref_clk, mdio, mdc, crs_dv, rxd0, rxd1, tx_en, txd0, txd1)
         };
 
-        let ring = unsafe { DES_RING.write(ethernet::DesRing::new()) };
+        let ring = unsafe {
+            let p = DES_RING.get();
+            core::ptr::write(p, ethernet::DesRing::new());
+            &mut *p
+        };
 
         // Configure the ethernet controller
         let (mut eth_dma, eth_mac) = ethernet::new(

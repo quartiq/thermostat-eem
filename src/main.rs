@@ -43,7 +43,7 @@ use statistics::{Buffer, Statistics};
 pub struct InputChannel {
     #[tree(rename = "typ")]
     sensor: StrLeaf<Sensor>,
-    #[tree(rename="sensor", typ = "Sensor", defer=*self.sensor)]
+    #[tree(rename="sensor", typ = "Sensor", defer=(*self.sensor))]
     _sensor: (),
 }
 
