@@ -79,6 +79,7 @@ serde_with = { version = "3.12", default-features = false, features = [
 	"macros",
 ] }
 num_enum = { version = "0.7.3", default-features = false }
+grounded = "0.2.0"
 
 [profile.dev]
 codegen-units = 1
@@ -92,7 +93,7 @@ lto = true
 codegen-units = 1
 
 [build-dependencies]
-built = { version = "0.7", features = ["git2"], default-features = false }
+built = { version = "0.8", features = ["git2"], default-features = false }
 
 [patch.crates-io]
 #idsp = { path = "../idsp" }

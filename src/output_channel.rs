@@ -7,8 +7,9 @@ use crate::{hardware::pwm::Pwm, DacCode};
 use idsp::{
     iir, {AccuOsc, Sweep},
 };
-use miniconf::{Leaf, StrLeaf, Tree};
+use miniconf::{Error, Keys, Leaf, Tree, TreeDeserialize};
 use num_traits::Float;
+use serde::Deserializer;
 
 #[derive(
     Copy, Clone, Default, Debug, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
@@ -30,20 +31,19 @@ pub struct OutputChannel {
     /// fed into the IIR.
     pub weights: Leaf<[[f32; 4]; 4]>,
 
+    /// Biquad parameters
+    #[tree(typ="Leaf<iir::BiquadReprDiscriminants>", rename="typ",
+        with(serialize=self.biquad.tag_serialize, deserialize=self.biquad.tag_deserialize),
+        deny(ref_any="deny", mut_any="deny"))]
+    _tag: (),
+
     /// PID/Biquad/IIR filter parameters
     ///
     /// The y limits will be clamped to the maximum output current of +-3 A.
-    #[tree(validate=self.validate_biquad, rename="typ")]
-    pub biquad: StrLeaf<iir::BiquadRepr<f32, f64>>,
+    #[tree(with(deserialize=self.validate_biquad))]
+    pub biquad: iir::BiquadRepr<f32, f64>,
 
-    #[tree(
-        rename = "biquad",
-        typ = "iir::BiquadRepr<f32, f32>",
-        defer = "*self.biquad",
-        validate=self.validate_biquad,
-    )]
-    pub _biquad: (),
-
+    /// Built biquad
     #[tree(skip)]
     pub iir: iir::Biquad<f64>,
 
@@ -59,7 +59,7 @@ pub struct OutputChannel {
     ///
     /// # Value
     /// 0.0 to 4.3
-    #[tree(validate=self.validate_voltage_limit)]
+    #[tree(with(deserialize=self.validate_voltage_limit))]
     pub voltage_limit: Leaf<f32>,
 }
 
@@ -70,7 +70,7 @@ pub struct SineSweep {
     length: Leaf<usize>,
     amp: Leaf<f32>,
     /// Trigger both signal sources
-    #[tree(validate=self.validate_trigger)]
+    #[tree(with(deserialize=self.validate_trigger))]
     trigger: Leaf<()>,
     #[tree(skip)]
     sweep: Take<AccuOsc<Sweep>>,
@@ -100,32 +100,35 @@ impl Iterator for SineSweep {
 }
 
 impl SineSweep {
-    fn validate_trigger(&mut self, depth: usize) -> Result<usize, &'static str> {
+    fn validate_trigger<'de, D: Deserializer<'de>, K: Keys>(
+        &mut self,
+        keys: K,
+        de: D,
+    ) -> Result<(), Error<D::Error>> {
+        self.trigger.deserialize_by_key(keys, de)?;
         self.sweep = AccuOsc::new(Sweep::new(*self.rate, *self.state)).take(*self.length);
-        Ok(depth)
+        Ok(())
     }
 }
 
 impl Default for OutputChannel {
     fn default() -> Self {
-        let mut s = Self {
+        let b = iir::BiquadRepr::Pid(iir::Pid {
+            max: Leaf(0.01),
+            min: Leaf(-0.01),
+            setpoint: Leaf(25.0),
+            ..Default::default()
+        });
+        Self {
             state: Default::default(),
             voltage_limit: Leaf(Pwm::MAX_VOLTAGE_LIMIT),
-            biquad: StrLeaf(iir::BiquadRepr::Pid(iir::Pid {
-                max: Leaf(0.01),
-                min: Leaf(-0.01),
-                setpoint: Leaf(25.0),
-                ..Default::default()
-            })),
-            _biquad: Default::default(),
-            iir: Default::default(),
+            _tag: (),
+            iir: b.build::<f64>(1007.0.recip(), 1.0, 1.0),
+            biquad: b,
             iir_state: Default::default(),
             weights: Default::default(),
             sweep: Default::default(),
-        };
-        s.validate_biquad(0).unwrap();
-        s.validate_voltage_limit(0).unwrap();
-        s
+        }
     }
 }
 
@@ -148,19 +151,29 @@ impl OutputChannel {
         y as f32 + s
     }
 
-    fn validate_biquad(&mut self, depth: usize) -> Result<usize, &'static str> {
+    fn validate_biquad<'de, D: Deserializer<'de>, K: Keys>(
+        &mut self,
+        keys: K,
+        de: D,
+    ) -> Result<(), Error<D::Error>> {
+        self.biquad.deserialize_by_key(keys, de)?;
         self.iir = self.biquad.build::<f64>(1007.0.recip(), 1.0, 1.0);
         let range = DacCode::MAX_CURRENT.min(Pwm::MAX_CURRENT_LIMIT);
         self.iir
             .set_max(self.iir.max().clamp(-range as _, range as _));
         self.iir
             .set_min(self.iir.min().clamp(-range as _, range as _));
-        Ok(depth)
+        Ok(())
     }
 
-    fn validate_voltage_limit(&mut self, depth: usize) -> Result<usize, &'static str> {
+    fn validate_voltage_limit<'de, D: Deserializer<'de>, K: Keys>(
+        &mut self,
+        keys: K,
+        de: D,
+    ) -> Result<(), Error<D::Error>> {
+        self.voltage_limit.deserialize_by_key(keys, de)?;
         *self.voltage_limit = (*self.voltage_limit).clamp(0.0, Pwm::MAX_VOLTAGE_LIMIT);
-        Ok(depth)
+        Ok(())
     }
 
     pub fn current_limits(&self) -> [f32; 2] {
