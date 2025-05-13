@@ -7,7 +7,7 @@ use super::{
     dac::{R_SENSE, VREF_TEC},
     hal::{
         gpio::{gpiob::*, gpioc::*, gpiod::*, gpioe::*, Alternate},
-        hal::PwmPin,
+        hal_02::PwmPin,
         prelude::*,
         pwm::{ComplementaryDisabled, ComplementaryImpossible, C1, C2, C3, C4},
         rcc::{rec, CoreClocks},

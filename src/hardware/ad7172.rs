@@ -4,7 +4,7 @@ use arbitrary_int::{u2, u3};
 use bitbybit::{bitenum, bitfield};
 use core::fmt::Debug;
 
-use super::hal::hal::blocking::spi::{Transfer, Write};
+use super::hal::hal_02::blocking::spi::{Transfer, Write};
 
 // ADC Register Addresses
 #[bitenum(u6)]
