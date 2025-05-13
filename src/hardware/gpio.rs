@@ -3,7 +3,7 @@ use strum::IntoEnumIterator;
 
 use super::hal::{
     gpio::{gpiod::*, gpioe::*, gpiof::*, gpiog::*, ErasedPin, Input, Output, PushPull},
-    hal::digital::v2::PinState,
+    hal_02::digital::v2::PinState,
 };
 use crate::net::serde::Serialize;
 

@@ -11,8 +11,8 @@ use super::ad7172;
 use super::hal::{
     self, device,
     gpio::{self, gpiob, gpioc, gpioe, ExtiPin},
-    hal::blocking::delay::DelayUs,
-    hal::digital::v2::PinState,
+    hal_02::blocking::delay::DelayUs,
+    hal_02::digital::v2::PinState,
     prelude::*,
     rcc, spi, stm32,
 };

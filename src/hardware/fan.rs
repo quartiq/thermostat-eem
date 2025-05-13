@@ -1,6 +1,6 @@
 use super::hal::{
     gpio::{gpiob::*, gpioc::*, Alternate},
-    hal::PwmPin,
+    hal_02::PwmPin,
     prelude::*,
     pwm::Pwm,
     pwm::{ComplementaryDisabled, C2},

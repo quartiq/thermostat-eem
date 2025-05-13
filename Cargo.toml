@@ -26,19 +26,11 @@ cortex-m = { version = "0.7.7", features = [
 	"critical-section-single-core",
 ] }
 cortex-m-rt = { version = "0.7", features = ["device"] }
-stm32h7xx-hal = { version = "0.16.0", features = [
-	"stm32h743v",
-	"rt",
-	"ethernet",
-	"xspi",
-	"usb_hs",
-] }
 log = { version = "0.4", features = [
 	"max_level_trace",
 	"release_max_level_info",
 ] }
 panic-probe = { version = "=0.3.0", features = ["print-rtt"] }
-smoltcp-nal = { version = "0.6", features = ["shared-stack"] }
 rtic = { version = "2.1", features = ["thumbv7-backend"] }
 rtic-monotonics = { version = "2.0", features = ["cortex-m-systick"] }
 rtic-sync = { version = "1.0" }
@@ -80,6 +72,16 @@ serde_with = { version = "3.12", default-features = false, features = [
 ] }
 num_enum = { version = "0.7.3", default-features = false }
 grounded = "0.2.0"
+
+[dependencies.stm32h7xx-hal]
+version = "0.16.0"
+features = ["stm32h743v", "rt", "ethernet", "xspi", "usb_hs"]
+git = "https://github.com/stm32-rs/stm32h7xx-hal.git"
+
+[dependencies.smoltcp-nal]
+version = "0.6"
+features = ["shared-stack"]
+git = "https://github.com/quartiq/smoltcp-nal.git"
 
 [profile.dev]
 codegen-units = 1

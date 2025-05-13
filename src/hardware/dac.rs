@@ -15,7 +15,7 @@ use strum::IntoEnumIterator;
 
 use super::hal::{
     gpio::{self, gpioc},
-    hal::blocking::spi::Write,
+    hal_02::blocking::spi::Write,
     prelude::*,
     rcc, spi, stm32,
     time::MegaHertz,

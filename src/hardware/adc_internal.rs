@@ -1,7 +1,7 @@
 use super::hal::{
     adc,
     gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*, Analog},
-    hal::blocking::delay::DelayUs,
+    hal_02::blocking::delay::DelayUs,
     prelude::*,
     rcc::{rec, CoreClocks},
     stm32::{ADC1, ADC12_COMMON, ADC2, ADC3, ADC3_COMMON},
