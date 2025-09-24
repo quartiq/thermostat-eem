@@ -3,7 +3,7 @@
 //! # Design
 //!  `Clock` is implemented using the RTIC `app::monotonics::now()` default `Monotonic`.
 //!  That `Monotonic` must tick at 1 kHz.
-use minimq::embedded_time::{clock::Error, fraction::Fraction, Clock, Instant};
+use minimq::embedded_time::{Clock, Instant, clock::Error, fraction::Fraction};
 
 #[derive(Copy, Clone, Debug)]
 pub struct SystemTimer(fn() -> u64);

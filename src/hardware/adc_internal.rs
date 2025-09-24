@@ -1,14 +1,14 @@
 use super::hal::{
     adc,
-    gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*, Analog},
+    gpio::{Analog, gpioa::*, gpiob::*, gpioc::*, gpiof::*},
     hal_02::blocking::delay::DelayUs,
     prelude::*,
-    rcc::{rec, CoreClocks},
-    stm32::{ADC1, ADC12_COMMON, ADC2, ADC3, ADC3_COMMON},
+    rcc::{CoreClocks, rec},
+    stm32::{ADC1, ADC2, ADC3, ADC3_COMMON, ADC12_COMMON},
 };
-use super::{
-    dac::{R_SENSE, VREF_TEC},
+use crate::{
     OutputChannelIdx,
+    convert::{R_SENSE, VREF_TEC},
 };
 
 const V_REF: f32 = 3.0; // ADC reference voltage

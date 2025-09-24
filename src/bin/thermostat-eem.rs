@@ -2,52 +2,33 @@
 //!
 //! Firmware for "Thermostat EEM", a multichannel temperature controller.
 
-#![no_std]
-#![no_main]
+#![cfg_attr(target_os = "none", no_std)]
+#![cfg_attr(target_os = "none", no_main)]
 
-pub mod hardware;
-pub mod net;
-pub mod output_channel;
-pub mod settings;
-pub mod statistics;
+use thermostat_eem::{output_channel, statistics};
 
 use panic_probe as _; // global panic handler
 use strum::IntoEnumIterator;
 
-use hardware::{
-    adc::AdcPhy,
-    adc::{sm::StateMachine, Adc, AdcCode, Ntc, Sensor},
-    adc_internal::AdcInternal,
-    dac::{Dac, DacCode},
-    gpio::{Gpio, PoePower},
-    hal,
-    pwm::{Limit, Pwm},
-    OutputChannelIdx, SerialTerminal, SystemTimer, Systick, UsbDevice,
-};
-
-use rtic_monotonics::Monotonic;
 use rtic_sync::{channel::*, make_channel};
 
 use fugit::ExtU32;
-use miniconf::{Leaf, StrLeaf, TreeDeserialize, TreeKey, TreeSerialize};
-use net::{
-    data_stream::{FrameGenerator, StreamFormat, StreamTarget},
-    Alarm, NetworkState, NetworkUsers,
-};
+use miniconf::Tree;
 use output_channel::{OutputChannel, State};
+use platform::{AppSettings, NetSettings};
 use serde::Serialize;
-use settings::NetSettings;
 use statistics::{Buffer, Statistics};
+use stream::Target;
+use thermostat_eem::convert::{AdcCode, AdcPhy, DacCode, Ntc, PoePower, Sensor};
 
-#[derive(Clone, Debug, TreeSerialize, TreeDeserialize, TreeKey, Default)]
+#[derive(Clone, Debug, Tree, Default)]
 pub struct InputChannel {
-    #[tree(rename = "typ")]
-    sensor: StrLeaf<Sensor>,
-    #[tree(rename="sensor", typ = "Sensor", defer=(*self.sensor))]
+    sensor: Sensor,
+    #[tree(rename="typ", typ="&str", with=miniconf::str_leaf, defer=self.sensor)]
     _sensor: (),
 }
 
-#[derive(Clone, Debug, TreeSerialize, TreeDeserialize, TreeKey)]
+#[derive(Clone, Debug, Tree)]
 pub struct ThermostatEem {
     /// Specifies the telemetry output period in seconds.
     ///
@@ -56,7 +37,7 @@ pub struct ThermostatEem {
     ///
     /// # Value
     /// Any positive non-zero value. Will be rounded to milliseconds.
-    telemetry_period: Leaf<f32>,
+    telemetry_period: f32,
 
     /// Input sensor configuration
     input: [[Option<InputChannel>; 4]; 4],
@@ -78,9 +59,10 @@ pub struct ThermostatEem {
     ///
     /// # Value
     /// See [Alarm]
-    alarm: Alarm,
+    alarm: output_channel::Alarm,
 
-    stream: Leaf<StreamTarget>,
+    #[tree(with=miniconf::leaf)]
+    stream: Target,
 }
 
 impl Default for ThermostatEem {
@@ -95,14 +77,14 @@ impl Default for ThermostatEem {
     }
 }
 
-#[derive(Clone, Debug, TreeSerialize, TreeDeserialize, TreeKey)]
+#[derive(Clone, Debug, Tree, Default)]
 pub struct Settings {
     pub thermostat_eem: ThermostatEem,
 
     pub net: NetSettings,
 }
 
-impl settings::AppSettings for Settings {
+impl AppSettings for Settings {
     fn new(net: NetSettings) -> Self {
         Self {
             net,
@@ -170,14 +152,44 @@ struct Data {
     adc_code: AdcCode,
 }
 
-#[rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC])]
+#[cfg(not(target_os = "none"))]
+fn main() {
+    use miniconf::{json::to_json_value, json_schema::TreeJsonSchema};
+    let s = Settings::default();
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&to_json_value(&s).unwrap()).unwrap()
+    );
+    let mut schema = TreeJsonSchema::new(Some(&s)).unwrap();
+    schema
+        .root
+        .insert("title".to_string(), "Thermostat-EEM".into());
+    println!("{}", serde_json::to_string_pretty(&schema.root).unwrap());
+}
+
+#[cfg(target_os = "none")]
+#[cfg_attr(target_os = "none", rtic::app(device = hal::stm32, peripherals = true, dispatchers=[DCMI, JPEG, SDMMC]))]
 mod app {
     use super::*;
+    use rtic_monotonics::Monotonic;
+    use stream::{Format, FrameGenerator};
+    use thermostat_eem::OutputChannelIdx;
+    use thermostat_eem::hardware::{
+        SerialTerminal, SystemTimer, Systick, UsbDevice,
+        adc::{Adc, sm::StateMachine},
+        adc_internal::AdcInternal,
+        dac::Dac,
+        gpio::Gpio,
+        hal,
+        net::{NetworkState, NetworkUsers},
+        pwm::{Limit, Pwm},
+        setup::setup,
+    };
 
     #[shared]
     struct Shared {
         usb: UsbDevice,
-        network: NetworkUsers<ThermostatEem, 7>,
+        network: NetworkUsers<ThermostatEem>,
         settings: Settings,
         telemetry: Telemetry,
         gpio: Gpio,
@@ -187,7 +199,7 @@ mod app {
 
     #[local]
     struct Local {
-        usb_terminal: SerialTerminal<Settings, 8>,
+        usb_terminal: SerialTerminal<Settings>,
         adc_sm: StateMachine<Adc>,
         dac: Dac,
         pwm: Pwm,
@@ -202,7 +214,7 @@ mod app {
         let clock = SystemTimer::new(|| Systick::now().ticks());
 
         // setup Thermostat hardware
-        let mut thermostat = hardware::setup::setup::<Settings, 8>(c.core, c.device, clock);
+        let mut thermostat = setup::<Settings, 8>(c.core, c.device, clock);
 
         for (channel, mux) in thermostat
             .settings
@@ -231,7 +243,7 @@ mod app {
             thermostat.metadata,
         );
 
-        let generator = network.configure_streaming(StreamFormat::ThermostatEem as _);
+        let generator = network.configure_streaming(Format::ThermostatEem);
 
         let (process, r) = make_channel!(Data, 4);
 
@@ -285,15 +297,15 @@ mod app {
         let pwm = c.local.pwm;
         (c.shared.network, c.shared.gpio, c.shared.settings).lock(|network, gpio, settings| {
             for (ch, s) in OutputChannelIdx::iter().zip(settings.thermostat_eem.output.iter_mut()) {
-                pwm.set_limit(Limit::Voltage(ch), *s.voltage_limit).unwrap();
+                pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
                 let [pos, neg] = s.current_limits();
                 pwm.set_limit(Limit::PositiveCurrent(ch), pos).unwrap();
                 pwm.set_limit(Limit::NegativeCurrent(ch), neg).unwrap();
-                gpio.set_shutdown(ch, (*s.state == State::Off).into());
-                gpio.set_led(ch.into(), (*s.state != State::Off).into()); // fix leds to channel state
+                gpio.set_shutdown(ch, (s.state == State::Off).into());
+                gpio.set_led(ch.into(), (s.state != State::Off).into()); // fix leds to channel state
             }
 
-            network.direct_stream(*settings.thermostat_eem.stream);
+            network.direct_stream(settings.thermostat_eem.stream);
         });
     }
 
@@ -329,14 +341,14 @@ mod app {
 
             c.shared
                 .network
-                .lock(|network| network.telemetry.publish(&telemetry));
+                .lock(|network| network.telemetry.publish_telemetry(&telemetry));
 
             // TODO: validate telemetry period.
             let telemetry_period = c
                 .shared
                 .settings
                 .lock(|settings| settings.thermostat_eem.telemetry_period);
-            Systick::delay((*telemetry_period as u32).secs()).await;
+            Systick::delay((telemetry_period as u32).secs()).await;
         }
     }
 
@@ -347,7 +359,7 @@ mod app {
                 .shared
                 .settings
                 .lock(|settings| settings.thermostat_eem.alarm.clone());
-            if *alarm.armed {
+            if alarm.armed {
                 let temperatures = c.shared.temperature.lock(|temp| *temp);
                 let mut alarms = [[None; 4]; 4];
                 let alarm_state = alarm
@@ -357,7 +369,7 @@ mod app {
                     .zip(temperatures.as_flattened().iter())
                     .zip(alarms.as_flattened_mut().iter_mut())
                     .any(|((l, t), a)| {
-                        *a = l.map(|l| !(*l[0]..*l[1]).contains(&(*t as _)));
+                        *a = l.map(|l| !(l[0]..l[1]).contains(&(*t as _)));
                         a.unwrap_or_default()
                     });
                 c.shared
@@ -365,10 +377,12 @@ mod app {
                     .lock(|telemetry| telemetry.alarm = alarms);
                 c.shared
                     .network
-                    .lock(|net| net.telemetry.publish_alarm(&alarm.target, &alarm_state));
+                    .lock(|net| net.telemetry.publish(&alarm.target, &alarm_state))
+                    .map_err(|e| log::error!("Telemetry publishing error: {:?}", e))
+                    .ok();
             }
             // Note that you have to wait for a full period of the previous setting first for a change of period to take affect.
-            Systick::delay(((*alarm.period * 1000.0) as u32).millis()).await;
+            Systick::delay(((alarm.period * 1000.0) as u32).millis()).await;
         }
     }
 

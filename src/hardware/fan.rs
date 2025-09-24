@@ -1,11 +1,11 @@
 use super::hal::{
-    gpio::{gpiob::*, gpioc::*, Alternate},
+    gpio::{Alternate, gpiob::*, gpioc::*},
     hal_02::PwmPin,
     prelude::*,
     pwm::Pwm,
-    pwm::{ComplementaryDisabled, C2},
+    pwm::{C2, ComplementaryDisabled},
     // rcc::ResetEnable,
-    rcc::{rec, CoreClocks},
+    rcc::{CoreClocks, rec},
     stm32::{TIM2, TIM8},
     time::KiloHertz,
 };

@@ -2,12 +2,14 @@ use arbitrary_int::u3;
 use strum::IntoEnumIterator;
 
 use super::hal::{
-    gpio::{gpiod::*, gpioe::*, gpiof::*, gpiog::*, ErasedPin, Input, Output, PushPull},
+    gpio::{ErasedPin, Input, Output, PushPull, gpiod::*, gpioe::*, gpiof::*, gpiog::*},
     hal_02::digital::v2::PinState,
 };
-use crate::net::serde::Serialize;
 
-use super::OutputChannelIdx;
+use crate::{
+    OutputChannelIdx,
+    convert::{PoePower, TecFrequency},
+};
 
 pub struct Gpio {
     pub hwrev: [ErasedPin<Input>; 4],
@@ -43,31 +45,6 @@ impl From<State> for PinState {
             State::Deassert => PinState::Low,
         }
     }
-}
-
-#[derive(Copy, Clone, Debug, Serialize)]
-pub enum PoePower {
-    /// No Power over Ethernet detected
-    Absent,
-    /// 802.3af (12.95 W) Power over Ethernet present
-    Low,
-    /// 802.3at (25.5 W) Power over Ethernet present
-    High,
-}
-
-impl Default for PoePower {
-    fn default() -> Self {
-        Self::Absent
-    }
-}
-
-/// TEC driver PWM frequency setting
-#[derive(Copy, Clone, Debug)]
-pub enum TecFrequency {
-    /// Low frequency (~500 kHz)
-    Low,
-    /// High frequency (~1 MHz)
-    High,
 }
 
 impl From<TecFrequency> for PinState {
@@ -126,7 +103,17 @@ impl Gpio {
             .iter()
             .enumerate()
             .map(|(i, p)| (p.is_high() as u8) << i)
-            .sum()
+            .sum::<u8>()
+            .try_into()
+            .unwrap()
+    }
+
+    pub fn hwrev_str(&self) -> &'static str {
+        match self.hwrev() {
+            0 => "v1.0",
+            1 => "v1.1",
+            _ => "unknown",
+        }
     }
 
     pub fn poe(&self) -> PoePower {

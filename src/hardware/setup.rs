@@ -1,7 +1,7 @@
 use core::fmt::Write;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::hardware::{ad7172, adc::Mux, platform};
+use crate::hardware::{ad7172, adc::Mux};
 use heapless::String;
 use smoltcp_nal::smoltcp;
 
@@ -14,16 +14,16 @@ use super::hal::{
 };
 
 use super::{
-    adc::{sm::StateMachine, Adc, AdcPins},
+    EthernetPhy, NetworkStack, Systick,
+    adc::{Adc, AdcPins, sm::StateMachine},
     adc_internal::{AdcInternal, AdcInternalPins},
     dac::{Dac, DacPins},
     delay,
     fan::{Fan, FanPins},
     gpio::Gpio,
-    metadata::ApplicationMetadata,
     pwm::{Pwm, PwmPins},
-    EthernetPhy, NetworkStack, Systick,
 };
+use platform::ApplicationMetadata;
 
 use log::info;
 
@@ -107,13 +107,13 @@ pub struct ThermostatDevices<C: serial_settings::Settings + 'static, const Y: us
     pub adc_internal: AdcInternal,
     pub adc_sm: StateMachine<Adc>,
     pub adc_input_config: AdcConfig,
-    pub usb_serial: super::SerialTerminal<C, Y>,
+    pub usb_serial: super::SerialTerminal<C>,
     pub usb: super::UsbDevice,
     pub metadata: &'static ApplicationMetadata,
     pub settings: C,
 }
 
-#[link_section = ".sram3.eth"]
+#[unsafe(link_section = ".sram3.eth")]
 /// Static storage for the ethernet DMA descriptor ring.
 static DES_RING: grounded::uninit::GroundedCell<
     ethernet::DesRing<{ super::TX_DESRING_CNT }, { super::RX_DESRING_CNT }>,
@@ -122,10 +122,10 @@ static DES_RING: grounded::uninit::GroundedCell<
 pub fn setup<C, const Y: usize>(
     mut core: stm32h7xx_hal::stm32::CorePeripherals,
     mut device: stm32h7xx_hal::stm32::Peripherals,
-    clock: crate::SystemTimer,
+    clock: crate::hardware::SystemTimer,
 ) -> ThermostatDevices<C, Y>
 where
-    C: serial_settings::Settings + crate::settings::AppSettings,
+    C: serial_settings::Settings + platform::AppSettings,
 {
     // Set up RTT logging
     {
@@ -170,8 +170,8 @@ where
     }
 
     // Check for a reboot to DFU before doing any system configuration.
-    if platform::dfu_bootflag() {
-        platform::execute_system_bootloader();
+    if platform::dfu_flag_is_set() {
+        platform::bootload_dfu();
     }
 
     let pwr = device.PWR.constrain();
@@ -467,11 +467,11 @@ where
     let (flash, mut settings) = {
         let mut flash = {
             let (_, flash_bank2) = device.FLASH.split();
-            super::flash::Flash(flash_bank2.unwrap())
+            platform::AsyncFlash(super::Flash(flash_bank2.unwrap()))
         };
 
-        let mut settings = C::new(crate::NetSettings::new(mac_addr));
-        crate::settings::SerialSettingsPlatform::load(&mut settings, &mut flash);
+        let mut settings = C::new(platform::NetSettings::new(mac_addr));
+        platform::SerialSettingsPlatform::<_, _, ()>::load(&mut settings, &mut flash);
         (flash, settings)
     };
 
@@ -676,14 +676,14 @@ where
         (usb_device, serial)
     };
 
-    let metadata = ApplicationMetadata::new(gpio.hwrev());
+    let metadata = super::metadata::metadata(gpio.hwrev_str());
 
     let usb_terminal = {
         let input_buffer = cortex_m::singleton!(: [u8; 128] = [0u8; 128]).unwrap();
         let serialize_buffer = cortex_m::singleton!(: [u8; 512] = [0u8; 512]).unwrap();
 
         serial_settings::Runner::new(
-            crate::settings::SerialSettingsPlatform {
+            platform::SerialSettingsPlatform {
                 interface: serial_settings::BestEffortInterface::new(usb_serial),
                 storage: flash,
                 metadata,
