@@ -1,10 +1,11 @@
 // Thermostat ADC struct.
 
 use arbitrary_int::u2;
+use embedded_hal_compat::{Forward, ForwardCompat};
 use smlang::statemachine;
 use strum::IntoEnumIterator;
 
-use super::ad7172;
+use ad7172;
 
 use super::hal::{
     self, device,
@@ -55,7 +56,7 @@ pub type AdcConfig = [[Option<Mux>; 4]; 4];
 
 /// Full Adc structure which holds all the ADC peripherals and auxillary pins on Thermostat-EEM and the configuration.
 pub struct Adc {
-    adcs: ad7172::Ad7172<hal::spi::Spi<hal::stm32::SPI4, hal::spi::Enabled>>,
+    adcs: ad7172::Ad7172<Forward<hal::spi::Spi<hal::stm32::SPI4, hal::spi::Enabled>>>,
     cs: [gpio::ErasedPin<gpio::Output>; 4],
     rdyn: gpioc::PC11<gpio::Input>,
     sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
@@ -84,7 +85,7 @@ impl Adc {
             spi4.spi(pins.spi, spi::MODE_3, 12500.kHz(), spi4_rec, clocks);
 
         let mut adc = Self {
-            adcs: ad7172::Ad7172::new(spi),
+            adcs: ad7172::Ad7172::new(spi.forward()),
             cs: pins.cs,
             rdyn: rdyn_pullup,
             sync: pins.sync,

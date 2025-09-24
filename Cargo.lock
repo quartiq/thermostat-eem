@@ -3,6 +3,17 @@
 version = 4
 
 [[package]]
+name = "ad7172"
+version = "0.1.0"
+dependencies = [
+ "arbitrary-int 2.0.0",
+ "bitbybit",
+ "embedded-hal 1.0.0",
+ "num-traits",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "arbitrary-int"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13,6 +24,9 @@ name = "arbitrary-int"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c858caffa49edfc4ecc45a4bec37abd3e88041a2903816f10f990b7b41abc281"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "atomic-polyfill"
@@ -320,6 +334,27 @@ dependencies = [
  "embedded-hal 1.0.0",
  "embedded-hal-async",
  "portable-atomic",
+]
+
+[[package]]
+name = "embedded-hal-bus"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "513e0b3a8fb7d3013a8ae17a834283f170deaf7d0eeab0a7c1a36ad4dd356d22"
+dependencies = [
+ "critical-section",
+ "embedded-hal 1.0.0",
+]
+
+[[package]]
+name = "embedded-hal-compat"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08ecac72f6be75ad2d4809c9f07d45502e2e5c9a4e9579077f28d7135de81df3"
+dependencies = [
+ "embedded-hal 0.2.7",
+ "embedded-hal 1.0.0",
+ "nb 1.1.0",
 ]
 
 [[package]]
@@ -1174,7 +1209,7 @@ dependencies = [
  "critical-section",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
- "embedded-hal-bus",
+ "embedded-hal-bus 0.2.0",
  "heapless 0.8.0",
  "portable-atomic",
  "rtic-common",
@@ -1599,6 +1634,7 @@ dependencies = [
 name = "thermostat-eem"
 version = "0.3.0"
 dependencies = [
+ "ad7172",
  "arbitrary-int 2.0.0",
  "bitbybit",
  "built",
@@ -1607,6 +1643,9 @@ dependencies = [
  "cortex-m-rt",
  "embassy-futures",
  "embedded-hal 0.2.7",
+ "embedded-hal 1.0.0",
+ "embedded-hal-bus 0.3.0",
+ "embedded-hal-compat",
  "embedded-io",
  "embedded-storage",
  "embedded-storage-async",

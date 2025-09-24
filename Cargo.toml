@@ -1,7 +1,14 @@
+[workspace.package]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/quartiq/thermostat-eem"
+
+[workspace]
+members = ["ad7172"]
+
 [package]
 name = "thermostat-eem"
 version = "0.3.0"
-edition = "2024"
 authors = [
 	"Robert Jördens <rj@quartiq.de>",
 	"Norman Krackow <nk@quartiq.de>",
@@ -9,11 +16,12 @@ authors = [
 ]
 description = "Firmware for the Sinara Thermostat-EEM temperature controller."
 categories = ["embedded", "no-std", "hardware-support", "science"]
-license = "MIT OR Apache-2.0"
 keywords = ["ethernet", "stm32h7", "adc", "dac", "physics"]
-repository = "https://github.com/quartiq/thermostat-eem"
 readme = "README.md"
 exclude = [".gitignore"]
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [features]
 default = ["all_differential"]
@@ -39,7 +47,11 @@ rtt-logger = "0.2"
 num-traits = { version = "0.2", default-features = false, features = ["libm"] }
 smlang = "0.8.0"
 idsp = "0.18.0"
-embedded-hal = "0.2.7"
+embedded-hal-02 = { package = "embedded-hal", version = "0.2.7", features = [
+	"unproven",
+] }
+embedded-hal-1 = { package = "embedded-hal", version = "1.0" }
+embedded-hal-bus = "0.3.0"
 bitbybit = "1.3.3"
 arbitrary-int = "2.0.0"
 lm75 = "0.2"
@@ -68,6 +80,8 @@ grounded = "0.2.0"
 # signal_generator = { version = "0.1" }
 stream = { version = "0.1" }
 platform = { version = "0.1" }
+ad7172 = { version = "0.1", path = "ad7172" }
+embedded-hal-compat = "0.13.0"
 
 [dependencies.smoltcp-nal]
 version = "0.6"
@@ -120,4 +134,3 @@ miniconf = { git = "https://github.com/quartiq/miniconf.git" }
 miniconf_derive = { git = "https://github.com/quartiq/miniconf.git" }
 miniconf_mqtt = { git = "https://github.com/quartiq/miniconf.git" }
 idsp = { git = "https://github.com/quartiq/idsp.git" }
-

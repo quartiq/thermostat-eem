@@ -1,7 +1,7 @@
 use core::fmt::Write;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::hardware::{ad7172, adc::Mux};
+use crate::hardware::adc::Mux;
 use heapless::String;
 use smoltcp_nal::smoltcp;
 
