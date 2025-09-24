@@ -5,7 +5,7 @@
 use arbitrary_int::{u2, u3};
 use bitbybit::{bitenum, bitfield};
 use core::fmt::Debug;
-use embedded_hal::spi::SpiBus;
+use embedded_hal::spi::SpiDevice;
 
 // ADC Register Addresses
 #[bitenum(u6)]
@@ -263,7 +263,7 @@ pub struct Ad7172<S> {
     spi: S,
 }
 
-impl<S: SpiBus<u8>> Ad7172<S> {
+impl<S: SpiDevice<u8>> Ad7172<S> {
     pub fn new(spi: S) -> Self {
         Ad7172 { spi }
     }

@@ -1,9 +1,27 @@
 // Thermostat ADC struct.
 
+use core::convert::Infallible;
+
 use arbitrary_int::u2;
+use embedded_hal_1::{digital::ErrorType, digital::OutputPin};
+use embedded_hal_bus::spi::{ExclusiveDevice, NoDelay};
 use embedded_hal_compat::{Forward, ForwardCompat};
 use smlang::statemachine;
 use strum::IntoEnumIterator;
+
+struct DummyCS;
+impl ErrorType for DummyCS {
+    type Error = Infallible;
+}
+impl OutputPin for DummyCS {
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
 
 use ad7172;
 
@@ -56,7 +74,13 @@ pub type AdcConfig = [[Option<Mux>; 4]; 4];
 
 /// Full Adc structure which holds all the ADC peripherals and auxillary pins on Thermostat-EEM and the configuration.
 pub struct Adc {
-    adcs: ad7172::Ad7172<Forward<hal::spi::Spi<hal::stm32::SPI4, hal::spi::Enabled>>>,
+    adcs: ad7172::Ad7172<
+        ExclusiveDevice<
+            Forward<hal::spi::Spi<hal::stm32::SPI4, hal::spi::Enabled>>,
+            DummyCS,
+            NoDelay,
+        >,
+    >,
     cs: [gpio::ErasedPin<gpio::Output>; 4],
     rdyn: gpioc::PC11<gpio::Input>,
     sync: gpiob::PB11<gpio::Output<gpio::PushPull>>,
@@ -81,11 +105,12 @@ impl Adc {
     ) -> Result<Self, Error> {
         let rdyn_pullup = pins.rdyn.internal_pull_up(true);
         // SPI MODE_3: idle high, capture on second transition
-        let spi: spi::Spi<_, _, u8> =
-            spi4.spi(pins.spi, spi::MODE_3, 12500.kHz(), spi4_rec, clocks);
+        let spi = spi4.spi(pins.spi, spi::MODE_3, 12500.kHz(), spi4_rec, clocks);
+
+        let dev = ExclusiveDevice::new_no_delay(spi.forward(), DummyCS).unwrap();
 
         let mut adc = Self {
-            adcs: ad7172::Ad7172::new(spi.forward()),
+            adcs: ad7172::Ad7172::new(dev),
             cs: pins.cs,
             rdyn: rdyn_pullup,
             sync: pins.sync,
