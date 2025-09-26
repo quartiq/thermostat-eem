@@ -18,7 +18,6 @@ use super::{
     adc::{Adc, AdcPins, sm::StateMachine},
     adc_internal::{AdcInternal, AdcInternalPins},
     dac::{Dac, DacPins},
-    delay,
     fan::{Fan, FanPins},
     gpio::Gpio,
     pwm::{Pwm, PwmPins},
@@ -210,7 +209,8 @@ where
 
     info!("--- Starting hardware setup");
 
-    let mut delay = delay::AsmDelay::new(ccdr.clocks.c_ck().to_Hz());
+    // Note: Frequencies are scaled by 2 to account for the M7 dual instruction pipeline.
+    let mut delay = platform::AsmDelay::new(ccdr.clocks.c_ck().to_Hz() * 2);
 
     // Take GPIOs
     let gpioa = device.GPIOA.split(ccdr.peripheral.GPIOA);
