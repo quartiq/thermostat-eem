@@ -16,26 +16,6 @@ pub mod net;
 pub mod pwm;
 pub mod setup;
 
-// Number of TX descriptors in the ethernet descriptor ring.
-const TX_DESRING_CNT: usize = 4;
-
-// Number of RX descriptors in the ethernet descriptor ring.
-const RX_DESRING_CNT: usize = 4;
-
-pub type NetworkStack = smoltcp_nal::NetworkStack<
-    'static,
-    hal::ethernet::EthernetDMA<TX_DESRING_CNT, RX_DESRING_CNT>,
-    SystemTimer,
->;
-
-pub type NetworkManager = smoltcp_nal::shared::NetworkManager<
-    'static,
-    hal::ethernet::EthernetDMA<TX_DESRING_CNT, RX_DESRING_CNT>,
-    SystemTimer,
->;
-
-pub type EthernetPhy = hal::ethernet::phy::LAN8742A<hal::ethernet::EthernetMAC>;
-
 /// System timer (RTIC Monotonic) tick frequency
 pub const MONOTONIC_FREQUENCY: u32 = 1_000;
 rtic_monotonics::systick_monotonic!(Systick, MONOTONIC_FREQUENCY);

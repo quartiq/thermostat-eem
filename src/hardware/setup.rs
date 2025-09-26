@@ -14,12 +14,13 @@ use super::hal::{
 };
 
 use super::{
-    EthernetPhy, NetworkStack, Systick,
+    Systick,
     adc::{Adc, AdcPins, sm::StateMachine},
     adc_internal::{AdcInternal, AdcInternalPins},
     dac::{Dac, DacPins},
     fan::{Fan, FanPins},
     gpio::Gpio,
+    net::{EthernetPhy, NetworkStack, RX_DESRING_CNT, TX_DESRING_CNT},
     pwm::{Pwm, PwmPins},
 };
 use platform::ApplicationMetadata;
@@ -122,7 +123,7 @@ pub struct ThermostatDevices<
 #[unsafe(link_section = ".sram3.eth")]
 /// Static storage for the ethernet DMA descriptor ring.
 static DES_RING: grounded::uninit::GroundedCell<
-    ethernet::DesRing<{ super::TX_DESRING_CNT }, { super::RX_DESRING_CNT }>,
+    ethernet::DesRing<{ TX_DESRING_CNT }, { RX_DESRING_CNT }>,
 > = grounded::uninit::GroundedCell::uninit();
 
 pub fn setup<C, const Y: usize>(
