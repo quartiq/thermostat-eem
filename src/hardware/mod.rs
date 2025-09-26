@@ -15,7 +15,6 @@ pub mod metadata;
 pub mod net;
 pub mod pwm;
 pub mod setup;
-pub mod system_timer;
 
 // Number of TX descriptors in the ethernet descriptor ring.
 const TX_DESRING_CNT: usize = 4;
@@ -48,7 +47,7 @@ pub type UsbBus = stm32h7xx_hal::usb_hs::UsbBus<stm32h7xx_hal::usb_hs::USB2>;
 pub type UsbDevice = usb_device::device::UsbDevice<'static, UsbBus>;
 
 pub type SerialPort =
-    usbd_serial::SerialPort<'static, crate::hardware::UsbBus, &'static mut [u8], &'static mut [u8]>;
+    usbd_serial::SerialPort<'static, UsbBus, &'static mut [u8], &'static mut [u8]>;
 
 pub type SerialTerminal<C> = serial_settings::Runner<
     'static,
