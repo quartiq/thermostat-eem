@@ -107,9 +107,11 @@ impl Adc {
     ) -> Result<Self, Error> {
         let rdyn_pullup = pins.rdyn.internal_pull_up(true);
         // SPI MODE_3: idle high, capture on second transition
-        let spi = spi4.spi(pins.spi, spi::MODE_3, 12500.kHz(), spi4_rec, clocks);
+        let spi =
+            spi4.spi(pins.spi, spi::MODE_3, 12500.kHz(), spi4_rec, clocks);
 
-        let dev = ExclusiveDevice::new_no_delay(spi.forward(), DummyPin).unwrap();
+        let dev =
+            ExclusiveDevice::new_no_delay(spi.forward(), DummyPin).unwrap();
 
         let mut adc = Self {
             adcs: ad7172::Ad7172::new(dev),
@@ -123,7 +125,11 @@ impl Adc {
     }
 
     /// Setup all ADCs to the specifies [AdcConfig].
-    fn setup(&mut self, delay: &mut impl DelayUs<u16>, config: &AdcConfig) -> Result<(), Error> {
+    fn setup(
+        &mut self,
+        delay: &mut impl DelayUs<u16>,
+        config: &AdcConfig,
+    ) -> Result<(), Error> {
         // deassert all CS first
         for pin in self.cs.iter_mut() {
             pin.set_state(PinState::High);
@@ -134,7 +140,9 @@ impl Adc {
 
         for phy in AdcPhy::iter() {
             log::info!("AD7172 {:?}", phy);
-            self.selected(phy, |adc| adc.setup_adc(delay, &config[phy as usize]))?;
+            self.selected(phy, |adc| {
+                adc.setup_adc(delay, &config[phy as usize])
+            })?;
         }
 
         // set sync high after initialization of all ADCs
@@ -416,7 +424,11 @@ impl sm::StateMachineContext for Adc {
 
 impl sm::StateMachine<Adc> {
     /// Set up the RDY pin, start generating interrupts, and start the state machine.
-    pub fn start(&mut self, exti: &mut device::EXTI, syscfg: &mut device::SYSCFG) {
+    pub fn start(
+        &mut self,
+        exti: &mut device::EXTI,
+        syscfg: &mut device::SYSCFG,
+    ) {
         let adc = self.context_mut();
         adc.rdyn.make_interrupt_source(syscfg);
         adc.rdyn.trigger_on_edge(exti, gpio::Edge::Falling);

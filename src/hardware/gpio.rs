@@ -2,7 +2,10 @@ use arbitrary_int::u3;
 use strum::IntoEnumIterator;
 
 use super::hal::{
-    gpio::{ErasedPin, Input, Output, PushPull, gpiod::*, gpioe::*, gpiof::*, gpiog::*},
+    gpio::{
+        ErasedPin, Input, Output, PushPull, gpiod::*, gpioe::*, gpiof::*,
+        gpiog::*,
+    },
     hal_02::digital::v2::PinState,
 };
 

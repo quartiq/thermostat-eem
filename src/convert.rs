@@ -22,10 +22,11 @@ impl DacCode {
     // DAC constants
     const MAX_DAC_WORD: i32 = 1 << 20; // maximum DAC dataword (exclusive) plus 2 bit due to interface alignment
     const VREF_DAC: f32 = 3.0; // DAC reference voltage
-    pub const MAX_CURRENT: f32 =
-        ((DacCode::MAX_DAC_WORD - 1) as f32 / DacCode::MAX_DAC_WORD as f32 * DacCode::VREF_DAC
-            - VREF_TEC)
-            / (10.0 * R_SENSE);
+    pub const MAX_CURRENT: f32 = ((DacCode::MAX_DAC_WORD - 1) as f32
+        / DacCode::MAX_DAC_WORD as f32
+        * DacCode::VREF_DAC
+        - VREF_TEC)
+        / (10.0 * R_SENSE);
 }
 
 impl TryFrom<f32> for DacCode {
@@ -34,7 +35,9 @@ impl TryFrom<f32> for DacCode {
     fn try_from(current: f32) -> Result<DacCode, Error> {
         // Current to DAC word conversion
         let ctli_voltage = current * (10.0 * R_SENSE) + VREF_TEC;
-        let dac_code = (ctli_voltage * (DacCode::MAX_DAC_WORD as f32 / DacCode::VREF_DAC)) as i32;
+        let dac_code = (ctli_voltage
+            * (DacCode::MAX_DAC_WORD as f32 / DacCode::VREF_DAC))
+            as i32;
 
         if !(0..DacCode::MAX_DAC_WORD).contains(&dac_code) {
             return Err(Error::Bounds);
@@ -100,7 +103,8 @@ impl From<AdcCode> for f32 {
         const GAIN: f32 = 0x555555 as _; // Default ADC gain from datasheet.
         // ADC relative full scale per LSB
         // Inverted equation from datasheet p. 40 with V_Ref normalized to 1
-        const FS_PER_LSB: f32 = 0x400000 as f32 / (2.0 * (1 << 23) as f32 * GAIN * 0.75);
+        const FS_PER_LSB: f32 =
+            0x400000 as f32 / (2.0 * (1 << 23) as f32 * GAIN * 0.75);
         value.0 as Self * FS_PER_LSB
     }
 }
@@ -161,8 +165,10 @@ impl Convert for Ntc {
         // avoided. Input values must not close to minimum/maximum (~1000 codes difference)
         // https://en.wikipedia.org/wiki/Thermistor#B_or_%CE%B2_parameter_equation
         let relative_voltage = f32::from(code) as f64;
-        let relative_resistance = relative_voltage / (1.0 - relative_voltage) * self.r_rel as f64;
-        (self.t0_inv as f64 + self.beta_inv as f64 * relative_resistance.ln()).recip()
+        let relative_resistance =
+            relative_voltage / (1.0 - relative_voltage) * self.r_rel as f64;
+        (self.t0_inv as f64 + self.beta_inv as f64 * relative_resistance.ln())
+            .recip()
             - ZERO_C as f64
     }
 }

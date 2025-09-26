@@ -17,7 +17,8 @@ use core::fmt::Write;
 use heapless::String;
 use miniconf::{TreeDeserializeOwned, TreeSchema, TreeSerialize};
 
-pub type NetworkReference = smoltcp_nal::shared::NetworkStackProxy<'static, NetworkStack>;
+pub type NetworkReference =
+    smoltcp_nal::shared::NetworkStackProxy<'static, NetworkStack>;
 
 pub struct MqttStorage {
     telemetry: [u8; 2048],
@@ -92,18 +93,24 @@ where
         metadata: &'static ApplicationMetadata,
     ) -> Self {
         let stack_manager =
-            cortex_m::singleton!(: NetworkManager = NetworkManager::new(stack)).unwrap();
+            cortex_m::singleton!(: NetworkManager = NetworkManager::new(stack))
+                .unwrap();
 
-        let processor = NetworkProcessor::new(stack_manager.acquire_stack(), phy);
+        let processor =
+            NetworkProcessor::new(stack_manager.acquire_stack(), phy);
 
         let prefix =
             cortex_m::singleton!(: String<128> = get_device_prefix(app, &net_settings.id)).unwrap();
 
-        let store = cortex_m::singleton!(: MqttStorage = MqttStorage::default()).unwrap();
-
-        let named_broker =
-            minimq::broker::NamedBroker::new(&net_settings.broker, stack_manager.acquire_stack())
+        let store =
+            cortex_m::singleton!(: MqttStorage = MqttStorage::default())
                 .unwrap();
+
+        let named_broker = minimq::broker::NamedBroker::new(
+            &net_settings.broker,
+            stack_manager.acquire_stack(),
+        )
+        .unwrap();
         let miniconf = miniconf_mqtt::MqttClient::<_, _, _, _, MAX_DEPTH>::new(
             stack_manager.acquire_stack(),
             prefix.as_str(),
@@ -114,9 +121,11 @@ where
         )
         .unwrap();
 
-        let named_broker =
-            minimq::broker::NamedBroker::new(&net_settings.broker, stack_manager.acquire_stack())
-                .unwrap();
+        let named_broker = minimq::broker::NamedBroker::new(
+            &net_settings.broker,
+            stack_manager.acquire_stack(),
+        )
+        .unwrap();
         let mqtt = minimq::Minimq::new(
             stack_manager.acquire_stack(),
             clock,
@@ -145,7 +154,10 @@ where
     ///
     /// # Args
     /// * `format` - A unique u8 code indicating the format of the data.
-    pub fn configure_streaming(&mut self, format: impl Into<u8>) -> FrameGenerator {
+    pub fn configure_streaming(
+        &mut self,
+        format: impl Into<u8>,
+    ) -> FrameGenerator {
         let mut generator = self.generator.take().unwrap();
         generator.configure(format);
         generator

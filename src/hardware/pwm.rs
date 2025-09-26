@@ -69,8 +69,10 @@ type Pt1<T, const S: u8> = super::hal::pwm::Pwm<T, S, ComplementaryImpossible>;
 #[allow(clippy::type_complexity)]
 pub struct Pwm {
     voltage: (Pt0<TIM1, C1>, Pt0<TIM1, C2>, Pt0<TIM1, C3>, Pt1<TIM1, C4>),
-    positive_current: (Pt1<TIM4, C1>, Pt1<TIM4, C2>, Pt1<TIM4, C3>, Pt1<TIM4, C4>),
-    negative_current: (Pt1<TIM3, C1>, Pt1<TIM3, C2>, Pt1<TIM3, C3>, Pt1<TIM3, C4>),
+    positive_current:
+        (Pt1<TIM4, C1>, Pt1<TIM4, C2>, Pt1<TIM4, C3>, Pt1<TIM4, C4>),
+    negative_current:
+        (Pt1<TIM3, C1>, Pt1<TIM3, C2>, Pt1<TIM3, C3>, Pt1<TIM3, C4>),
 }
 
 impl Pwm {
@@ -94,13 +96,20 @@ impl Pwm {
         // PWM freqency. 20kHz is ~80dB down with the installed second order 160Hz lowpass.
         const F_PWM: KiloHertz = KiloHertz::kHz(20);
 
-        let mut voltage = tim.0.pwm(pins.voltage, F_PWM.convert(), tim_rec.0, clocks);
-        let mut negative_current =
-            tim.1
-                .pwm(pins.negative_current, F_PWM.convert(), tim_rec.1, clocks);
-        let mut positive_current =
-            tim.2
-                .pwm(pins.positive_current, F_PWM.convert(), tim_rec.2, clocks);
+        let mut voltage =
+            tim.0.pwm(pins.voltage, F_PWM.convert(), tim_rec.0, clocks);
+        let mut negative_current = tim.1.pwm(
+            pins.negative_current,
+            F_PWM.convert(),
+            tim_rec.1,
+            clocks,
+        );
+        let mut positive_current = tim.2.pwm(
+            pins.positive_current,
+            F_PWM.convert(),
+            tim_rec.2,
+            clocks,
+        );
         fn init_pwm_pin<P: PwmPin<Duty = u16>>(pin: &mut P) {
             pin.set_duty(0);
             pin.enable();
@@ -143,7 +152,10 @@ impl Pwm {
             v * (1.0 / 4.0 / Pwm::V_PWM)
         }
 
-        fn set_pwm_channel<P: PwmPin<Duty = u16>>(channel: &mut P, duty: f32) -> Result<(), Error> {
+        fn set_pwm_channel<P: PwmPin<Duty = u16>>(
+            channel: &mut P,
+            duty: f32,
+        ) -> Result<(), Error> {
             let value = (duty * Pwm::MAX_DUTY as f32) as i32;
             if !(0..=Pwm::MAX_DUTY as _).contains(&value) {
                 return Err(Error::Bounds);
@@ -152,18 +164,22 @@ impl Pwm {
             Ok(())
         }
         match lim {
-            Limit::Voltage(OutputChannelIdx::Zero) => {
-                set_pwm_channel(&mut self.voltage.0, voltage_limit_to_duty_cycle(val))
-            }
-            Limit::Voltage(OutputChannelIdx::One) => {
-                set_pwm_channel(&mut self.voltage.1, voltage_limit_to_duty_cycle(val))
-            }
-            Limit::Voltage(OutputChannelIdx::Two) => {
-                set_pwm_channel(&mut self.voltage.2, voltage_limit_to_duty_cycle(val))
-            }
-            Limit::Voltage(OutputChannelIdx::Three) => {
-                set_pwm_channel(&mut self.voltage.3, voltage_limit_to_duty_cycle(val))
-            }
+            Limit::Voltage(OutputChannelIdx::Zero) => set_pwm_channel(
+                &mut self.voltage.0,
+                voltage_limit_to_duty_cycle(val),
+            ),
+            Limit::Voltage(OutputChannelIdx::One) => set_pwm_channel(
+                &mut self.voltage.1,
+                voltage_limit_to_duty_cycle(val),
+            ),
+            Limit::Voltage(OutputChannelIdx::Two) => set_pwm_channel(
+                &mut self.voltage.2,
+                voltage_limit_to_duty_cycle(val),
+            ),
+            Limit::Voltage(OutputChannelIdx::Three) => set_pwm_channel(
+                &mut self.voltage.3,
+                voltage_limit_to_duty_cycle(val),
+            ),
             Limit::NegativeCurrent(OutputChannelIdx::Zero) => set_pwm_channel(
                 &mut self.negative_current.0,
                 current_limit_to_duty_cycle(-val),

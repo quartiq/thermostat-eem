@@ -46,8 +46,12 @@ pub type UsbBus = stm32h7xx_hal::usb_hs::UsbBus<stm32h7xx_hal::usb_hs::USB2>;
 // Type alias for the USB device.
 pub type UsbDevice = usb_device::device::UsbDevice<'static, UsbBus>;
 
-pub type SerialPort =
-    usbd_serial::SerialPort<'static, UsbBus, &'static mut [u8], &'static mut [u8]>;
+pub type SerialPort = usbd_serial::SerialPort<
+    'static,
+    UsbBus,
+    &'static mut [u8],
+    &'static mut [u8],
+>;
 
 pub type SerialTerminal<C> = serial_settings::Runner<
     'static,
@@ -57,7 +61,8 @@ pub type SerialTerminal<C> = serial_settings::Runner<
 pub struct Flash(LockedFlashBank);
 
 impl embedded_storage::nor_flash::ErrorType for Flash {
-    type Error = <LockedFlashBank as embedded_storage::nor_flash::ErrorType>::Error;
+    type Error =
+        <LockedFlashBank as embedded_storage::nor_flash::ErrorType>::Error;
 }
 
 impl embedded_storage::nor_flash::ReadNorFlash for Flash {
@@ -67,7 +72,11 @@ impl embedded_storage::nor_flash::ReadNorFlash for Flash {
         self.0.capacity()
     }
 
-    fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
+    fn read(
+        &mut self,
+        offset: u32,
+        bytes: &mut [u8],
+    ) -> Result<(), Self::Error> {
         self.0.read(offset, bytes)
     }
 }

@@ -52,7 +52,8 @@ impl AdcInternal {
         pins: AdcInternalPins,
     ) -> Self {
         // Setup ADCs
-        let (adc1, _adc2) = adc::adc12(adc.0, adc.1, 1.MHz(), delay, adc_rcc.0, clocks);
+        let (adc1, _adc2) =
+            adc::adc12(adc.0, adc.1, 1.MHz(), delay, adc_rcc.0, clocks);
         let adc3 = adc::Adc::adc3(adc.2, 1.MHz(), delay, adc_rcc.1, clocks);
 
         let mut adc1 = adc1.enable();

@@ -12,7 +12,14 @@ use miniconf::{Leaf, Tree};
 use num_traits::Float;
 
 #[derive(
-    Copy, Clone, Default, Debug, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
+    Copy,
+    Clone,
+    Default,
+    Debug,
+    PartialEq,
+    PartialOrd,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub enum State {
     /// Active TEC driver and Biquad/PID.
@@ -102,7 +109,9 @@ impl Iterator for SineSweep {
 mod validate_trigger {
     use super::SineSweep;
     use idsp::{AccuOsc, Sweep};
-    use miniconf::{Deserializer, Keys, SerdeError, Serializer, TreeDeserialize};
+    use miniconf::{
+        Deserializer, Keys, SerdeError, Serializer, TreeDeserialize,
+    };
 
     pub use miniconf::{
         deny::{mut_any_by_key, ref_any_by_key},
@@ -123,7 +132,8 @@ mod validate_trigger {
         de: D,
     ) -> Result<(), SerdeError<D::Error>> {
         value.trigger.deserialize_by_key(keys, de)?;
-        value.sweep = AccuOsc::new(Sweep::new(value.rate, value.state)).take(value.length);
+        value.sweep = AccuOsc::new(Sweep::new(value.rate, value.state))
+            .take(value.length);
         Ok(())
     }
 
@@ -189,8 +199,8 @@ impl OutputChannel {
 mod validate_biquad {
     use super::{DacCode, MAX_CURRENT_LIMIT, OutputChannel, iir};
     use miniconf::{
-        Deserializer, Keys, Schema, SerdeError, Serializer, TreeDeserialize, TreeSchema,
-        TreeSerialize,
+        Deserializer, Keys, Schema, SerdeError, Serializer, TreeDeserialize,
+        TreeSchema, TreeSerialize,
     };
 
     pub use miniconf::deny::{mut_any_by_key, ref_any_by_key};

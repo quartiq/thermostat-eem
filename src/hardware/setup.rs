@@ -42,8 +42,12 @@ pub struct NetStorage {
 pub struct UdpSocketStorage {
     rx_storage: [u8; 1024],
     tx_storage: [u8; 2048],
-    tx_metadata: [smoltcp::storage::PacketMetadata<smoltcp::socket::udp::UdpMetadata>; 10],
-    rx_metadata: [smoltcp::storage::PacketMetadata<smoltcp::socket::udp::UdpMetadata>; 10],
+    tx_metadata: [smoltcp::storage::PacketMetadata<
+        smoltcp::socket::udp::UdpMetadata,
+    >; 10],
+    rx_metadata: [smoltcp::storage::PacketMetadata<
+        smoltcp::socket::udp::UdpMetadata,
+    >; 10],
 }
 
 impl UdpSocketStorage {
@@ -96,7 +100,10 @@ pub struct NetworkDevices {
 }
 
 /// The available hardware interfaces on Thermostat.
-pub struct ThermostatDevices<C: serial_settings::Settings + 'static, const Y: usize> {
+pub struct ThermostatDevices<
+    C: serial_settings::Settings + 'static,
+    const Y: usize,
+> {
     pub clocks: hal::rcc::CoreClocks,
     pub net: NetworkDevices,
     pub dac: Dac,
@@ -161,7 +168,8 @@ where
             );
         }
 
-        static LOGGER: rtt_logger::RTTLogger = rtt_logger::RTTLogger::new(log::LevelFilter::Debug);
+        static LOGGER: rtt_logger::RTTLogger =
+            rtt_logger::RTTLogger::new(log::LevelFilter::Debug);
         log::set_logger(&LOGGER)
             .map(|()| log::set_max_level(log::LevelFilter::Trace))
             .unwrap();
@@ -434,17 +442,23 @@ where
     let mut afe_i2c = {
         let sda = gpiof.pf0.into_alternate_open_drain();
         let scl = gpiof.pf1.into_alternate_open_drain();
-        device
-            .I2C2
-            .i2c((scl, sda), 100.kHz(), ccdr.peripheral.I2C2, &ccdr.clocks)
+        device.I2C2.i2c(
+            (scl, sda),
+            100.kHz(),
+            ccdr.peripheral.I2C2,
+            &ccdr.clocks,
+        )
     };
 
     let mut i2c = {
         let sda = gpiob.pb9.into_alternate_open_drain();
         let scl = gpiob.pb8.into_alternate_open_drain();
-        device
-            .I2C1
-            .i2c((scl, sda), 100.kHz(), ccdr.peripheral.I2C1, &ccdr.clocks)
+        device.I2C1.i2c(
+            (scl, sda),
+            100.kHz(),
+            ccdr.peripheral.I2C1,
+            &ccdr.clocks,
+        )
     };
 
     let mut eui48 = [0; 6];
@@ -471,7 +485,10 @@ where
         };
 
         let mut settings = C::new(platform::NetSettings::new(mac_addr));
-        platform::SerialSettingsPlatform::<_, _, ()>::load(&mut settings, &mut flash);
+        platform::SerialSettingsPlatform::<_, _, ()>::load(
+            &mut settings,
+            &mut flash,
+        );
         (flash, settings)
     };
 
@@ -520,23 +537,28 @@ where
         );
 
         // Reset and initialize the ethernet phy.
-        let mut lan8742a = ethernet::phy::LAN8742A::new(eth_mac.set_phy_addr(0));
+        let mut lan8742a =
+            ethernet::phy::LAN8742A::new(eth_mac.set_phy_addr(0));
         lan8742a.phy_reset();
         lan8742a.phy_init();
 
         unsafe { ethernet::enable_interrupt() };
 
         // Configure IP address according to DHCP socket availability
-        let ip_addrs: smoltcp::wire::IpAddress = match settings.net().ip.parse() {
+        let ip_addrs: smoltcp::wire::IpAddress = match settings.net().ip.parse()
+        {
             Ok(addr) => addr,
             Err(e) => {
-                log::warn!("Invalid IP address in settings: {e:?}. Defaulting to 0.0.0.0 (DHCP)");
+                log::warn!(
+                    "Invalid IP address in settings: {e:?}. Defaulting to 0.0.0.0 (DHCP)"
+                );
                 "0.0.0.0".parse().unwrap()
             }
         };
 
         let random_seed = {
-            let mut rng = device.RNG.constrain(ccdr.peripheral.RNG, &ccdr.clocks);
+            let mut rng =
+                device.RNG.constrain(ccdr.peripheral.RNG, &ccdr.clocks);
             let mut data = [0u8; 8];
             rng.fill(&mut data).unwrap();
             data
@@ -544,12 +566,14 @@ where
 
         // Note(unwrap): The hardware configuration function is only allowed to be called once.
         // Unwrapping is intended to panic if called again to prevent re-use of global memory.
-        let store = cortex_m::singleton!(: NetStorage = NetStorage::default()).unwrap();
+        let store =
+            cortex_m::singleton!(: NetStorage = NetStorage::default()).unwrap();
 
         store.ip_addrs[0] = smoltcp::wire::IpCidr::new(ip_addrs, 24);
 
-        let mut ethernet_config =
-            smoltcp::iface::Config::new(smoltcp::wire::HardwareAddress::Ethernet(mac_addr));
+        let mut ethernet_config = smoltcp::iface::Config::new(
+            smoltcp::wire::HardwareAddress::Ethernet(mac_addr),
+        );
         ethernet_config.random_seed = u64::from_be_bytes(random_seed);
 
         let mut interface = smoltcp::iface::Interface::new(
@@ -571,13 +595,16 @@ where
             }
         });
 
-        let mut sockets = smoltcp::iface::SocketSet::new(&mut store.sockets[..]);
+        let mut sockets =
+            smoltcp::iface::SocketSet::new(&mut store.sockets[..]);
         for storage in store.tcp_socket_storage[..].iter_mut() {
             let tcp_socket = {
-                let rx_buffer =
-                    smoltcp::socket::tcp::SocketBuffer::new(&mut storage.rx_storage[..]);
-                let tx_buffer =
-                    smoltcp::socket::tcp::SocketBuffer::new(&mut storage.tx_storage[..]);
+                let rx_buffer = smoltcp::socket::tcp::SocketBuffer::new(
+                    &mut storage.rx_storage[..],
+                );
+                let tx_buffer = smoltcp::socket::tcp::SocketBuffer::new(
+                    &mut storage.tx_storage[..],
+                );
 
                 smoltcp::socket::tcp::Socket::new(rx_buffer, tx_buffer)
             };
@@ -611,7 +638,8 @@ where
             sockets.add(udp_socket);
         }
 
-        let mut stack = smoltcp_nal::NetworkStack::new(interface, eth_dma, sockets, clock);
+        let mut stack =
+            smoltcp_nal::NetworkStack::new(interface, eth_dma, sockets, clock);
 
         stack.seed_random_port(&random_seed);
 
@@ -636,8 +664,11 @@ where
             &ccdr.clocks,
         );
 
-        let endpoint_memory = cortex_m::singleton!(: Option<&'static mut [u32]> = None).unwrap();
-        endpoint_memory.replace(&mut cortex_m::singleton!(: [u32; 1024] = [0; 1024]).unwrap()[..]);
+        let endpoint_memory =
+            cortex_m::singleton!(: Option<&'static mut [u32]> = None).unwrap();
+        endpoint_memory.replace(
+            &mut cortex_m::singleton!(: [u32; 1024] = [0; 1024]).unwrap()[..],
+        );
         let usb_bus = cortex_m::singleton!(: usb_device::bus::UsbBusAllocator<super::UsbBus> =
         stm32h7xx_hal::usb_hs::UsbBus::new(
             usb,
@@ -646,7 +677,8 @@ where
         .unwrap();
 
         let read_store = cortex_m::singleton!(: [u8; 128] = [0; 128]).unwrap();
-        let write_store = cortex_m::singleton!(: [u8; 1024] = [0; 1024]).unwrap();
+        let write_store =
+            cortex_m::singleton!(: [u8; 1024] = [0; 1024]).unwrap();
         let serial = usbd_serial::SerialPort::new_with_store(
             usb_bus,
             &mut read_store[..],
@@ -679,12 +711,16 @@ where
     let metadata = super::metadata::metadata(gpio.hwrev_str());
 
     let usb_terminal = {
-        let input_buffer = cortex_m::singleton!(: [u8; 128] = [0u8; 128]).unwrap();
-        let serialize_buffer = cortex_m::singleton!(: [u8; 512] = [0u8; 512]).unwrap();
+        let input_buffer =
+            cortex_m::singleton!(: [u8; 128] = [0u8; 128]).unwrap();
+        let serialize_buffer =
+            cortex_m::singleton!(: [u8; 512] = [0u8; 512]).unwrap();
 
         serial_settings::Runner::new(
             platform::SerialSettingsPlatform {
-                interface: serial_settings::BestEffortInterface::new(usb_serial),
+                interface: serial_settings::BestEffortInterface::new(
+                    usb_serial,
+                ),
                 storage: flash,
                 metadata,
                 _settings_marker: core::marker::PhantomData,
