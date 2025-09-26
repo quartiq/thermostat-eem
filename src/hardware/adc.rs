@@ -9,20 +9,6 @@ use embedded_hal_compat::{Forward, ForwardCompat};
 use smlang::statemachine;
 use strum::IntoEnumIterator;
 
-struct DummyCS;
-impl ErrorType for DummyCS {
-    type Error = Infallible;
-}
-impl OutputPin for DummyCS {
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-
 use ad7172;
 
 use super::hal::{
@@ -35,6 +21,22 @@ use super::hal::{
 };
 
 use crate::convert::{AdcCode, AdcPhy};
+
+struct DummyPin;
+
+impl ErrorType for DummyPin {
+    type Error = Infallible;
+}
+
+impl OutputPin for DummyPin {
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
 
 #[derive(Debug)]
 pub enum Error {
@@ -77,7 +79,7 @@ pub struct Adc {
     adcs: ad7172::Ad7172<
         ExclusiveDevice<
             Forward<hal::spi::Spi<hal::stm32::SPI4, hal::spi::Enabled>>,
-            DummyCS,
+            DummyPin,
             NoDelay,
         >,
     >,
@@ -107,7 +109,7 @@ impl Adc {
         // SPI MODE_3: idle high, capture on second transition
         let spi = spi4.spi(pins.spi, spi::MODE_3, 12500.kHz(), spi4_rec, clocks);
 
-        let dev = ExclusiveDevice::new_no_delay(spi.forward(), DummyCS).unwrap();
+        let dev = ExclusiveDevice::new_no_delay(spi.forward(), DummyPin).unwrap();
 
         let mut adc = Self {
             adcs: ad7172::Ad7172::new(dev),
