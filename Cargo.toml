@@ -65,7 +65,7 @@ strum = { version = "0.27", default-features = false, features = ["derive"] }
 serial_settings = "0.2"
 postcard = "1"
 embedded-storage = "0.3"
-sequential-storage = "4"
+sequential-storage = "5"
 usb-device = "0.3.2"
 usbd-serial = "0.2"
 panic-persist = { version = "0.3", features = ["utf8", "custom-panic-handler"] }

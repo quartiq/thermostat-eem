@@ -1061,7 +1061,7 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 [[package]]
 name = "platform"
 version = "0.1.0"
-source = "git+https://github.com/quartiq/stabilizer.git#a4c11bfa26c47aa8c40386a928f252de3b62f6b0"
+source = "git+https://github.com/quartiq/stabilizer.git#0a620a61a090ed5d8656cb3861c744f56ae26ca4"
 dependencies = [
  "cortex-m",
  "embassy-futures",
@@ -1373,9 +1373,9 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "sequential-storage"
-version = "4.0.3"
+version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "516ed74ad8268ec0d78c574af8fc7e09a9c3a0df63c7692c588a10d7097dea3b"
+checksum = "0779e7aa11fe1e0a6a0bfb6abcdcc8852c6b74e3946d2ce93d24963dafc4a271"
 dependencies = [
  "embedded-storage-async",
 ]
@@ -1473,7 +1473,7 @@ dependencies = [
 [[package]]
 name = "serial_settings"
 version = "0.2.0"
-source = "git+https://github.com/quartiq/stabilizer.git#a4c11bfa26c47aa8c40386a928f252de3b62f6b0"
+source = "git+https://github.com/quartiq/stabilizer.git#0a620a61a090ed5d8656cb3861c744f56ae26ca4"
 dependencies = [
  "embedded-io",
  "heapless 0.8.0",
@@ -1615,7 +1615,7 @@ dependencies = [
 [[package]]
 name = "stream"
 version = "0.1.0"
-source = "git+https://github.com/quartiq/stabilizer.git#a4c11bfa26c47aa8c40386a928f252de3b62f6b0"
+source = "git+https://github.com/quartiq/stabilizer.git#0a620a61a090ed5d8656cb3861c744f56ae26ca4"
 dependencies = [
  "cortex-m",
  "heapless 0.8.0",
