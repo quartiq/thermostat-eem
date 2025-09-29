@@ -123,13 +123,10 @@ codegen-units = 1
 built = { version = "0.8", features = ["git2"], default-features = false }
 
 [patch.crates-io]
-# signal_generator = { git = "https://github.com/quartiq/stabilizer.git" }
-# serial_settings = { git = "https://github.com/quartiq/stabilizer.git" }
-# stream = { git = "https://github.com/quartiq/stabilizer.git" }
-# platform = { git = "https://github.com/quartiq/stabilizer.git" }
-platform = { path = "../stabilizer/platform" }
-stream = { path = "../stabilizer/stream" }
-serial_settings = { path = "../stabilizer/serial_settings" }
+signal_generator = { git = "https://github.com/quartiq/stabilizer.git" }
+serial_settings = { git = "https://github.com/quartiq/stabilizer.git" }
+stream = { git = "https://github.com/quartiq/stabilizer.git" }
+platform = { git = "https://github.com/quartiq/stabilizer.git" }
 miniconf = { git = "https://github.com/quartiq/miniconf.git" }
 miniconf_derive = { git = "https://github.com/quartiq/miniconf.git" }
 miniconf_mqtt = { git = "https://github.com/quartiq/miniconf.git" }
