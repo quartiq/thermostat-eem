@@ -1,10 +1,11 @@
+#![no_std]
+
 // (AD7172 https://www.analog.com/media/en/technical-documentation/data-sheets/AD7172-2.pdf)
 
 use arbitrary_int::{u2, u3};
 use bitbybit::{bitenum, bitfield};
 use core::fmt::Debug;
-
-use super::hal::hal_02::blocking::spi::{Transfer, Write};
+use embedded_hal::spi::SpiDevice;
 
 // ADC Register Addresses
 #[bitenum(u6)]
@@ -252,29 +253,25 @@ pub struct FiltCon {
 }
 
 /// DAC value out of bounds error.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("Invalid chip ID")]
     AdcId,
 }
 
-pub struct Ad7172<SPI> {
-    spi: SPI,
+pub struct Ad7172<S> {
+    spi: S,
 }
 
-impl<SPI> Ad7172<SPI>
-where
-    SPI: Transfer<u8> + Write<u8>,
-    <SPI as Write<u8>>::Error: core::fmt::Debug,
-    <SPI as Transfer<u8>>::Error: core::fmt::Debug,
-{
-    pub fn new(spi: SPI) -> Self {
+impl<S: SpiDevice<u8>> Ad7172<S> {
+    pub fn new(spi: S) -> Self {
         Ad7172 { spi }
     }
 
     pub fn reset(&mut self) {
         // 64 cycles high for ADC reset
-        let mut buf = [0xFFu8; 8];
-        self.spi.transfer(&mut buf).unwrap();
+        let buf = [0xFFu8; 8];
+        self.spi.write(&buf).unwrap();
     }
 
     /// Read a ADC register of size in bytes. Max. size 4 bytes.
@@ -287,7 +284,7 @@ where
             .with_ignore(false)
             .build()
             .raw_value();
-        self.spi.transfer(&mut buf[7 - size..]).unwrap();
+        self.spi.transfer_in_place(&mut buf[7 - size..]).unwrap();
         (u64::from_be_bytes(buf) & ((1 << (size * 8)) - 1)) as u32
     }
 

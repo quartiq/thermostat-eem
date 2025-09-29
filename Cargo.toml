@@ -1,19 +1,27 @@
+[workspace.package]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/quartiq/thermostat-eem"
+
+[workspace]
+members = ["ad7172"]
+
 [package]
 name = "thermostat-eem"
 version = "0.3.0"
-edition = "2021"
 authors = [
-	"Norman Krackow <nk@quartiq.de>",
 	"Robert Jördens <rj@quartiq.de>",
+	"Norman Krackow <nk@quartiq.de>",
 	"Ryan Summers <ryan.summers@vertigo-designs.com>",
 ]
 description = "Firmware for the Sinara Thermostat-EEM temperature controller."
 categories = ["embedded", "no-std", "hardware-support", "science"]
-license = "MIT OR Apache-2.0"
 keywords = ["ethernet", "stm32h7", "adc", "dac", "physics"]
-repository = "https://github.com/quartiq/thermostat-eem"
 readme = "README.md"
 exclude = [".gitignore"]
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [features]
 default = ["all_differential"]
@@ -21,17 +29,11 @@ all_differential = []
 all_single_ended = []
 
 [dependencies]
-cortex-m = { version = "0.7.7", features = [
-	"inline-asm",
-	"critical-section-single-core",
-] }
-cortex-m-rt = { version = "0.7", features = ["device"] }
 log = { version = "0.4", features = [
 	"max_level_trace",
 	"release_max_level_info",
 ] }
 panic-probe = { version = "=0.3.0", features = ["print-rtt"] }
-rtic = { version = "2.1", features = ["thumbv7-backend"] }
 rtic-monotonics = { version = "2.0", features = ["cortex-m-systick"] }
 rtic-sync = { version = "1.0" }
 embedded-time = "0.12.1"
@@ -42,13 +44,16 @@ minimq = "0.10"
 serde = { version = "1.0.217", features = ["derive"], default-features = false }
 serde-json-core = "0.6"
 rtt-logger = "0.2"
-rtt-target = { version = "0.3", features = ["cortex-m"] }
 num-traits = { version = "0.2", default-features = false, features = ["libm"] }
 smlang = "0.8.0"
 idsp = "0.18.0"
-embedded-hal = "0.2.7"
+embedded-hal-02 = { package = "embedded-hal", version = "0.2.7", features = [
+	"unproven",
+] }
+embedded-hal-1 = { package = "embedded-hal", version = "1.0" }
+embedded-hal-bus = "0.3.0"
 bitbybit = "1.3.3"
-arbitrary-int = "1.3.0"
+arbitrary-int = "2.0.0"
 lm75 = "0.2"
 bytemuck = { version = "1.21.0", features = [
 	"derive",
@@ -57,10 +62,10 @@ bytemuck = { version = "1.21.0", features = [
 miniconf = { version = "0.19", features = ["json-core", "derive", "postcard"] }
 miniconf_mqtt = { version = "0.19" }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
-serial-settings = "0.2"
+serial_settings = "0.2"
 postcard = "1"
 embedded-storage = "0.3"
-sequential-storage = "4"
+sequential-storage = "5"
 usb-device = "0.3.2"
 usbd-serial = "0.2"
 panic-persist = { version = "0.3", features = ["utf8", "custom-panic-handler"] }
@@ -72,16 +77,36 @@ serde_with = { version = "3.12", default-features = false, features = [
 ] }
 num_enum = { version = "0.7.3", default-features = false }
 grounded = "0.2.0"
-
-[dependencies.stm32h7xx-hal]
-version = "0.16.0"
-features = ["stm32h743v", "rt", "ethernet", "xspi", "usb_hs"]
-git = "https://github.com/stm32-rs/stm32h7xx-hal.git"
+# signal_generator = { version = "0.1" }
+stream = { version = "0.1" }
+platform = { version = "0.1" }
+ad7172 = { version = "0.1", path = "ad7172" }
+embedded-hal-compat = "0.13.0"
 
 [dependencies.smoltcp-nal]
 version = "0.6"
 features = ["shared-stack"]
 git = "https://github.com/quartiq/smoltcp-nal.git"
+
+[target.'cfg(target_os = "none")'.dependencies]
+stm32h7xx-hal = { version = "0.16.0", features = [
+	"stm32h743v",
+	"rt",
+	"ethernet",
+	"xspi",
+	"usb_hs",
+], git = "https://github.com/stm32-rs/stm32h7xx-hal.git" }
+cortex-m = { version = "0.7.7", features = [
+	"inline-asm",
+	"critical-section-single-core",
+] }
+cortex-m-rt = { version = "0.7", features = ["device"] }
+rtic = { version = "2.1", features = ["thumbv7-backend"] }
+rtt-target = { version = "0.3", features = ["cortex-m"] }
+
+[target.'cfg(not(target_os = "none"))'.dependencies]
+serde_json = { version = "1.0.133", features = ["preserve_order"] }
+miniconf = { version = "0.19", features = ["schema"] }
 
 [profile.dev]
 codegen-units = 1
@@ -98,4 +123,10 @@ codegen-units = 1
 built = { version = "0.8", features = ["git2"], default-features = false }
 
 [patch.crates-io]
-serial-settings = { git = "https://github.com/quartiq/stabilizer.git" }
+serial_settings = { git = "https://github.com/quartiq/stabilizer.git" }
+stream = { git = "https://github.com/quartiq/stabilizer.git" }
+platform = { git = "https://github.com/quartiq/stabilizer.git" }
+miniconf = { git = "https://github.com/quartiq/miniconf.git" }
+miniconf_derive = { git = "https://github.com/quartiq/miniconf.git" }
+miniconf_mqtt = { git = "https://github.com/quartiq/miniconf.git" }
+idsp = { git = "https://github.com/quartiq/idsp.git" }

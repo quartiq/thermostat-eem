@@ -1,14 +1,14 @@
 use super::hal::{
     adc,
-    gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*, Analog},
+    gpio::{Analog, gpioa::*, gpiob::*, gpioc::*, gpiof::*},
     hal_02::blocking::delay::DelayUs,
     prelude::*,
-    rcc::{rec, CoreClocks},
-    stm32::{ADC1, ADC12_COMMON, ADC2, ADC3, ADC3_COMMON},
+    rcc::{CoreClocks, rec},
+    stm32::{ADC1, ADC2, ADC3, ADC3_COMMON, ADC12_COMMON},
 };
-use super::{
-    dac::{R_SENSE, VREF_TEC},
+use crate::{
     OutputChannelIdx,
+    convert::{R_SENSE, VREF_TEC},
 };
 
 const V_REF: f32 = 3.0; // ADC reference voltage
@@ -52,7 +52,8 @@ impl AdcInternal {
         pins: AdcInternalPins,
     ) -> Self {
         // Setup ADCs
-        let (adc1, _adc2) = adc::adc12(adc.0, adc.1, 1.MHz(), delay, adc_rcc.0, clocks);
+        let (adc1, _adc2) =
+            adc::adc12(adc.0, adc.1, 1.MHz(), delay, adc_rcc.0, clocks);
         let adc3 = adc::Adc::adc3(adc.2, 1.MHz(), delay, adc_rcc.1, clocks);
 
         let mut adc1 = adc1.enable();

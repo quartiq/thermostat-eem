@@ -3,18 +3,18 @@
 //! The Thermostat TEC driver ICs feature current limits controlled by an analog voltage input.
 //! This voltage is controlled by the MCU using low-pass filtered PWM outputs.
 //!
-use super::{
-    dac::{R_SENSE, VREF_TEC},
-    hal::{
-        gpio::{gpiob::*, gpioc::*, gpiod::*, gpioe::*, Alternate},
-        hal_02::PwmPin,
-        prelude::*,
-        pwm::{ComplementaryDisabled, ComplementaryImpossible, C1, C2, C3, C4},
-        rcc::{rec, CoreClocks},
-        stm32::{TIM1, TIM3, TIM4},
-        time::KiloHertz,
-    },
+use super::hal::{
+    gpio::{Alternate, gpiob::*, gpioc::*, gpiod::*, gpioe::*},
+    hal_02::PwmPin,
+    prelude::*,
+    pwm::{C1, C2, C3, C4, ComplementaryDisabled, ComplementaryImpossible},
+    rcc::{CoreClocks, rec},
+    stm32::{TIM1, TIM3, TIM4},
+    time::KiloHertz,
+};
+use crate::{
     OutputChannelIdx,
+    convert::{R_SENSE, VREF_TEC},
 };
 
 /// TEC limit types
@@ -69,16 +69,16 @@ type Pt1<T, const S: u8> = super::hal::pwm::Pwm<T, S, ComplementaryImpossible>;
 #[allow(clippy::type_complexity)]
 pub struct Pwm {
     voltage: (Pt0<TIM1, C1>, Pt0<TIM1, C2>, Pt0<TIM1, C3>, Pt1<TIM1, C4>),
-    positive_current: (Pt1<TIM4, C1>, Pt1<TIM4, C2>, Pt1<TIM4, C3>, Pt1<TIM4, C4>),
-    negative_current: (Pt1<TIM3, C1>, Pt1<TIM3, C2>, Pt1<TIM3, C3>, Pt1<TIM3, C4>),
+    positive_current:
+        (Pt1<TIM4, C1>, Pt1<TIM4, C2>, Pt1<TIM4, C3>, Pt1<TIM4, C4>),
+    negative_current:
+        (Pt1<TIM3, C1>, Pt1<TIM3, C2>, Pt1<TIM3, C3>, Pt1<TIM3, C4>),
 }
 
 impl Pwm {
     // PWM constants
     const MAX_DUTY: u32 = 10000; // Maximum duty cycle valid for all channels.
     const V_PWM: f32 = 3.3; // MCU PWM pin output high voltage
-    pub const MAX_CURRENT_LIMIT: f32 = 3.0; // As per MAX1968 datasheet. (Pwm::V_PWM * 0.15) / (VREF_TEC * R_SENSE) for 100% duty cycle equivalent.
-    pub const MAX_VOLTAGE_LIMIT: f32 = 4.3; // As per MAX1968 datasheet
 
     /// Construct a new PWM driver for all Thermostat output channel limits.
     ///
@@ -96,13 +96,20 @@ impl Pwm {
         // PWM freqency. 20kHz is ~80dB down with the installed second order 160Hz lowpass.
         const F_PWM: KiloHertz = KiloHertz::kHz(20);
 
-        let mut voltage = tim.0.pwm(pins.voltage, F_PWM.convert(), tim_rec.0, clocks);
-        let mut negative_current =
-            tim.1
-                .pwm(pins.negative_current, F_PWM.convert(), tim_rec.1, clocks);
-        let mut positive_current =
-            tim.2
-                .pwm(pins.positive_current, F_PWM.convert(), tim_rec.2, clocks);
+        let mut voltage =
+            tim.0.pwm(pins.voltage, F_PWM.convert(), tim_rec.0, clocks);
+        let mut negative_current = tim.1.pwm(
+            pins.negative_current,
+            F_PWM.convert(),
+            tim_rec.1,
+            clocks,
+        );
+        let mut positive_current = tim.2.pwm(
+            pins.positive_current,
+            F_PWM.convert(),
+            tim_rec.2,
+            clocks,
+        );
         fn init_pwm_pin<P: PwmPin<Duty = u16>>(pin: &mut P) {
             pin.set_duty(0);
             pin.enable();
@@ -145,7 +152,10 @@ impl Pwm {
             v * (1.0 / 4.0 / Pwm::V_PWM)
         }
 
-        fn set_pwm_channel<P: PwmPin<Duty = u16>>(channel: &mut P, duty: f32) -> Result<(), Error> {
+        fn set_pwm_channel<P: PwmPin<Duty = u16>>(
+            channel: &mut P,
+            duty: f32,
+        ) -> Result<(), Error> {
             let value = (duty * Pwm::MAX_DUTY as f32) as i32;
             if !(0..=Pwm::MAX_DUTY as _).contains(&value) {
                 return Err(Error::Bounds);
@@ -154,18 +164,22 @@ impl Pwm {
             Ok(())
         }
         match lim {
-            Limit::Voltage(OutputChannelIdx::Zero) => {
-                set_pwm_channel(&mut self.voltage.0, voltage_limit_to_duty_cycle(val))
-            }
-            Limit::Voltage(OutputChannelIdx::One) => {
-                set_pwm_channel(&mut self.voltage.1, voltage_limit_to_duty_cycle(val))
-            }
-            Limit::Voltage(OutputChannelIdx::Two) => {
-                set_pwm_channel(&mut self.voltage.2, voltage_limit_to_duty_cycle(val))
-            }
-            Limit::Voltage(OutputChannelIdx::Three) => {
-                set_pwm_channel(&mut self.voltage.3, voltage_limit_to_duty_cycle(val))
-            }
+            Limit::Voltage(OutputChannelIdx::Zero) => set_pwm_channel(
+                &mut self.voltage.0,
+                voltage_limit_to_duty_cycle(val),
+            ),
+            Limit::Voltage(OutputChannelIdx::One) => set_pwm_channel(
+                &mut self.voltage.1,
+                voltage_limit_to_duty_cycle(val),
+            ),
+            Limit::Voltage(OutputChannelIdx::Two) => set_pwm_channel(
+                &mut self.voltage.2,
+                voltage_limit_to_duty_cycle(val),
+            ),
+            Limit::Voltage(OutputChannelIdx::Three) => set_pwm_channel(
+                &mut self.voltage.3,
+                voltage_limit_to_duty_cycle(val),
+            ),
             Limit::NegativeCurrent(OutputChannelIdx::Zero) => set_pwm_channel(
                 &mut self.negative_current.0,
                 current_limit_to_duty_cycle(-val),
