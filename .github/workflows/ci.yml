@@ -18,24 +18,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          target: thumbv7em-none-eabihf
-          override: true
-      - name: cargo fmt --check
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: cargo check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --verbose
+          targets: thumbv7em-none-eabihf
+          components: clippy,rustfmt
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy
+      - run: cargo check --all --verbose
 
   compile:
     runs-on: ubuntu-latest
@@ -54,8 +43,8 @@ jobs:
             features: ''
             continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
           targets: thumbv7em-none-eabihf
@@ -72,36 +61,27 @@ jobs:
         with:
           path: thermostat-eem.bin
 
+  schema:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      # https://github.com/rust-lang/cargo/issues/13051
+      - run: cargo run --target x86_64-unknown-linux-gnu
+
   doc:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          target: thumbv7em-none-eabihf
-          override: true
-
+          targets: thumbv7em-none-eabihf
       - uses: Swatinem/rust-cache@v1
-
-      - name: Install Deadlinks
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: |
-            cargo-deadlinks
-
-      - name: cargo doc
-        uses: actions-rs/cargo@v1
-        with:
-          command: doc
-          args: --no-deps -p miniconf -p idsp -p thermostat-eem
-
-      - name: cargo deadlinks
-        uses: actions-rs/cargo@v1
-        with:
-          command: deadlinks
-          # We intentionally ignore fragments, as RTIC may generate fragments for various
-          # auto-generated code.
-          args: --dir target/thumbv7em-none-eabihf/doc --ignore-fragments --check-intra-doc-links
+      - run: cargo install cargo-deadlinks
+      - run: cargo install mdbook-linkcheck
+      - run: |
+          cargo doc --no-deps \
+          -p miniconf -p idsp -p thermostat-eem
+      - run: cargo deadlinks --dir target/thumbv7em-none-eabihf/doc --ignore-fragments --check-intra-doc-links
+        continue-on-error: true
