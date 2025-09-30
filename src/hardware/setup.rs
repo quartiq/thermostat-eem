@@ -238,15 +238,17 @@ where
             gpiod.pd10.into_floating_input().erase(),
             gpiod.pd11.into_floating_input().erase(),
         ],
-        led: [
-            gpiog.pg9.into_push_pull_output().erase(),
-            gpiog.pg10.into_push_pull_output().erase(),
+        led_red: [
             gpioe.pe8.into_push_pull_output().erase(),
             gpioe.pe10.into_push_pull_output().erase(),
-            gpioe.pe12.into_push_pull_output().erase(),
-            gpiog.pg15.into_push_pull_output().erase(),
             gpioe.pe15.into_push_pull_output().erase(),
             gpiog.pg8.into_push_pull_output().erase(),
+        ],
+        led_green: [
+            gpiog.pg9.into_push_pull_output().erase(),
+            gpiog.pg10.into_push_pull_output().erase(),
+            gpioe.pe12.into_push_pull_output().erase(),
+            gpiog.pg15.into_push_pull_output().erase(),
         ],
         shdn: [
             gpiog.pg4.into_push_pull_output().erase(),

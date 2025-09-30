@@ -11,8 +11,6 @@
 //! TEC driver datasheet: `<https://datasheets.maximintegrated.com/en/ds/MAX1968-MAX1969.pdf>`
 //!
 
-use strum::IntoEnumIterator;
-
 use super::hal::{
     gpio::{self, gpioc},
     hal_02::blocking::spi::Write,
@@ -73,7 +71,7 @@ impl Dac {
         }
 
         // default to zero current
-        for i in OutputChannelIdx::iter() {
+        for i in OutputChannelIdx::ALL {
             dac.set(i, (0.0).try_into().unwrap());
         }
         dac

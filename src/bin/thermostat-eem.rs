@@ -8,14 +8,13 @@
 use thermostat_eem::{output_channel, statistics};
 
 use panic_probe as _; // global panic handler
-use strum::IntoEnumIterator;
-
-use rtic_sync::{channel::*, make_channel};
 
 use fugit::ExtU32;
 use miniconf::Tree;
+use num_traits::Float as _;
 use output_channel::{OutputChannel, State};
 use platform::{AppSettings, NetSettings};
+use rtic_sync::{channel::*, make_channel};
 use serde::Serialize;
 use statistics::{Buffer, Statistics};
 use stream::Target;
@@ -27,40 +26,21 @@ use thermostat_eem::convert::{
 pub struct InputChannel {
     sensor: Sensor,
     #[tree(rename="typ", typ="&str", with=miniconf::str_leaf, defer=self.sensor)]
-    _sensor: (),
+    _typ: (),
 }
 
 #[derive(Clone, Debug, Tree)]
 pub struct ThermostatEem {
     /// Specifies the telemetry output period in seconds.
-    ///
-    /// # Path
-    /// `telemetry_period`
-    ///
-    /// # Value
-    /// Any positive non-zero value. Will be rounded to milliseconds.
     telemetry_period: f32,
 
     /// Input sensor configuration
     input: [[Option<InputChannel>; 4]; 4],
 
     /// Array of settings for the Thermostat output channels.
-    ///
-    /// # Path
-    /// `output_channel/<n>`
-    /// * `<n> := [0, 1, 2, 3]` specifies which channel to configure.
-    ///
-    /// # Value
-    /// See [OutputChannel]
     output: [OutputChannel; 4],
 
     /// Alarm settings.
-    ///
-    /// # Path
-    /// `Alarm`
-    ///
-    /// # Value
-    /// See [Alarm]
     alarm: output_channel::Alarm,
 
     #[tree(with=miniconf::leaf)]
@@ -109,7 +89,7 @@ impl serial_settings::Settings for Settings {
 }
 
 /// Telemetry for various quantities that are continuously monitored by eg. the MCU ADC.
-#[derive(Serialize, Copy, Clone, Default, Debug)]
+#[derive(Serialize, Clone, Default, Debug)]
 pub struct Monitor {
     p3v3_voltage: f32,
     p5v_voltage: f32,
@@ -125,10 +105,12 @@ pub struct Monitor {
     poe: PoePower,
     /// Overtemperature status.
     overtemp: bool,
+    // CPU temperature
+    // cpu_temp: f32,
 }
 
 /// Thermostat-EEM Telemetry.
-#[derive(Serialize, Copy, Clone, Debug, Default)]
+#[derive(Serialize, Clone, Debug, Default)]
 pub struct Telemetry {
     /// see [Monitor]
     monitor: Monitor,
@@ -141,7 +123,7 @@ pub struct Telemetry {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Stream {
     temperature: [[f32; 4]; 4],
     current: [f32; 4],
@@ -278,6 +260,7 @@ mod app {
         telemetry::spawn().unwrap();
         alarm::spawn().unwrap();
         usb::spawn().unwrap();
+        blink::spawn().unwrap();
 
         (shared, local)
     }
@@ -300,7 +283,8 @@ mod app {
         let pwm = c.local.pwm;
         (c.shared.network, c.shared.gpio, c.shared.settings).lock(
             |network, gpio, settings| {
-                for (ch, s) in OutputChannelIdx::iter()
+                for (ch, s) in OutputChannelIdx::ALL
+                    .into_iter()
                     .zip(settings.thermostat_eem.output.iter_mut())
                 {
                     pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
@@ -308,7 +292,10 @@ mod app {
                     pwm.set_limit(Limit::PositiveCurrent(ch), pos).unwrap();
                     pwm.set_limit(Limit::NegativeCurrent(ch), neg).unwrap();
                     gpio.set_shutdown(ch, (s.state == State::Off).into());
-                    gpio.set_led(ch.into(), (s.state != State::Off).into()); // fix leds to channel state
+                    gpio.set_led_green(
+                        ch.into(),
+                        (s.state != State::Off).into(),
+                    );
                 }
 
                 network.direct_stream(settings.thermostat_eem.stream);
@@ -316,17 +303,50 @@ mod app {
         );
     }
 
+    #[task(priority = 1, shared=[gpio, settings])]
+    async fn blink(mut c: blink::Context) {
+        const DUTY_STEPS: u32 = 20;
+        const DUTY_PER_DECADE: f32 = 0.25;
+        const MIN_ERROR: f32 = 0.001;
+        loop {
+            let err = (&mut c.shared.settings).lock(|settings| {
+                OutputChannelIdx::ALL.map(|ch| {
+                    settings.thermostat_eem.output[ch as usize].error()
+                })
+            });
+            let thresh = err.map(|e| {
+                ((e.abs() * MIN_ERROR.recip()).log10()
+                    * (DUTY_PER_DECADE * DUTY_STEPS as f32))
+                    as i32
+            });
+            for i in 0..DUTY_STEPS {
+                (&mut c.shared.gpio).lock(|gpio| {
+                    for (ch, thresh) in
+                        OutputChannelIdx::ALL.into_iter().zip(thresh.iter())
+                    {
+                        gpio.set_led_red(
+                            ch.into(),
+                            (*thresh > i as i32).into(),
+                        );
+                    }
+                });
+                Systick::delay((1000 / DUTY_STEPS).millis()).await;
+            }
+        }
+    }
+
     #[task(priority = 1, local=[adc_internal], shared=[network, settings, telemetry, gpio, statistics])]
     async fn telemetry(mut c: telemetry::Context) {
         loop {
             let mut telemetry: Telemetry =
-                c.shared.telemetry.lock(|telemetry| *telemetry);
+                c.shared.telemetry.lock(|telemetry| telemetry.clone());
             let adc_int = &mut c.local.adc_internal;
+            // telemetry.monitor.cpu_temp = adc_int.read_temperature();
             telemetry.monitor.p3v3_voltage = adc_int.read_p3v3_voltage();
             telemetry.monitor.p5v_voltage = adc_int.read_p5v_voltage();
             telemetry.monitor.p12v_voltage = adc_int.read_p12v_voltage();
             telemetry.monitor.p12v_current = adc_int.read_p12v_current();
-            for ch in OutputChannelIdx::iter() {
+            for ch in OutputChannelIdx::ALL.into_iter() {
                 let idx = ch as usize;
                 telemetry.monitor.output_vref[idx] =
                     adc_int.read_output_vref(ch);
@@ -345,8 +365,7 @@ mod app {
                 for cfg_i in 0..4 {
                     c.shared.statistics.lock(|buff| {
                         telemetry.statistics[phy_i][cfg_i] =
-                            buff[phy_i][cfg_i].into();
-                        buff[phy_i][cfg_i] = Default::default();
+                            core::mem::take(&mut buff[phy_i][cfg_i]).into();
                     });
                 }
             }
@@ -355,12 +374,16 @@ mod app {
                 network.telemetry.publish_telemetry(&telemetry)
             });
 
-            // TODO: validate telemetry period.
             let telemetry_period = c
                 .shared
                 .settings
                 .lock(|settings| settings.thermostat_eem.telemetry_period);
-            Systick::delay((telemetry_period as u32).secs()).await;
+            Systick::delay(
+                ((telemetry_period * 1000.0) as u32)
+                    .millis()
+                    .max(500.millis()),
+            )
+            .await;
         }
     }
 
@@ -398,7 +421,10 @@ mod app {
                     .ok();
             }
             // Note that you have to wait for a full period of the previous setting first for a change of period to take affect.
-            Systick::delay(((alarm.period * 1000.0) as u32).millis()).await;
+            Systick::delay(
+                ((alarm.period * 1000.0) as u32).millis().max(100.millis()),
+            )
+            .await;
         }
     }
 
@@ -432,7 +458,7 @@ mod app {
                             return;
                         }
 
-                        for ch in OutputChannelIdx::iter() {
+                        for ch in OutputChannelIdx::ALL.into_iter() {
                             let idx = ch as usize;
                             let current = settings.thermostat_eem.output[idx]
                                 .update(temperature);

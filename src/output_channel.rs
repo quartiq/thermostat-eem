@@ -41,7 +41,7 @@ pub struct OutputChannel {
 
     /// Biquad parameters
     #[tree(rename="typ", typ="&str", with=miniconf::str_leaf, defer=self.biquad)]
-    _tag: (),
+    _typ: (),
 
     /// PID/Biquad/IIR filter parameters
     ///
@@ -156,7 +156,7 @@ impl Default for OutputChannel {
         Self {
             state: Default::default(),
             voltage_limit: MAX_VOLTAGE_LIMIT,
-            _tag: (),
+            _typ: (),
             iir: b.build::<f64>(1007.0.recip(), 1.0, 1.0),
             biquad: b,
             iir_state: Default::default(),
@@ -193,6 +193,11 @@ impl OutputChannel {
             (self.iir.max() as f32 + 0.05 * MAX_CURRENT_LIMIT).max(0.),
             (self.iir.min() as f32 - 0.05 * MAX_CURRENT_LIMIT).min(0.),
         ]
+    }
+
+    pub fn error(&self) -> f32 {
+        (self.iir_state[0] as f32 + self.iir_state[1] as f32) * 0.5
+            + self.iir.input_offset() as f32
     }
 }
 
