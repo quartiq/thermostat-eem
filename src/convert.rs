@@ -1,3 +1,5 @@
+use arbitrary_int::u2;
+use bitbybit::bitenum;
 use miniconf::Tree;
 use num_traits::float::Float;
 use strum::{AsRefStr, EnumString};
@@ -53,8 +55,8 @@ impl From<DacCode> for u32 {
     }
 }
 
-#[derive(Clone, Copy, Debug, strum::EnumIter, PartialEq, Eq)]
-#[repr(usize)]
+#[derive(Debug, PartialEq, PartialOrd)]
+#[bitenum(u2, exhaustive = true)]
 pub enum AdcPhy {
     Zero = 0,
     One = 1,
@@ -70,13 +72,10 @@ impl AdcPhy {
     /// of a channel depends on how many channels are enabled on an ADC.
     pub fn next(&self) -> Self {
         // Round-robin
-        match self {
-            Self::Zero => Self::One,
-            Self::One => Self::Two,
-            Self::Two => Self::Three,
-            Self::Three => Self::Zero,
-        }
+        Self::new_with_raw_value(self.raw_value().wrapping_add(u2::from_u8(1)))
     }
+
+    pub const ALL: [Self; 4] = [Self::Zero, Self::One, Self::Two, Self::Three];
 }
 
 /// A type representing an ADC sample.

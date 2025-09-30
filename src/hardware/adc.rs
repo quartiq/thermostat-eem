@@ -7,7 +7,6 @@ use embedded_hal_1::{digital::ErrorType, digital::OutputPin};
 use embedded_hal_bus::spi::{ExclusiveDevice, NoDelay};
 use embedded_hal_compat::{Forward, ForwardCompat};
 use smlang::statemachine;
-use strum::IntoEnumIterator;
 
 use ad7172;
 
@@ -138,7 +137,7 @@ impl Adc {
         // set sync low first for synchronization at rising edge
         self.sync.set_low();
 
-        for phy in AdcPhy::iter() {
+        for phy in AdcPhy::ALL.into_iter() {
             log::info!("AD7172 {:?}", phy);
             self.selected(phy, |adc| {
                 adc.setup_adc(delay, &config[phy as usize])

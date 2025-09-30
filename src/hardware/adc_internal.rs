@@ -51,6 +51,10 @@ impl AdcInternal {
         adc: (ADC1, ADC2, ADC3, ADC12_COMMON, ADC3_COMMON),
         pins: AdcInternalPins,
     ) -> Self {
+        // Enable temperature sensor
+        adc.4.ccr.modify(|_, w| w.vsenseen().set_bit());
+        // adc.3.ccr.modify(|_, w| w.vsenseen().set_bit());
+
         // Setup ADCs
         let (adc1, _adc2) =
             adc::adc12(adc.0, adc.1, 1.MHz(), delay, adc_rcc.0, clocks);
@@ -61,7 +65,7 @@ impl AdcInternal {
         adc1.set_resolution(adc::Resolution::SixteenBit);
 
         let mut adc3 = adc3.enable();
-        adc1.set_sample_time(adc::AdcSampleTime::T_810);
+        adc3.set_sample_time(adc::AdcSampleTime::T_810);
         adc3.set_resolution(adc::Resolution::SixteenBit);
 
         AdcInternal { adc1, adc3, pins }
@@ -152,5 +156,15 @@ impl AdcInternal {
         const GAIN: f32 = 0.005 * (10000.0 / 100.0); // 12V current measurement resistor configuration for LT6106
         let code: u32 = self.adc3.read(&mut self.pins.p12v_current).unwrap();
         code as f32 / self.adc3.slope() as f32 * (V_REF / GAIN)
+    }
+
+    /// read CPU temperature sensor and return temperature in Celsius
+    pub fn read_temperature(&mut self) -> f32 {
+        let code: u32 =
+            self.adc3.read(&mut super::hal::adc::Temperature).unwrap();
+        let ts_cal_110 = super::hal::signature::TS_CAL_110::read();
+        let ts_cal_30 = super::hal::signature::TS_CAL_30::read();
+        30. + (code as i32 - ts_cal_30 as i32) as f32
+            * ((110. - 30.) / (ts_cal_110 - ts_cal_30) as f32)
     }
 }

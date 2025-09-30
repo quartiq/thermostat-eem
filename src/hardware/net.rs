@@ -41,15 +41,15 @@ pub type NetworkManager = smoltcp_nal::shared::NetworkManager<
 >;
 
 pub struct MqttStorage {
-    telemetry: [u8; 2048],
-    settings: [u8; 1024],
+    telemetry: [u8; 3 << 10],
+    settings: [u8; 1 << 10],
 }
 
 impl Default for MqttStorage {
     fn default() -> Self {
         Self {
-            telemetry: [0u8; 2048],
-            settings: [0u8; 1024],
+            telemetry: [0u8; 3 << 10],
+            settings: [0u8; 1 << 10],
         }
     }
 }

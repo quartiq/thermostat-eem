@@ -1,5 +1,4 @@
-use arbitrary_int::u3;
-use strum::IntoEnumIterator;
+use arbitrary_int::u2;
 
 use super::hal::{
     gpio::{
@@ -17,7 +16,8 @@ use crate::{
 pub struct Gpio {
     pub hwrev: [ErasedPin<Input>; 4],
     // Front panel LEDs
-    pub led: [ErasedPin<Output>; 8],
+    pub led_red: [ErasedPin<Output>; 4],
+    pub led_green: [ErasedPin<Output>; 4],
     pub shdn: [ErasedPin<Output>; 4],
     pub poe_pwr: PF2<Input>,
     pub at_event: PE7<Input>,
@@ -59,12 +59,12 @@ impl From<TecFrequency> for PinState {
     }
 }
 
-pub type Led = u3;
+pub type Led = u2;
 
 // Channel enabled indicator LEDs. First set of four from top to bottom.
 impl From<OutputChannelIdx> for Led {
     fn from(other: OutputChannelIdx) -> Led {
-        Led::new(other as _)
+        other.raw_value()
     }
 }
 
@@ -78,11 +78,12 @@ impl Gpio {
     /// # Args
     /// * `pins` - Thermostat GPIO pins.
     pub fn init(&mut self) {
-        for i in OutputChannelIdx::iter() {
+        for i in OutputChannelIdx::ALL {
             self.set_shutdown(i, State::Assert);
         }
-        for i in 0u8..8 {
-            self.set_led(Led::new(i), State::Deassert);
+        for i in 0..4 {
+            self.set_led_red(Led::new(i), State::Deassert);
+            self.set_led_green(Led::new(i), State::Deassert);
         }
         self.set_eem_pwr(false);
         self.set_tec_frequency(TecFrequency::Low);
@@ -97,8 +98,12 @@ impl Gpio {
         self.shdn[ch as usize].set_state(!PinState::from(shutdown));
     }
 
-    pub fn set_led(&mut self, led: Led, state: State) {
-        self.led[led.value() as usize].set_state(PinState::from(state));
+    pub fn set_led_red(&mut self, led: Led, state: State) {
+        self.led_red[led.value() as usize].set_state(PinState::from(state));
+    }
+
+    pub fn set_led_green(&mut self, led: Led, state: State) {
+        self.led_green[led.value() as usize].set_state(PinState::from(state));
     }
 
     pub fn hwrev(&self) -> u8 {
