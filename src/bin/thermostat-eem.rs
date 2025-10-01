@@ -299,7 +299,7 @@ mod app {
         );
     }
 
-    #[task(priority = 1, shared=[gpio, settings])]
+    #[task(priority = 1, shared=[gpio, settings, telemetry])]
     async fn blink(mut c: blink::Context) {
         const DUTY_PERIOD: u32 = 10; // ms
         const DUTY_STEPS: i32 = 20;
@@ -307,6 +307,19 @@ mod app {
         const MAX_ERROR: f32 = 10.; // MAX_ERROR K for MIN_DUTY steps duty
         const MIN_DUTY: i32 = 1;
         loop {
+            (&mut c.shared.telemetry, &mut c.shared.gpio).lock(
+                |telemetry, gpio| {
+                    for (alarm, ch) in
+                        telemetry.alarm.iter().zip(OutputChannelIdx::ALL)
+                    {
+                        gpio.set_led_red(
+                            ch.into(),
+                            alarm.iter().any(|a| a.unwrap_or_default()).into(),
+                        );
+                    }
+                },
+            );
+
             let err = (&mut c.shared.settings).lock(|settings| {
                 OutputChannelIdx::ALL.map(|ch| {
                     let s = &settings.thermostat_eem.output[ch as usize];
@@ -377,9 +390,7 @@ mod app {
                 .settings
                 .lock(|settings| settings.thermostat_eem.telemetry_period);
             Systick::delay(
-                ((telemetry_period * 1000.0) as u32)
-                    .millis()
-                    .max(500.millis()),
+                ((telemetry_period * 1000.0) as u32).max(500).millis(),
             )
             .await;
         }
@@ -388,41 +399,37 @@ mod app {
     #[task(priority = 1, shared=[network, settings, temperature, telemetry])]
     async fn alarm(mut c: alarm::Context) {
         loop {
-            let alarm = c
+            let config = c
                 .shared
                 .settings
                 .lock(|settings| settings.thermostat_eem.alarm.clone());
-            if alarm.armed {
-                let temperatures = c.shared.temperature.lock(|temp| *temp);
-                let mut alarms = [[None; 4]; 4];
-                let alarm_state = alarm
-                    .temperature_limits
-                    .as_flattened()
-                    .iter()
-                    .zip(temperatures.as_flattened().iter())
-                    .zip(alarms.as_flattened_mut().iter_mut())
-                    .any(|((l, t), a)| {
-                        *a = l.map(|l| !(l[0]..l[1]).contains(&(*t as _)));
-                        a.unwrap_or_default()
-                    });
-                c.shared
-                    .telemetry
-                    .lock(|telemetry| telemetry.alarm = alarms);
+            let temperatures = c.shared.temperature.lock(|temp| *temp);
+            let mut alarms = [[None; 4]; 4];
+            let state = config
+                .temperature_limits
+                .as_flattened()
+                .iter()
+                .zip(temperatures.as_flattened().iter())
+                .zip(alarms.as_flattened_mut().iter_mut())
+                .any(|((l, t), a)| {
+                    *a = l.as_ref().map(|l| !l.contains(&(*t as _)));
+                    a.unwrap_or_default()
+                });
+            c.shared
+                .telemetry
+                .lock(|telemetry| telemetry.alarm = alarms);
+            if let Some(target) = config.target.as_ref() {
                 c.shared
                     .network
-                    .lock(|net| {
-                        net.telemetry.publish(&alarm.target, &alarm_state)
-                    })
+                    .lock(|net| net.telemetry.publish(&target, &state))
                     .map_err(|e| {
                         log::error!("Telemetry publishing error: {:?}", e)
                     })
                     .ok();
             }
             // Note that you have to wait for a full period of the previous setting first for a change of period to take affect.
-            Systick::delay(
-                ((alarm.period * 1000.0) as u32).millis().max(100.millis()),
-            )
-            .await;
+            Systick::delay(((config.period * 1000.0) as u32).max(100).millis())
+                .await;
         }
     }
 
