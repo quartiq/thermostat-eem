@@ -1,7 +1,7 @@
 //! # Thermostat_EEM IIR wrapper.
 //!
 
-use core::iter::Take;
+use core::{iter::Take, ops::Range};
 
 use crate::convert::{DacCode, MAX_CURRENT_LIMIT, MAX_VOLTAGE_LIMIT};
 use heapless::String;
@@ -276,26 +276,14 @@ mod validate_voltage_limit {
 /// limits again, alarm will be "false" again.
 #[derive(Clone, Debug, Tree)]
 pub struct Alarm {
-    /// Set the alarm to armed (true) or disarmed (false).
-    /// If the alarm is armed, the device will publish it's alarm state onto the `target`.
-    ///
-    /// # Value
-    /// True to arm, false to disarm.
-    pub armed: bool,
-
     /// Alarm target.
     /// The alarm will publish its state (true or false) onto this mqtt path.
-    /// Full path to the desired target. No wildcards.
-    ///
-    /// # Value
-    /// Any string up to 128 characters.
-    pub target: String<128>,
+    /// Full path to the desired target. No wildcards. Or `None` to disable.
+    #[tree(with=miniconf::leaf)]
+    pub target: Option<String<128>>,
 
-    /// Alarm period in milliseconds.
+    /// Alarm period in seconds.
     /// The alarm will publish its state with this period.
-    ///
-    /// # Value
-    /// f32
     pub period: f32,
 
     /// Temperature limits for the alarm.
@@ -304,20 +292,13 @@ pub struct Alarm {
     /// The alarm will be asserted if any of the enabled input channels goes below its minimum or above its maximum temperature.
     /// The alarm is non latching and clears itself once all channels are in their respective limits.
     ///
-    /// # Path
     /// `temperature_limits/<adc>/<channel>`
-    /// * `<adc> := [0, 1, 2, 3]` specifies which adc to configure.
-    /// * `<channel>` specifies which channel of an ADC to configure. Only the enabled channels for the specific ADC are available.
-    ///
-    /// # Value
-    /// `[f32, f32]` or `None`
-    pub temperature_limits: [[Leaf<Option<[f32; 2]>>; 4]; 4],
+    pub temperature_limits: [[Leaf<Option<Range<f32>>>; 4]; 4],
 }
 
 impl Default for Alarm {
     fn default() -> Self {
         Self {
-            armed: false,
             target: Default::default(),
             period: 1.0,
             temperature_limits: Default::default(),

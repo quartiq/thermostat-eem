@@ -50,7 +50,7 @@ pub struct ThermostatEem {
 impl Default for ThermostatEem {
     fn default() -> Self {
         Self {
-            telemetry_period: 1.0.into(),
+            telemetry_period: 5.0.into(),
             input: Default::default(),
             output: Default::default(),
             alarm: Default::default(),
@@ -82,8 +82,8 @@ impl AppSettings for Settings {
 impl serial_settings::Settings for Settings {
     fn reset(&mut self) {
         *self = Self {
-            thermostat_eem: ThermostatEem::default(),
             net: NetSettings::new(self.net.mac),
+            ..Default::default()
         }
     }
 }
@@ -105,8 +105,8 @@ pub struct Monitor {
     poe: PoePower,
     /// Overtemperature status.
     overtemp: bool,
-    // CPU temperature
-    // cpu_temp: f32,
+    /// CPU temperature
+    cpu_temp: f32,
 }
 
 /// Thermostat-EEM Telemetry.
@@ -292,10 +292,6 @@ mod app {
                     pwm.set_limit(Limit::PositiveCurrent(ch), pos).unwrap();
                     pwm.set_limit(Limit::NegativeCurrent(ch), neg).unwrap();
                     gpio.set_shutdown(ch, (s.state == State::Off).into());
-                    gpio.set_led_green(
-                        ch.into(),
-                        (s.state != State::Off).into(),
-                    );
                 }
 
                 network.direct_stream(settings.thermostat_eem.stream);
@@ -303,34 +299,49 @@ mod app {
         );
     }
 
-    #[task(priority = 1, shared=[gpio, settings])]
+    #[task(priority = 1, shared=[gpio, settings, telemetry])]
     async fn blink(mut c: blink::Context) {
-        const DUTY_STEPS: u32 = 20;
-        const DUTY_PER_DECADE: f32 = 0.25;
-        const MIN_ERROR: f32 = 0.001;
+        const DUTY_PERIOD: u32 = 10; // ms
+        const DUTY_STEPS: i32 = 20;
+        const DUTY_DECADES: f32 = -4.; // lower error -> higher duty cycle
+        const MAX_ERROR: f32 = 10.; // MAX_ERROR K for MIN_DUTY steps duty
+        const MIN_DUTY: i32 = 1;
         loop {
-            let err = (&mut c.shared.settings).lock(|settings| {
-                OutputChannelIdx::ALL.map(|ch| {
-                    settings.thermostat_eem.output[ch as usize].error()
-                })
-            });
-            let thresh = err.map(|e| {
-                ((e.abs() * MIN_ERROR.recip()).log10()
-                    * (DUTY_PER_DECADE * DUTY_STEPS as f32))
-                    as i32
-            });
-            for i in 0..DUTY_STEPS {
-                (&mut c.shared.gpio).lock(|gpio| {
-                    for (ch, thresh) in
-                        OutputChannelIdx::ALL.into_iter().zip(thresh.iter())
+            (&mut c.shared.telemetry, &mut c.shared.gpio).lock(
+                |telemetry, gpio| {
+                    for (alarm, ch) in
+                        telemetry.alarm.iter().zip(OutputChannelIdx::ALL)
                     {
                         gpio.set_led_red(
                             ch.into(),
-                            (*thresh > i as i32).into(),
+                            alarm.iter().any(|a| a.unwrap_or_default()).into(),
                         );
                     }
+                },
+            );
+
+            let err = (&mut c.shared.settings).lock(|settings| {
+                OutputChannelIdx::ALL.map(|ch| {
+                    let s = &settings.thermostat_eem.output[ch as usize];
+                    (s.state != State::Off).then_some(s.error())
+                })
+            });
+            let duty = err.map(|e| {
+                e.map(|e| {
+                    (((e.abs() * MAX_ERROR.recip()).log10()
+                        * (DUTY_STEPS as f32 / DUTY_DECADES))
+                        as i32)
+                        .max(MIN_DUTY)
+                })
+                .unwrap_or_default()
+            });
+            for i in 0..DUTY_STEPS {
+                (&mut c.shared.gpio).lock(|gpio| {
+                    for (duty, ch) in duty.iter().zip(OutputChannelIdx::ALL) {
+                        gpio.set_led_green(ch.into(), (*duty > i).into());
+                    }
                 });
-                Systick::delay((1000 / DUTY_STEPS).millis()).await;
+                Systick::delay(DUTY_PERIOD.millis()).await;
             }
         }
     }
@@ -341,7 +352,7 @@ mod app {
             let mut telemetry: Telemetry =
                 c.shared.telemetry.lock(|telemetry| telemetry.clone());
             let adc_int = &mut c.local.adc_internal;
-            // telemetry.monitor.cpu_temp = adc_int.read_temperature();
+            telemetry.monitor.cpu_temp = adc_int.read_temperature();
             telemetry.monitor.p3v3_voltage = adc_int.read_p3v3_voltage();
             telemetry.monitor.p5v_voltage = adc_int.read_p5v_voltage();
             telemetry.monitor.p12v_voltage = adc_int.read_p12v_voltage();
@@ -379,9 +390,7 @@ mod app {
                 .settings
                 .lock(|settings| settings.thermostat_eem.telemetry_period);
             Systick::delay(
-                ((telemetry_period * 1000.0) as u32)
-                    .millis()
-                    .max(500.millis()),
+                ((telemetry_period * 1000.0) as u32).max(500).millis(),
             )
             .await;
         }
@@ -390,41 +399,37 @@ mod app {
     #[task(priority = 1, shared=[network, settings, temperature, telemetry])]
     async fn alarm(mut c: alarm::Context) {
         loop {
-            let alarm = c
+            let config = c
                 .shared
                 .settings
                 .lock(|settings| settings.thermostat_eem.alarm.clone());
-            if alarm.armed {
-                let temperatures = c.shared.temperature.lock(|temp| *temp);
-                let mut alarms = [[None; 4]; 4];
-                let alarm_state = alarm
-                    .temperature_limits
-                    .as_flattened()
-                    .iter()
-                    .zip(temperatures.as_flattened().iter())
-                    .zip(alarms.as_flattened_mut().iter_mut())
-                    .any(|((l, t), a)| {
-                        *a = l.map(|l| !(l[0]..l[1]).contains(&(*t as _)));
-                        a.unwrap_or_default()
-                    });
-                c.shared
-                    .telemetry
-                    .lock(|telemetry| telemetry.alarm = alarms);
+            let temperatures = c.shared.temperature.lock(|temp| *temp);
+            let mut alarms = [[None; 4]; 4];
+            let state = config
+                .temperature_limits
+                .as_flattened()
+                .iter()
+                .zip(temperatures.as_flattened().iter())
+                .zip(alarms.as_flattened_mut().iter_mut())
+                .any(|((l, t), a)| {
+                    *a = l.as_ref().map(|l| !l.contains(&(*t as _)));
+                    a.unwrap_or_default()
+                });
+            c.shared
+                .telemetry
+                .lock(|telemetry| telemetry.alarm = alarms);
+            if let Some(target) = config.target.as_ref() {
                 c.shared
                     .network
-                    .lock(|net| {
-                        net.telemetry.publish(&alarm.target, &alarm_state)
-                    })
+                    .lock(|net| net.telemetry.publish(&target, &state))
                     .map_err(|e| {
                         log::error!("Telemetry publishing error: {:?}", e)
                     })
                     .ok();
             }
             // Note that you have to wait for a full period of the previous setting first for a change of period to take affect.
-            Systick::delay(
-                ((alarm.period * 1000.0) as u32).millis().max(100.millis()),
-            )
-            .await;
+            Systick::delay(((config.period * 1000.0) as u32).max(100).millis())
+                .await;
         }
     }
 

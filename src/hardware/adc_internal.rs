@@ -51,14 +51,13 @@ impl AdcInternal {
         adc: (ADC1, ADC2, ADC3, ADC12_COMMON, ADC3_COMMON),
         pins: AdcInternalPins,
     ) -> Self {
-        // Enable temperature sensor
-        adc.4.ccr.modify(|_, w| w.vsenseen().set_bit());
-        // adc.3.ccr.modify(|_, w| w.vsenseen().set_bit());
-
         // Setup ADCs
         let (adc1, _adc2) =
             adc::adc12(adc.0, adc.1, 1.MHz(), delay, adc_rcc.0, clocks);
         let adc3 = adc::Adc::adc3(adc.2, 1.MHz(), delay, adc_rcc.1, clocks);
+
+        adc::Temperature::new().enable(&adc3);
+        adc::Vrefint::new().enable(&adc3);
 
         let mut adc1 = adc1.enable();
         adc1.set_sample_time(adc::AdcSampleTime::T_810);
@@ -158,13 +157,21 @@ impl AdcInternal {
         code as f32 / self.adc3.slope() as f32 * (V_REF / GAIN)
     }
 
-    /// read CPU temperature sensor and return temperature in Celsius
+    /// read vref+ voltage using vrefint
+    pub fn read_vref(&mut self) -> f32 {
+        let code: u32 = self.adc3.read(&mut super::hal::adc::Vrefint).unwrap();
+        let vrefint_cal = super::hal::signature::VREFIN_CAL::read();
+        3.3 * vrefint_cal as f32 / code as f32
+    }
+
+    /// read CPU temperature in Celsius
     pub fn read_temperature(&mut self) -> f32 {
         let code: u32 =
             self.adc3.read(&mut super::hal::adc::Temperature).unwrap();
         let ts_cal_110 = super::hal::signature::TS_CAL_110::read();
         let ts_cal_30 = super::hal::signature::TS_CAL_30::read();
-        30. + (code as i32 - ts_cal_30 as i32) as f32
-            * ((110. - 30.) / (ts_cal_110 - ts_cal_30) as f32)
+        30. + (code as f32 * (V_REF / 3.3) - ts_cal_30 as f32)
+            * (110 - 30) as f32
+            * (1. / (ts_cal_110 - ts_cal_30) as f32)
     }
 }
