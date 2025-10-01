@@ -3,6 +3,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::hardware::adc::Mux;
 use heapless::String;
+use lm75::Lm75;
 use smoltcp_nal::smoltcp;
 
 use super::adc::AdcConfig;
@@ -114,6 +115,8 @@ pub struct ThermostatDevices<
     pub adc_internal: AdcInternal,
     pub adc_sm: StateMachine<Adc>,
     pub adc_input_config: AdcConfig,
+    pub afe_i2c: hal::i2c::I2c<hal::pac::I2C2>,
+    pub lm75: Lm75<hal::i2c::I2c<hal::pac::I2C1>, lm75::ic::Lm75>,
     pub usb_serial: super::SerialTerminal<C>,
     pub usb: super::UsbDevice,
     pub metadata: &'static ApplicationMetadata,
@@ -472,8 +475,6 @@ where
         log::warn!("I2C failure, using default MAC");
         eui48 = [0x02, 0x00, 0x00, 0x00, 0x00, 0xd3];
     } else {
-        let mut lm75 = lm75::Lm75::new(i2c, lm75::Address::default());
-        log::info!("LM75 Temperature: {}°C", lm75.read_temperature().unwrap());
         if let Ok(()) = afe_i2c.write_read(0x50, &[0xFA], &mut eui48) {
             log::info!("AFE EUI48: {}", smoltcp::wire::EthernetAddress(eui48));
         } else {
@@ -482,6 +483,11 @@ where
     }
     let mac_addr = smoltcp::wire::EthernetAddress(eui48);
     log::info!("EUI48: {}", mac_addr);
+
+    let mut lm75 = Lm75::new(i2c, lm75::Address::default());
+    if let Ok(t) = lm75.read_temperature() {
+        log::info!("PCB Temperature: {}°C", t);
+    }
 
     let (flash, mut settings) = {
         let mut flash = {
@@ -749,6 +755,8 @@ where
         adc_internal,
         adc_sm,
         adc_input_config,
+        afe_i2c,
+        lm75,
         usb_serial: usb_terminal,
         settings,
         usb: usb_device,
