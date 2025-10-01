@@ -50,7 +50,7 @@ pub struct ThermostatEem {
 impl Default for ThermostatEem {
     fn default() -> Self {
         Self {
-            telemetry_period: 1.0.into(),
+            telemetry_period: 5.0.into(),
             input: Default::default(),
             output: Default::default(),
             alarm: Default::default(),
@@ -82,8 +82,8 @@ impl AppSettings for Settings {
 impl serial_settings::Settings for Settings {
     fn reset(&mut self) {
         *self = Self {
-            thermostat_eem: ThermostatEem::default(),
             net: NetSettings::new(self.net.mac),
+            ..Default::default()
         }
     }
 }
@@ -105,8 +105,8 @@ pub struct Monitor {
     poe: PoePower,
     /// Overtemperature status.
     overtemp: bool,
-    // CPU temperature
-    // cpu_temp: f32,
+    /// CPU temperature
+    cpu_temp: f32,
 }
 
 /// Thermostat-EEM Telemetry.
@@ -292,10 +292,6 @@ mod app {
                     pwm.set_limit(Limit::PositiveCurrent(ch), pos).unwrap();
                     pwm.set_limit(Limit::NegativeCurrent(ch), neg).unwrap();
                     gpio.set_shutdown(ch, (s.state == State::Off).into());
-                    gpio.set_led_green(
-                        ch.into(),
-                        (s.state != State::Off).into(),
-                    );
                 }
 
                 network.direct_stream(settings.thermostat_eem.stream);
@@ -305,32 +301,34 @@ mod app {
 
     #[task(priority = 1, shared=[gpio, settings])]
     async fn blink(mut c: blink::Context) {
-        const DUTY_STEPS: u32 = 20;
-        const DUTY_PER_DECADE: f32 = 0.25;
-        const MIN_ERROR: f32 = 0.001;
+        const DUTY_PERIOD: u32 = 10; // ms
+        const DUTY_STEPS: i32 = 20;
+        const DUTY_DECADES: f32 = -4.; // lower error -> higher duty cycle
+        const MAX_ERROR: f32 = 10.; // MAX_ERROR K for MIN_DUTY steps duty
+        const MIN_DUTY: i32 = 1;
         loop {
             let err = (&mut c.shared.settings).lock(|settings| {
                 OutputChannelIdx::ALL.map(|ch| {
-                    settings.thermostat_eem.output[ch as usize].error()
+                    let s = &settings.thermostat_eem.output[ch as usize];
+                    (s.state != State::Off).then_some(s.error())
                 })
             });
-            let thresh = err.map(|e| {
-                ((e.abs() * MIN_ERROR.recip()).log10()
-                    * (DUTY_PER_DECADE * DUTY_STEPS as f32))
-                    as i32
+            let duty = err.map(|e| {
+                e.map(|e| {
+                    (((e.abs() * MAX_ERROR.recip()).log10()
+                        * (DUTY_STEPS as f32 / DUTY_DECADES))
+                        as i32)
+                        .max(MIN_DUTY)
+                })
+                .unwrap_or_default()
             });
             for i in 0..DUTY_STEPS {
                 (&mut c.shared.gpio).lock(|gpio| {
-                    for (ch, thresh) in
-                        OutputChannelIdx::ALL.into_iter().zip(thresh.iter())
-                    {
-                        gpio.set_led_red(
-                            ch.into(),
-                            (*thresh > i as i32).into(),
-                        );
+                    for (duty, ch) in duty.iter().zip(OutputChannelIdx::ALL) {
+                        gpio.set_led_green(ch.into(), (*duty > i).into());
                     }
                 });
-                Systick::delay((1000 / DUTY_STEPS).millis()).await;
+                Systick::delay(DUTY_PERIOD.millis()).await;
             }
         }
     }
@@ -341,7 +339,7 @@ mod app {
             let mut telemetry: Telemetry =
                 c.shared.telemetry.lock(|telemetry| telemetry.clone());
             let adc_int = &mut c.local.adc_internal;
-            // telemetry.monitor.cpu_temp = adc_int.read_temperature();
+            telemetry.monitor.cpu_temp = adc_int.read_temperature();
             telemetry.monitor.p3v3_voltage = adc_int.read_p3v3_voltage();
             telemetry.monitor.p5v_voltage = adc_int.read_p5v_voltage();
             telemetry.monitor.p12v_voltage = adc_int.read_p12v_voltage();

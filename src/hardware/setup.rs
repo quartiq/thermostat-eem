@@ -375,6 +375,8 @@ where
         adc_internal.read_p12v_voltage(),
         adc_internal.read_p12v_current()
     );
+    info!("VREF+: {} V", adc_internal.read_vref());
+    info!("CPU Temperature: {} °C", adc_internal.read_temperature());
 
     info!("Setup ADC");
 
