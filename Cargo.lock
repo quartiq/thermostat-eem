@@ -1061,7 +1061,7 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 [[package]]
 name = "platform"
 version = "0.1.0"
-source = "git+https://github.com/quartiq/stabilizer.git#0a620a61a090ed5d8656cb3861c744f56ae26ca4"
+source = "git+https://github.com/quartiq/stabilizer.git#07cf3155c1ba7e43cc92bcd0c0c95773539dce05"
 dependencies = [
  "cortex-m",
  "embassy-futures",
@@ -1473,7 +1473,7 @@ dependencies = [
 [[package]]
 name = "serial_settings"
 version = "0.2.0"
-source = "git+https://github.com/quartiq/stabilizer.git#0a620a61a090ed5d8656cb3861c744f56ae26ca4"
+source = "git+https://github.com/quartiq/stabilizer.git#07cf3155c1ba7e43cc92bcd0c0c95773539dce05"
 dependencies = [
  "embedded-io",
  "heapless 0.8.0",
@@ -1615,7 +1615,7 @@ dependencies = [
 [[package]]
 name = "stream"
 version = "0.1.0"
-source = "git+https://github.com/quartiq/stabilizer.git#0a620a61a090ed5d8656cb3861c744f56ae26ca4"
+source = "git+https://github.com/quartiq/stabilizer.git#07cf3155c1ba7e43cc92bcd0c0c95773539dce05"
 dependencies = [
  "cortex-m",
  "heapless 0.8.0",

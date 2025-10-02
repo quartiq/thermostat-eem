@@ -376,7 +376,9 @@ mod app {
             }
 
             c.shared.network.lock(|network| {
-                network.telemetry.publish_telemetry(&telemetry)
+                network
+                    .telemetry
+                    .publish_telemetry("/telemetry", &telemetry)
             });
 
             let telemetry_period = c
