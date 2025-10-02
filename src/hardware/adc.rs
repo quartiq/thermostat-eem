@@ -421,6 +421,13 @@ impl sm::StateMachineContext for Adc {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct Data {
+    pub phy: AdcPhy,
+    pub ch: u2,
+    pub code: AdcCode,
+}
+
 impl sm::StateMachine<Adc> {
     /// Set up the RDY pin, start generating interrupts, and start the state machine.
     pub fn start(
@@ -439,12 +446,15 @@ impl sm::StateMachine<Adc> {
     ///
     /// This routine is called every time the currently selected ADC on Thermostat reports that it has data ready
     /// to be read out by pulling the dout line low. It then reads out the ADC data via SPI.
-    pub fn handle_interrupt(&mut self) -> (AdcPhy, usize, AdcCode) {
+    pub fn handle_interrupt(&mut self) -> Data {
         if let sm::States::Selected(phy) = *self.state() {
             let (code, status) = self.context_mut().read_data();
-            let adc_ch = status.channel().value() as _;
             self.process_event(sm::Events::Read).unwrap();
-            (phy, adc_ch, code)
+            Data {
+                phy,
+                ch: status.channel(),
+                code,
+            }
         } else {
             panic!("Unexpected State")
         }

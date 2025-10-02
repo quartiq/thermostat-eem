@@ -18,9 +18,7 @@ use rtic_sync::{channel::*, make_channel};
 use serde::Serialize;
 use statistics::{Buffer, Statistics};
 use stream::Target;
-use thermostat_eem::convert::{
-    AdcCode, AdcPhy, DacCode, Ntc, PoePower, Sensor,
-};
+use thermostat_eem::convert::{AdcPhy, DacCode, Ntc, PoePower, Sensor};
 
 #[derive(Clone, Debug, Tree, Default)]
 pub struct InputChannel {
@@ -129,13 +127,6 @@ struct Stream {
     current: [f32; 4],
 }
 
-#[derive(Clone, Debug)]
-struct Data {
-    phy: AdcPhy,
-    ch: usize,
-    adc_code: AdcCode,
-}
-
 #[cfg(not(target_os = "none"))]
 fn main() {
     use miniconf::{json::to_json_value, json_schema::TreeJsonSchema};
@@ -160,7 +151,7 @@ mod app {
     use thermostat_eem::OutputChannelIdx;
     use thermostat_eem::hardware::{
         SerialTerminal, SystemTimer, Systick, UsbDevice,
-        adc::{Adc, sm::StateMachine},
+        adc::{Adc, Data, sm::StateMachine},
         adc_internal::AdcInternal,
         dac::Dac,
         gpio::Gpio,
@@ -283,9 +274,11 @@ mod app {
         let pwm = c.local.pwm;
         (c.shared.network, c.shared.gpio, c.shared.settings).lock(
             |network, gpio, settings| {
-                for (ch, s) in OutputChannelIdx::ALL
-                    .into_iter()
-                    .zip(settings.thermostat_eem.output.iter_mut())
+                for (s, ch) in settings
+                    .thermostat_eem
+                    .output
+                    .iter_mut()
+                    .zip(OutputChannelIdx::ALL)
                 {
                     pwm.set_limit(Limit::Voltage(ch), s.voltage_limit).unwrap();
                     let [pos, neg] = s.current_limits();
@@ -320,21 +313,22 @@ mod app {
                 },
             );
 
-            let err = (&mut c.shared.settings).lock(|settings| {
-                OutputChannelIdx::ALL.map(|ch| {
-                    let s = &settings.thermostat_eem.output[ch as usize];
-                    (s.state != State::Off).then_some(s.error())
+            let duty = (&mut c.shared.settings)
+                .lock(|settings| {
+                    OutputChannelIdx::ALL.each_ref().map(|ch| {
+                        let s = &settings.thermostat_eem.output[*ch as usize];
+                        (s.state != State::Off).then_some(s.error())
+                    })
                 })
-            });
-            let duty = err.map(|e| {
-                e.map(|e| {
-                    (((e.abs() * MAX_ERROR.recip()).log10()
-                        * (DUTY_STEPS as f32 / DUTY_DECADES))
-                        as i32)
-                        .max(MIN_DUTY)
-                })
-                .unwrap_or_default()
-            });
+                .map(|e| {
+                    e.map(|e| {
+                        (((e.abs() * MAX_ERROR.recip()).log10()
+                            * (DUTY_STEPS as f32 / DUTY_DECADES))
+                            as i32)
+                            .max(MIN_DUTY)
+                    })
+                    .unwrap_or_default()
+                });
             for i in 0..DUTY_STEPS {
                 (&mut c.shared.gpio).lock(|gpio| {
                     for (duty, ch) in duty.iter().zip(OutputChannelIdx::ALL) {
@@ -357,7 +351,7 @@ mod app {
             telemetry.monitor.p5v_voltage = adc_int.read_p5v_voltage();
             telemetry.monitor.p12v_voltage = adc_int.read_p12v_voltage();
             telemetry.monitor.p12v_current = adc_int.read_p12v_current();
-            for ch in OutputChannelIdx::ALL.into_iter() {
+            for ch in OutputChannelIdx::ALL {
                 let idx = ch as usize;
                 telemetry.monitor.output_vref[idx] =
                     adc_int.read_output_vref(ch);
@@ -382,7 +376,9 @@ mod app {
             }
 
             c.shared.network.lock(|network| {
-                network.telemetry.publish_telemetry(&telemetry)
+                network
+                    .telemetry
+                    .publish_telemetry("/telemetry", &telemetry)
             });
 
             let telemetry_period = c
@@ -405,23 +401,26 @@ mod app {
                 .lock(|settings| settings.thermostat_eem.alarm.clone());
             let temperatures = c.shared.temperature.lock(|temp| *temp);
             let mut alarms = [[None; 4]; 4];
-            let state = config
+            for ((l, t), a) in config
                 .temperature_limits
                 .as_flattened()
                 .iter()
                 .zip(temperatures.as_flattened().iter())
                 .zip(alarms.as_flattened_mut().iter_mut())
-                .any(|((l, t), a)| {
-                    *a = l.as_ref().map(|l| !l.contains(&(*t as _)));
-                    a.unwrap_or_default()
-                });
+            {
+                *a = l.as_ref().map(|l| !l.contains(&(*t as _)));
+            }
+            let all = alarms
+                .iter()
+                .any(|a| a.iter().any(|a| a.unwrap_or_default()));
+
             c.shared
                 .telemetry
                 .lock(|telemetry| telemetry.alarm = alarms);
             if let Some(target) = config.target.as_ref() {
                 c.shared
                     .network
-                    .lock(|net| net.telemetry.publish(&target, &state))
+                    .lock(|net| net.telemetry.publish(&target, &all))
                     .map_err(|e| {
                         log::error!("Telemetry publishing error: {:?}", e)
                     })
@@ -439,66 +438,69 @@ mod app {
         mut c: process::Context,
         mut data: Receiver<'static, Data, 4>,
     ) {
-        while let Ok(Data { phy, ch, adc_code }) = data.recv().await {
-            let temp = c.shared.settings.lock(|settings| {
-                let input = settings.thermostat_eem.input[phy as usize][ch]
-                    .as_ref()
-                    .unwrap();
-                input.sensor.convert(adc_code)
-            });
+        while let Ok(Data { phy, ch, code }) = data.recv().await {
             (
                 &mut c.shared.temperature,
                 &mut c.shared.statistics,
-                &mut c.shared.telemetry,
                 &mut c.shared.settings,
             )
-                .lock(
-                    |temperature, statistics, telemetry, settings| {
-                        temperature[phy as usize][ch] = temp;
-                        statistics[phy as usize][ch].update(temp as _);
-
-                        // Start processing when the last ADC has been read out.
-                        // This implies a zero-order hold (aka the input sample will not be updated at every signal processing step) if more than one channel is enabled on an ADC.
-                        if phy != AdcPhy::Three {
-                            return;
-                        }
-
-                        for ch in OutputChannelIdx::ALL.into_iter() {
-                            let idx = ch as usize;
-                            let current = settings.thermostat_eem.output[idx]
-                                .update(temperature);
-                            telemetry.output_current[idx] = current;
-                            c.local
-                                .dac
-                                .set(ch, DacCode::try_from(current).unwrap());
-                        }
-                        let mut s = Stream {
-                            temperature: [[0.0; 4]; 4],
-                            current: telemetry.output_current,
-                        };
-                        for (t, u) in s
-                            .temperature
-                            .as_flattened_mut()
-                            .iter_mut()
-                            .zip(temperature.as_flattened().iter())
-                        {
-                            *t = *u as _;
-                        }
-                        c.local.generator.add(|buf| {
-                            let b =
-                                bytemuck::cast_slice(bytemuck::bytes_of(&s));
-                            buf[..b.len()].copy_from_slice(b);
-                            b.len()
-                        });
-                    },
-                );
+                .lock(|temperature, statistics, settings| {
+                    let temp = settings.thermostat_eem.input[phy as usize]
+                        [ch.value() as usize]
+                        .as_ref()
+                        .unwrap()
+                        .sensor
+                        .convert(code);
+                    temperature[phy as usize][ch.value() as usize] = temp;
+                    statistics[phy as usize][ch.value() as usize]
+                        .update(temp as _);
+                });
+            // Start processing when the last ADC has been read out.
+            // This implies a zero-order hold: an input will not be updated at
+            // every process()/for every update() if more than one channel is
+            // enabled on an ADC.
+            if phy == AdcPhy::Three {
+                (
+                    &mut c.shared.temperature,
+                    &mut c.shared.telemetry,
+                    &mut c.shared.settings,
+                )
+                    .lock(
+                        |temperature, telemetry, settings| {
+                            for ch in OutputChannelIdx::ALL.iter() {
+                                let current = settings.thermostat_eem.output
+                                    [*ch as usize]
+                                    .update(temperature);
+                                telemetry.output_current[*ch as usize] =
+                                    current;
+                                c.local.dac.set(
+                                    *ch,
+                                    DacCode::try_from(current).unwrap(),
+                                );
+                            }
+                            let s = Stream {
+                                temperature: temperature
+                                    .each_ref()
+                                    .map(|t| t.each_ref().map(|t| *t as _)),
+                                current: telemetry.output_current,
+                            };
+                            c.local.generator.add(|buf| {
+                                let b = bytemuck::cast_slice(
+                                    bytemuck::bytes_of(&s),
+                                );
+                                buf[..b.len()].copy_from_slice(b);
+                                b.len()
+                            });
+                        },
+                    );
+            }
         }
     }
 
     #[task(priority = 3, binds = EXTI15_10, local=[adc_sm, process])]
     fn adc_readout(c: adc_readout::Context) {
-        let (phy, ch, adc_code) = c.local.adc_sm.handle_interrupt();
-        if let Err(e) = c.local.process.try_send(Data { phy, ch, adc_code }) {
+        let data = c.local.adc_sm.handle_interrupt();
+        if let Err(e) = c.local.process.try_send(data) {
             log::warn!("Processing queue overflow: {e:?}");
         }
     }
