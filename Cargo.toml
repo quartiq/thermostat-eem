@@ -59,8 +59,8 @@ bytemuck = { version = "1.21.0", features = [
 	"derive",
 	"zeroable_maybe_uninit",
 ], default-features = false }
-miniconf = { version = "0.19", features = ["json-core", "derive", "postcard"] }
-miniconf_mqtt = { version = "0.19" }
+miniconf = { version = "0.20", features = ["json-core", "derive", "postcard"] }
+miniconf_mqtt = { version = "0.20" }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 serial_settings = "0.2"
 postcard = "1"
@@ -70,7 +70,6 @@ usb-device = "0.3.2"
 usbd-serial = "0.2"
 panic-persist = { version = "0.3", features = ["utf8", "custom-panic-handler"] }
 embassy-futures = { version = "0.1", default-features = false }
-embedded-io = "0.6"
 embedded-storage-async = "0.4"
 serde_with = { version = "3.12", default-features = false, features = [
 	"macros",
@@ -106,7 +105,7 @@ rtt-target = { version = "0.3", features = ["cortex-m"] }
 
 [target.'cfg(not(target_os = "none"))'.dependencies]
 serde_json = { version = "1.0.133", features = ["preserve_order"] }
-miniconf = { version = "0.19", features = ["schema"] }
+miniconf = { version = "0.20", features = ["schema"] }
 
 [profile.dev]
 codegen-units = 1
@@ -126,7 +125,5 @@ built = { version = "0.8", features = ["git2"], default-features = false }
 serial_settings = { git = "https://github.com/quartiq/stabilizer.git" }
 stream = { git = "https://github.com/quartiq/stabilizer.git" }
 platform = { git = "https://github.com/quartiq/stabilizer.git" }
-miniconf = { git = "https://github.com/quartiq/miniconf.git" }
-miniconf_derive = { git = "https://github.com/quartiq/miniconf.git" }
-miniconf_mqtt = { git = "https://github.com/quartiq/miniconf.git" }
 idsp = { git = "https://github.com/quartiq/idsp.git" }
+serde-reflection = { git = "https://github.com/quartiq/serde-reflection.git", branch = "pub-ser-de" }
