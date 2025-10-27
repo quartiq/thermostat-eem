@@ -81,11 +81,7 @@ stream = { version = "0.1" }
 platform = { version = "0.1" }
 ad7172 = { version = "0.1", path = "ad7172" }
 embedded-hal-compat = "0.13.0"
-
-[dependencies.smoltcp-nal]
-version = "0.6"
-features = ["shared-stack"]
-git = "https://github.com/quartiq/smoltcp-nal.git"
+smoltcp-nal = { version = "0.7", features = ["shared-stack"] }
 
 [target.'cfg(target_os = "none")'.dependencies]
 stm32h7xx-hal = { version = "0.16.0", features = [
